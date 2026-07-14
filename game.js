@@ -51,7 +51,7 @@ class ErosionGame extends HTMLElement {
   _destroy() {
     this._dead = true;
     cancelAnimationFrame(this._raf);
-    clearInterval(this._helloIv); clearTimeout(this._banT); clearInterval(this._wdIv);
+    clearInterval(this._helloIv); clearTimeout(this._banT); clearInterval(this._wdIv); clearTimeout(this._waitHintT);
     if (this.net) { try { this.net.end(true); } catch (e) {} this.net = null; }
     window.removeEventListener('resize', this._onRz);
     window.removeEventListener('keydown', this._kd); window.removeEventListener('keyup', this._ku);
@@ -66,7 +66,14 @@ class ErosionGame extends HTMLElement {
     this.diffMul = DIFF[A('diff')] ?? 1;
     this.maxWave = parseInt(A('waves')) || 8;
     this.buildTime = parseInt(A('buildtime')) || 25;
-    this._buildDOM(); this._initAudio(); this._reset(); this._initThree(); this._bindInput();
+    this._buildDOM(); this._initAudio(); this._reset();
+    try { this._initThree(); } catch (e) {
+      console.error('[erosion] WebGL init failed:', e);
+      this._overlay(`<div style="font:700 20px ${FONT}">그래픽 초기화 실패</div><div style="font:400 13px ${FONT};margin-top:8px;line-height:1.6;color:${PAL.dim}">이 브라우저에서 WebGL을 사용할 수 없습니다.<br>하드웨어 가속을 켜거나 다른 브라우저로 시도하세요.</div><div style="margin-top:14px"><button id="egGlOut" style="${this._obtn(false)}">로비로</button></div>`);
+      this.ovIn.querySelector('#egGlOut').onclick = () => this._exit();
+      return;
+    }
+    this._bindInput();
     if (this.mode === 'solo') { this.phase = 'count'; this.countT = 3; }
     else { this.phase = 'wait'; this._initNet(); }
     this._last = performance.now();
@@ -97,24 +104,25 @@ class ErosionGame extends HTMLElement {
     this._flow(); this._syncStruct();
     this._hudReset();
   }
-  /* Dijkstra flow field toward core; structures = high cost (enemies can chew through) */
+  /* Dijkstra flow field toward core; structures = high cost (enemies can chew through).
+     Dial's bucket queue — integer costs (1 or 25), O(V+E) instead of O(V²). */
   _flow() {
     const dist = this.flowD = new Float32Array(N * N).fill(1e9);
-    const q = [];
-    for (const i of this.coreTiles) { dist[i] = 0; q.push(i); }
-    // simple bucket-ish loop (costs small ints)
-    const open = new Set(q);
-    while (open.size) {
-      let best = -1, bd = 1e9;
-      for (const i of open) if (dist[i] < bd) { bd = dist[i]; best = i; }
-      open.delete(best);
-      const gx = best % N, gz = (best / N) | 0;
-      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
-        const j = ti(X, Z), o = this.occ[j];
-        if (o === 5) continue; // erosion rock — impassable
-        const cost = 1 + (o === 1 || o === 2 ? 24 : 0);
-        if (dist[best] + cost < dist[j] - 1e-6) { dist[j] = dist[best] + cost; open.add(j); }
+    const buckets = [[]];
+    for (const i of this.coreTiles) { dist[i] = 0; buckets[0].push(i); }
+    for (let d = 0; d < buckets.length; d++) {
+      const b = buckets[d]; if (!b) continue;
+      for (let n = 0; n < b.length; n++) {
+        const cur = b[n];
+        if (dist[cur] !== d) continue; // stale entry — already relaxed cheaper
+        const gx = cur % N, gz = (cur / N) | 0;
+        for (const [a, c] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const X = gx + a, Z = gz + c; if (!inG(X, Z)) continue;
+          const j = ti(X, Z), o = this.occ[j];
+          if (o === 5) continue; // erosion rock — impassable
+          const nd = d + 1 + (o === 1 || o === 2 ? 24 : 0);
+          if (nd < dist[j]) { dist[j] = nd; (buckets[nd] || (buckets[nd] = [])).push(j); }
+        }
       }
     }
   }
@@ -567,8 +575,13 @@ class ErosionGame extends HTMLElement {
     const kick = `<div style="font:700 11px ${FONT};letter-spacing:.16em;color:${PAL.red}">`;
     this._overlay(this.isHost
       ? `${kick}방 개설됨 — 접속 대기</div><div style="font:700 54px ${FONT};letter-spacing:.18em;margin:6px 0 2px;color:${PAL.cyan};text-shadow:0 0 20px rgba(37,216,255,.5)">${this.room}</div><div style="font:400 13px ${FONT};line-height:1.6;color:${PAL.dim}">동료가 이 코드로 참가하면 자동으로 시작됩니다.<br>릴레이 서버에 연결 중…</div><div style="margin-top:16px"><button id="egCancel" style="${this._obtn(false)}">취소</button></div>`
-      : `${kick}참가 중</div><div style="font:700 40px ${FONT};letter-spacing:.18em;margin:6px 0 2px;color:${PAL.cyan}">${this.room}</div><div style="font:400 13px ${FONT};line-height:1.6;color:${PAL.dim}">방장을 찾는 중… 상대가 방을 열어두었는지 확인하세요.</div><div style="margin-top:16px"><button id="egCancel" style="${this._obtn(false)}">취소</button></div>`);
+      : `${kick}참가 중</div><div style="font:700 40px ${FONT};letter-spacing:.18em;margin:6px 0 2px;color:${PAL.cyan}">${this.room}</div><div id="egWaitMsg" style="font:400 13px ${FONT};line-height:1.6;color:${PAL.dim}">방장을 찾는 중… 상대가 방을 열어두었는지 확인하세요.</div><div style="margin-top:16px"><button id="egCancel" style="${this._obtn(false)}">취소</button></div>`);
     this.ovIn.querySelector('#egCancel').onclick = () => this._exit();
+    if (!this.isHost) this._waitHintT = setTimeout(() => {
+      if (this._dead || this.phase !== 'wait') return;
+      const d = this.ovIn.querySelector('#egWaitMsg');
+      if (d) { d.textContent = '아직 응답이 없습니다 — 코드가 정확한지, 방장이 대기 화면을 열어두었는지 확인하세요.'; d.style.color = PAL.amber; }
+    }, 12000);
     const urls = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
     let ui = 0;
     const connect = () => {
@@ -638,7 +651,7 @@ class ErosionGame extends HTMLElement {
   }
   _applyState(m) {
     this.tm = m.tm; if (m.xp !== undefined) this._setXp(m.xp);
-    this.scrap = m.sc; this.coreHp = m.core; this.wave = m.wv;
+    this.scrap = m.sc; this.coreHp = m.core; this.wave = m.wv; this._qn = m.qn || 0;
     const wasPhase = this.phase;
     if (this.phase !== 'over' && this.phase !== 'count' && m.ph) { if (m.ph !== this.phase) { this.phase = m.ph; if (m.ph === 'assault') this._banner('WAVE ' + this.wave + ' — 습격!'); else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); } } this.phT = m.pt; }
     const seen = new Set();
@@ -736,7 +749,7 @@ class ErosionGame extends HTMLElement {
   _applyItemFx(k, x, z, mine) {
     this._fx(x, z, true, k === 'bomb' ? 0xffffff : PAL.cyanHex); this._beep(500, .15, 'square', .06);
     if (k === 'bomb') { if (this.isHostish()) for (const e of [...this.enemies.values()]) if (dist2(x, z, e.x, e.z) < 36) this._dmgEnemy(e, 90); this._banner('융단 폭격'); }
-    else if (k === 'turret') { if (this.isHostish()) { const i = ti(w2g(x), w2g(z)); const spots = [i, i + 1, i - 1, i + N, i - N].filter(j => j >= 0 && j < N * N && !this.occ[j]); if (spots.length) this._place(spots[0], 2); } }
+    else if (k === 'turret') { if (this.isHostish()) { const i = ti(w2g(x), w2g(z)); const spots = [i, i + 1, i - 1, i + N, i - N].filter(j => j >= 0 && j < N * N && !this.occ[j]); if (spots.length) { this._place(spots[0], 2); this.bld[spots[0]] = .75; this.sendStT = 0; } } }
     else if (k === 'kit') { if (mine) this.me.hp = this.me.maxhp; }
     else if (k === 'slow') { this.slowT = 5; this._banner('지연 필드 — 적 감속'); }
   }
@@ -777,7 +790,6 @@ class ErosionGame extends HTMLElement {
     this._flow(); this._syncStruct(); this.sendStT = 0; // push rocks to joiner on next state tick
     this._unstuck(this.me);
     if (this.allyOn && this.mode === 'solo') this._unstuck(this.ally);
-    if (round > 1) this._banner(`구역 재구성 — 침식 지형 ${placed}개`, 2200);
   }
   _unstuck(p) { // shove a unit off a tile that just became solid
     if (!this._blockedAt(p.x, p.z)) return;
@@ -793,7 +805,7 @@ class ErosionGame extends HTMLElement {
     this.phase = 'build'; this.phT = this.wave === 0 ? this.buildTime + 10 : this.buildTime;
     this._applyRoundMap(this.wave + 1);
     const bonus = 30 + this.wave * 12; this.scrap += bonus;
-    if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus}`); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
+    if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus} · 구역 재구성`, 3400); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
     else this._banner('준비 단계 — 벽과 포탑을 건설하라 (건설 버튼)', 4000);
     if (this.fitems.length < 2 && this.wave > 0) { const g = this.gates[Math.floor(Math.random() * 4)]; this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: rnd(-8, 8), z: rnd(-8, 8) }); }
   }
@@ -1057,7 +1069,7 @@ class ErosionGame extends HTMLElement {
       this.sendStateT -= dt;
       if (this.sendStateT <= 0) {
         this.sendStateT = .13; this.sendStT -= .13;
-        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1),
+        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length,
           en: [...this.enemies.values()].map(e => [e.id, e.ty, Math.round(e.x * 10), Math.round(e.z * 10), Math.round(e.hp)]),
           itm: this.fitems.map(f => [f.id, f.k, Math.round(f.x * 10), Math.round(f.z * 10)]) };
         if (this.sendStT <= 0) { this.sendStT = 1.4; o.st = this._structPack(); }
@@ -1169,7 +1181,7 @@ class ErosionGame extends HTMLElement {
     this._hudT = (this._hudT || 0) - dt; if (this._hudT > 0) return; this._hudT = .12;
     this.wvEl.textContent = this.phase === 'build' ? `WAVE ${this.wave + 1} 준비` : `WAVE ${Math.max(1, this.wave)} / ${this.maxWave}`;
     if (this.phase === 'build') { this.phEl.textContent = `습격까지 ${Math.max(0, Math.ceil(this.phT))}초 — 건설·연구 단계`; this.phEl.style.color = PAL.cyan; }
-    else if (this.phase === 'assault') { this.phEl.textContent = `습격 진행 중 — 잔여 ${this.enemies.size + (this.isHostish() ? this.spawnQ.length : 0)}`; this.phEl.style.color = PAL.red; }
+    else if (this.phase === 'assault') { this.phEl.textContent = `습격 진행 중 — 잔여 ${this.enemies.size + (this.isHostish() ? this.spawnQ.length : (this._qn || 0))}`; this.phEl.style.color = PAL.red; }
     else this.phEl.textContent = '';
     this.goBtn.style.display = this.isHostish() && this.phase === 'build' ? 'block' : 'none';
     const chp = this.coreHp / this.coreMax;
