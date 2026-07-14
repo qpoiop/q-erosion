@@ -41,6 +41,9 @@ const ITEMS = { bomb: { n: '융단 폭격' }, turret: { n: '즉석 포탑' }, ki
 const ITEM_KEYS = Object.keys(ITEMS);
 const DIFF = { easy: .75, normal: 1, hard: 1.35 };
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
+const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
+/* deterministic PRNG — round-map layouts must be identical on host & joiner */
+const mulberry32 = s => () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
 class ErosionGame extends HTMLElement {
   connectedCallback() { this._dead = false; this._booted = false; setTimeout(() => { if (this.isConnected) this._init(); }, 0); }
@@ -77,6 +80,7 @@ class ErosionGame extends HTMLElement {
     this.me = mk(-2.5, 5); this.ally = mk(2.5, 5);
     this.allyOn = this.mode === 'solo';
     this.occ = new Uint8Array(N * N); this.shp = new Float32Array(N * N);
+    this.bld = new Float32Array(N * N); this.building = new Set(); this._mapRound = 0;
     this.enemies = new Map(); this.eid = 1; this.bullets = []; this.ebullets = []; this.fitems = [];
     this.tm = 0; this.xp = 0; this.lv = 1; this.kills = 0; this.pendUp = 0; this.slowT = 0;
     this.scrap = 50; this.g = { wallMul: 1, turMul: 1, costMul: 1 };
@@ -108,6 +112,7 @@ class ErosionGame extends HTMLElement {
       for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
         const j = ti(X, Z), o = this.occ[j];
+        if (o === 5) continue; // erosion rock — impassable
         const cost = 1 + (o === 1 || o === 2 ? 24 : 0);
         if (dist[best] + cost < dist[j] - 1e-6) { dist[j] = dist[best] + cost; open.add(j); }
       }
@@ -116,10 +121,11 @@ class ErosionGame extends HTMLElement {
   _structHp(k) { return k === 1 ? WALL_HP * this.g.wallMul : TURRET_HP; }
   _place(i, k, silent) {
     this.occ[i] = k; this.shp[i] = this._structHp(k);
+    this.bld[i] = 0; this.building.add(i);
     this._flow(); this._syncStruct();
-    if (!silent) { const gx = i % N, gz = (i / N) | 0; this._fx(g2w(gx), g2w(gz), false, PAL.cyanHex); this._beep(520, .08, 'square', .05); }
+    if (!silent) this._beep(520, .08, 'square', .05);
   }
-  _remove(i) { this.occ[i] = 0; this.shp[i] = 0; this._flow(); this._syncStruct(); }
+  _remove(i) { this.occ[i] = 0; this.shp[i] = 0; this.bld[i] = 0; this.building.delete(i); this._flow(); this._syncStruct(); }
   _cost(k) { return Math.round((k === 1 ? WALL_COST : TURRET_COST) * this.g.costMul); }
   _canPlace(i) {
     if (this.occ[i]) return false;
@@ -205,6 +211,7 @@ class ErosionGame extends HTMLElement {
     this.mGlowAmber = new T.MeshStandardMaterial({ color: 0x1a1206, emissive: PAL.amberHex, emissiveIntensity: 1.3 });
     this.mFlash = new T.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.6 });
     this.mWallS = new T.MeshStandardMaterial({ color: 0x232836, roughness: .4, metalness: .75 });
+    this.mObs = new T.MeshStandardMaterial({ color: 0x241f31, roughness: .85, metalness: .25 });
     this.bulletG = new T.BoxGeometry(.6, .1, .1);
     this.ebulletG = new T.SphereGeometry(.16, 8, 8);
     // core (cyan crystal at center)
@@ -292,11 +299,16 @@ class ErosionGame extends HTMLElement {
     body.castShadow = true; g.add(body); g.body = body;
     this.scene.add(g); return g;
   }
-  _sMesh(k) { // structure mesh
+  _sMesh(k, i) { // structure mesh
     const T = THREE, g = new T.Group();
     if (k === 1) {
       const b = new T.Mesh(new T.BoxGeometry(TS * .92, 1.5, TS * .92), this.mWallS); b.position.y = .75; b.castShadow = b.receiveShadow = true; g.add(b);
       const trim = new T.Mesh(new T.BoxGeometry(TS * .96, .1, TS * .96), this.mGlowCyan); trim.position.y = 1.53; g.add(trim); g.trim = trim;
+    } else if (k === 5) { // erosion rock — per-round terrain obstacle
+      const h = 1.1 + (i % 7) * .14;
+      const b1 = new T.Mesh(new T.BoxGeometry(TS * .8, h, TS * .8), this.mObs); b1.position.y = h / 2; b1.rotation.y = (i % 9) * .12; b1.castShadow = b1.receiveShadow = true; g.add(b1);
+      const b2 = new T.Mesh(new T.BoxGeometry(TS * .5, h * .6, TS * .5), this.mObs); b2.position.set(.3 - (i % 3) * .3, h * .55, .25 - (i % 2) * .5); b2.rotation.y = .5 + (i % 5) * .3; b2.castShadow = true; g.add(b2);
+      const rim = new T.Mesh(new T.BoxGeometry(TS * .86, .07, TS * .86), this.mGlowRed7); rim.position.y = .05; g.add(rim);
     } else {
       const base = new T.Mesh(new T.BoxGeometry(.9, .5, .9), this.mWallS); base.position.y = .25; base.castShadow = true; g.add(base);
       const pod = new T.Mesh(new T.BoxGeometry(.55, .45, .8), this.mBody); pod.position.y = .75; pod.castShadow = true; g.add(pod); g.pod = pod;
@@ -304,6 +316,29 @@ class ErosionGame extends HTMLElement {
       const lamp = new T.PointLight(PAL.cyanHex, .5, 4); lamp.position.y = 1.2; g.add(lamp);
     }
     this.scene.add(g); return g;
+  }
+  _mkBar(x, z) { // construction progress gauge above a structure
+    const T = THREE, gr = new T.Group();
+    const bg = new T.Mesh(new T.BoxGeometry(1.5, .12, .12), new T.MeshBasicMaterial({ color: 0x10131c }));
+    const fill = new T.Mesh(new T.BoxGeometry(1.5, .14, .14), new T.MeshBasicMaterial({ color: PAL.cyanHex }));
+    gr.add(bg); gr.add(fill); gr.fill = fill;
+    gr.position.set(x, 2.25, z); gr.rotation.y = -Math.PI / 4;
+    this.scene.add(gr); return gr;
+  }
+  _structDone(i) { // construction complete
+    const x = g2w(i % N), z = g2w((i / N) | 0);
+    this._fx(x, z, false, PAL.cyanHex);
+    this._beep(880, .1, 'square', .05); this._beep(1320, .14, 'square', .04);
+    const g = this.sMeshes.get(i); if (g) g.userData.pop = .28;
+  }
+  _buildSim(dt) { // advance construction gauges (runs on every client)
+    for (const i of this.building) {
+      const k = this.occ[i];
+      if (k !== 1 && k !== 2) { this.building.delete(i); continue; }
+      if (this.bld[i] >= 1) { this.building.delete(i); continue; }
+      this.bld[i] += dt / BUILD_T[k];
+      if (this.bld[i] >= 1) { this.bld[i] = 1; this.building.delete(i); this._structDone(i); }
+    }
   }
   _fx(x, z, big, colHex) {
     const T = THREE;
@@ -548,12 +583,18 @@ class ErosionGame extends HTMLElement {
     this.sendPoseT = 0; this.sendStateT = 0; this.sendStT = 0;
   }
   _send(o) { if (this.net && this.net.connected) { this._netUp = true; this.net.publish(this.pubT, JSON.stringify(o)); } }
-  _structPack() { const a = []; for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2) a.push([i, this.occ[i], Math.round(this.shp[i])]); return a; }
+  _structPack() { const a = []; for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2 || this.occ[i] === 5) a.push([i, this.occ[i], Math.round(this.shp[i]), +this.bld[i].toFixed(2)]); return a; }
   _structUnpack(a) {
     const had = new Set();
-    for (const [i, k, hp] of a) { had.add(i); if (this.occ[i] !== k) this.occ[i] = k; this.shp[i] = hp; }
-    for (let i = 0; i < N * N; i++) if ((this.occ[i] === 1 || this.occ[i] === 2) && !had.has(i)) { this.occ[i] = 0; this.shp[i] = 0; }
-    this._syncStruct();
+    for (const [i, k, hp, b] of a) {
+      had.add(i); if (this.occ[i] !== k) this.occ[i] = k; this.shp[i] = hp;
+      if (k === 5) { this.bld[i] = 1; continue; }
+      const nb = b ?? 1;
+      if (nb >= 1) { if (this.bld[i] < 1) { this.bld[i] = 1; this.building.delete(i); } }
+      else if (this.bld[i] < 1) { this.bld[i] = Math.max(this.bld[i], nb); this.building.add(i); }
+    }
+    for (let i = 0; i < N * N; i++) if ((this.occ[i] === 1 || this.occ[i] === 2 || this.occ[i] === 5) && !had.has(i)) { this.occ[i] = 0; this.shp[i] = 0; this.bld[i] = 0; this.building.delete(i); }
+    this._syncStruct(); this._unstuck(this.me);
   }
   _startOnline() {
     this.phase = 'count'; this.countT = 3; this.allyOn = true; this.allyG.visible = true;
@@ -705,9 +746,52 @@ class ErosionGame extends HTMLElement {
     if (p === this.me) { this.dmgFlash = 1; this.shake = Math.max(this.shake || 0, .35); }
     if (p.hp <= 0) { p.hp = 0; p.down = true; p.downT = 40; p.revP = 0; if (p === this.me) this._banner('쓰러짐 — 동료의 구조 대기'); }
   }
+  /* ---------- round map (deterministic per wave — identical on host & joiner) ---------- */
+  _applyRoundMap(round) {
+    if (!this.isHostish()) return; // joiner receives rocks via struct sync
+    if (round === this._mapRound) return; this._mapRound = round;
+    for (let i = 0; i < N * N; i++) if (this.occ[i] === 5) this.occ[i] = 0;
+    const rng = mulberry32(((round * 2654435761) >>> 0) ^ (this.maxWave * 97));
+    const shapes = [[[0, 0]], [[0, 0], [1, 0]], [[0, 0], [0, 1]], [[0, 0], [1, 0], [0, 1]], [[0, 0], [1, 0], [1, 1]]];
+    const clusters = 4 + Math.min(6, round);
+    let placed = 0, guard = 0;
+    while (placed < clusters && guard++ < 250) {
+      const sh = shapes[(rng() * shapes.length) | 0];
+      const bx = 3 + ((rng() * (N - 7)) | 0), bz = 3 + ((rng() * (N - 7)) | 0);
+      const tiles = [];
+      let ok = true;
+      for (const [dx, dz] of sh) {
+        const x = bx + dx, z = bz + dz;
+        if (!inG(x, z) || this.occ[ti(x, z)]) { ok = false; break; }
+        if (x >= 9 && x <= 16 && z >= 9 && z <= 16) { ok = false; break; } // core buffer
+        if (this.gates.some(g => Math.abs(x - g.gx) <= 3 && Math.abs(z - g.gz) <= 3)) { ok = false; break; } // gate buffer
+        tiles.push(ti(x, z));
+      }
+      if (!ok) continue;
+      for (const j of tiles) this.occ[j] = 5;
+      this._flow();
+      if (this.gates.some(g => this.flowD[ti(g.gx, g.gz)] > 1e8)) { for (const j of tiles) this.occ[j] = 0; continue; } // would seal a gate
+      placed++;
+      if (this.scene) this._fx(g2w(tiles[0] % N), g2w((tiles[0] / N) | 0), false, PAL.red7Hex);
+    }
+    this._flow(); this._syncStruct(); this.sendStT = 0; // push rocks to joiner on next state tick
+    this._unstuck(this.me);
+    if (this.allyOn && this.mode === 'solo') this._unstuck(this.ally);
+    if (round > 1) this._banner(`구역 재구성 — 침식 지형 ${placed}개`, 2200);
+  }
+  _unstuck(p) { // shove a unit off a tile that just became solid
+    if (!this._blockedAt(p.x, p.z)) return;
+    const gx = w2g(p.x), gz = w2g(p.z);
+    for (let r = 1; r < 8; r++) for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+      if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+      const X = gx + dx, Z = gz + dz;
+      if (inG(X, Z) && !this.occ[ti(X, Z)]) { p.x = g2w(X); p.z = g2w(Z); return; }
+    }
+  }
   /* ---------- waves (host) ---------- */
   _startBuild() {
     this.phase = 'build'; this.phT = this.wave === 0 ? this.buildTime + 10 : this.buildTime;
+    this._applyRoundMap(this.wave + 1);
     const bonus = 30 + this.wave * 12; this.scrap += bonus;
     if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus}`); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
     else this._banner('준비 단계 — 벽과 포탑을 건설하라 (건설 버튼)', 4000);
@@ -797,7 +881,7 @@ class ErosionGame extends HTMLElement {
   _turretSim(dt) {
     this._turCd = this._turCd || {};
     for (let i = 0; i < N * N; i++) {
-      if (this.occ[i] !== 2) continue;
+      if (this.occ[i] !== 2 || this.bld[i] < 1) continue; // under construction — offline
       const cd = (this._turCd[i] || 0) - dt; this._turCd[i] = cd;
       if (cd > 0) continue;
       const x = g2w(i % N), z = g2w((i / N) | 0);
@@ -888,7 +972,7 @@ class ErosionGame extends HTMLElement {
     const playing = this.phase === 'build' || this.phase === 'assault';
     if (playing && !this.over) {
       this.tm += dt; this.slowT = Math.max(0, this.slowT - dt);
-      this._movePlayer(dt);
+      this._movePlayer(dt); this._buildSim(dt);
       this._autoCombat(this.me, dt, true);
       if (this.mode === 'solo') this._botSim(dt);
       if (this.isHostish()) {
@@ -913,7 +997,7 @@ class ErosionGame extends HTMLElement {
     }
     this._render(dt);
   }
-  _blockedAt(x, z) { const i = ti(w2g(x), w2g(z)); const o = this.occ[i]; return o === 1 || o === 2 || o === 3; }
+  _blockedAt(x, z) { const i = ti(w2g(x), w2g(z)); const o = this.occ[i]; return o === 1 || o === 2 || o === 3 || o === 5; }
   _movePlayer(dt) {
     const p = this.me; if (p.down) return;
     let mx = this.joyVec.x, mz = this.joyVec.z;
@@ -994,13 +1078,27 @@ class ErosionGame extends HTMLElement {
       this._structDirty = false;
       for (let i = 0; i < N * N; i++) {
         const k = this.occ[i], has = this.sMeshes.has(i);
-        if ((k === 1 || k === 2)) {
+        if ((k === 1 || k === 2 || k === 5)) {
           let g = this.sMeshes.get(i);
-          if (!g || g.kind !== k) { if (g) this.scene.remove(g); g = this._sMesh(k); g.kind = k; this.sMeshes.set(i, g); g.position.set(g2w(i % N), 0, g2w((i / N) | 0)); }
-        } else if (has) { this.scene.remove(this.sMeshes.get(i)); this.sMeshes.delete(i); }
+          if (!g || g.kind !== k) { if (g) { if (g.bar) this.scene.remove(g.bar); this.scene.remove(g); } g = this._sMesh(k, i); g.kind = k; this.sMeshes.set(i, g); g.position.set(g2w(i % N), 0, g2w((i / N) | 0)); }
+        } else if (has) { const old = this.sMeshes.get(i); if (old.bar) this.scene.remove(old.bar); this.scene.remove(old); this.sMeshes.delete(i); }
       }
     }
     for (const [i, g] of this.sMeshes) {
+      if (g.kind !== 5) {
+        const b = this.bld[i];
+        if (b < 1) { // rising from the ground + progress gauge
+          g.scale.y = .12 + .88 * b;
+          if (!g.bar) g.bar = this._mkBar(g.position.x, g.position.z);
+          g.bar.fill.scale.x = Math.max(.001, b);
+          g.bar.fill.position.x = -.75 * (1 - b);
+        } else {
+          if (g.bar) { this.scene.remove(g.bar); g.bar = null; }
+          let sy = 1;
+          if (g.userData.pop > 0) { g.userData.pop -= dt; sy = 1 + .22 * Math.sin(Math.min(1, 1 - g.userData.pop / .28) * Math.PI); }
+          g.scale.y = sy;
+        }
+      }
       if (g.kind === 1) { const hpP = this.shp[i] / (WALL_HP * this.g.wallMul); g.trim.material = hpP < .35 ? this.mGlowRed : this.mGlowCyan; g.children[0].scale.y = .55 + .45 * clamp(hpP, 0, 1); g.children[0].position.y = .75 * g.children[0].scale.y; g.trim.position.y = 1.53 * g.children[0].scale.y; }
       else if (g.gun) { // aim at nearest enemy
         let best = null, bd = 90; const x = g.position.x, z = g.position.z;
@@ -1101,7 +1199,7 @@ class ErosionGame extends HTMLElement {
     for (let z = 0; z < N; z++)for (let x = 0; x < N; x++) {
       const o = this.occ[ti(x, z)];
       if (!o) continue;
-      ctx.fillStyle = o === 1 ? '#cfd6e4' : o === 2 ? PAL.cyan : o === 3 ? PAL.cyan : PAL.red;
+      ctx.fillStyle = o === 1 ? '#cfd6e4' : o === 2 ? PAL.cyan : o === 3 ? PAL.cyan : o === 5 ? '#8a8298' : PAL.red;
       ctx.globalAlpha = o === 3 || o === 4 ? .9 : .8;
       ctx.fillRect(x * S, z * S, S, S);
     }
