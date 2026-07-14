@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+  <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.147.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://unpkg.com/three@0.147.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://unpkg.com/three@0.147.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://unpkg.com/three@0.147.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://unpkg.com/three@0.147.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://unpkg.com/three@0.147.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; background: #0b0c10; }
+    body { font-family: "Chakra Petch", "Noto Sans KR", sans-serif; color: #e8eaf0; }
+    a { color: #25d8ff; } a:hover { color: #7ee8ff; }
+    input::placeholder { color: #4a5266; }
+    @keyframes egGlow { 0%,100% { text-shadow: 0 0 24px rgba(255,59,42,.55), 0 0 60px rgba(255,59,42,.25); } 50% { text-shadow: 0 0 40px rgba(255,59,42,.85), 0 0 90px rgba(255,59,42,.4); } }
+    @keyframes egScan { from { background-position: 0 0; } to { background-position: 0 8px; } }
+    @keyframes egDrift { from { background-position: 0 0; } to { background-position: 64px 64px; } }
+  </style>
+</helmet>
+<sc-if value="{{ inLobby }}" hint-placeholder-val="{{ true }}">
+  <div style="min-height:100vh;position:relative;overflow:hidden;background:radial-gradient(1200px 600px at 50% -10%, #1a1420 0%, #0b0c10 55%), #0b0c10">
+    <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(90,100,130,.07) 1px, transparent 1px),linear-gradient(90deg, rgba(90,100,130,.07) 1px, transparent 1px);background-size:64px 64px;animation:egDrift 12s linear infinite;pointer-events:none"></div>
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 2px, transparent 2px 4px);background-size:100% 8px;animation:egScan .6s linear infinite;pointer-events:none;opacity:.5"></div>
+    <div style="position:absolute;left:50%;top:0;transform:translateX(-50%);width:900px;max-width:100%;height:340px;background:radial-gradient(closest-side, rgba(255,59,42,.16), transparent);pointer-events:none"></div>
+    <div style="position:relative;max-width:1020px;margin:0 auto;padding:0 20px;box-sizing:border-box">
+      <div style="display:flex;align-items:center;gap:12px;padding:20px 0">
+        <div style="width:14px;height:14px;background:#ff3b2a;box-shadow:0 0 14px rgba(255,59,42,.8)"></div>
+        <div style="font-weight:700;letter-spacing:.18em;font-size:13px;color:#9aa3b5">EROSION PROTOCOL</div>
+        <div style="margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.14em;border:1px solid #3a4052;padding:5px 10px;color:#9aa3b5;background:rgba(12,14,20,.6)">2P CO-OP · FREE RELAY</div>
+      </div>
+      <div style="padding:44px 0 10px;text-align:center">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.3em;color:#25d8ff;text-shadow:0 0 16px rgba(37,216,255,.5)">CO-OP TACTICAL SURVIVAL</div>
+        <h1 style="font-size:clamp(44px,8.5vw,96px);line-height:1;margin:14px 0 6px;font-weight:900;letter-spacing:.02em;color:#ff3b2a;animation:egGlow 3s ease-in-out infinite;font-family:'Noto Sans KR',sans-serif">침식 프로토콜</h1>
+        <div style="font-size:clamp(13px,2vw,17px);letter-spacing:.42em;color:#e8eaf0;font-weight:600;margin-bottom:18px">E R O S I O N</div>
+        <p style="max-width:600px;margin:0 auto;font-size:14.5px;line-height:1.8;color:#9aa3b5;font-family:'Noto Sans KR',sans-serif">
+          4개의 균열에서 침식체가 파도처럼 몰려온다.<br>
+          <b style="color:#e8eaf0">벽으로 길을 막고, 포탑으로 요격하고</b>, 중앙의 정화 코어를 사수하라.<br>
+          자원으로 캐릭터·스킬·구조물을 연구하고, 쓰러진 동료는 곁에서 일으켜 세워라.
+        </p>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;padding:30px 0 8px;justify-content:center">
+        <div style="flex:1 1 260px;max-width:330px;background:rgba(13,15,21,.85);border:1px solid #3a4052;border-top:3px solid #ff3b2a;padding:20px;display:flex;flex-direction:column;gap:10px;backdrop-filter:blur(6px)">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.2em;color:#ff3b2a">HOST</div>
+          <div style="font-size:19px;font-weight:700;font-family:'Noto Sans KR',sans-serif">방 만들기</div>
+          <div style="font-size:12.5px;line-height:1.65;color:#9aa3b5;font-family:'Noto Sans KR',sans-serif">4자리 코드가 생성됩니다. 동료가 같은 코드로 참가하면 자동 시작.</div>
+          <button onClick="{{ createRoom }}" style="margin-top:auto;font:700 14px 'Noto Sans KR',sans-serif;background:#ff3b2a;color:#fff;border:none;padding:13px;cursor:pointer;letter-spacing:.06em;box-shadow:0 0 18px rgba(255,59,42,.35)" style-hover="background:#ff5545" style-active="background:#c22212">방 개설 →</button>
+        </div>
+        <div style="flex:1 1 260px;max-width:330px;background:rgba(13,15,21,.85);border:1px solid #3a4052;border-top:3px solid #25d8ff;padding:20px;display:flex;flex-direction:column;gap:10px;backdrop-filter:blur(6px)">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.2em;color:#25d8ff">JOIN</div>
+          <div style="font-size:19px;font-weight:700;font-family:'Noto Sans KR',sans-serif">참가하기</div>
+          <div style="font-size:12.5px;line-height:1.65;color:#9aa3b5;font-family:'Noto Sans KR',sans-serif">방장에게 받은 코드를 입력하세요.</div>
+          <div style="display:flex;gap:8px;margin-top:auto">
+            <input maxlength="4" placeholder="CODE" value="{{ joinVal }}" onChange="{{ setJoin }}" style="flex:1;min-width:0;background:rgba(0,0,0,.5);border:1px solid #3a4052;color:#25d8ff;font:700 18px 'Chakra Petch',sans-serif;letter-spacing:.3em;text-transform:uppercase;padding:10px 12px;outline:none;text-align:center" style-focus="border-color:#25d8ff;box-shadow:0 0 12px rgba(37,216,255,.3)">
+            <button onClick="{{ joinRoom }}" style="font:700 14px 'Noto Sans KR',sans-serif;background:transparent;color:#25d8ff;border:1px solid #25d8ff;padding:0 18px;cursor:pointer" style-hover="background:rgba(37,216,255,.12)" style-active="background:rgba(37,216,255,.25)">참가</button>
+          </div>
+        </div>
+        <div style="flex:1 1 260px;max-width:330px;background:rgba(13,15,21,.85);border:1px solid #3a4052;border-top:3px solid #ffb020;padding:20px;display:flex;flex-direction:column;gap:10px;backdrop-filter:blur(6px)">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.2em;color:#ffb020">SOLO</div>
+          <div style="font-size:19px;font-weight:700;font-family:'Noto Sans KR',sans-serif">혼자 연습</div>
+          <div style="font-size:12.5px;line-height:1.65;color:#9aa3b5;font-family:'Noto Sans KR',sans-serif">AI 봇 동료 <b style="color:#ffb020">유닛-B</b>와 함께. 조작과 전략을 익히기 좋습니다.</div>
+          <button onClick="{{ startSolo }}" style="margin-top:auto;font:700 14px 'Noto Sans KR',sans-serif;background:transparent;color:#ffb020;border:1px solid #ffb020;padding:12px;cursor:pointer;letter-spacing:.06em" style-hover="background:rgba(255,176,32,.12)" style-active="background:rgba(255,176,32,.25)">연습 개시 →</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:1px;background:#3a4052;border:1px solid #3a4052;margin:26px 0 0">
+        <sc-for list="{{ rules }}" as="r" hint-placeholder-count="4">
+          <div style="flex:1 1 220px;min-width:200px;background:rgba(13,15,21,.9);padding:16px;box-sizing:border-box">
+            <div style="font-weight:700;font-size:20px;color:#ff3b2a;font-family:'Chakra Petch',sans-serif">{{ r.n }}</div>
+            <div style="font-weight:700;font-size:14px;margin:6px 0 4px;font-family:'Noto Sans KR',sans-serif">{{ r.t }}</div>
+            <div style="font-size:12px;line-height:1.6;color:#9aa3b5;font-family:'Noto Sans KR',sans-serif">{{ r.d }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding:16px 0 34px;font-size:11px;line-height:1.7;color:#5a6377;font-family:'Noto Sans KR',sans-serif;text-align:center">
+        온라인 협동은 무료 공개 WebSocket 릴레이로 연결됩니다 — 서버 설치·비용 없음.<br>
+        모바일: 화면 드래그 이동(가상 스틱) · 자동 조준 · 대시/아이템 버튼 &nbsp;|&nbsp; PC: WASD 이동 · Space 대시 · E 아이템
+      </div>
+    </div>
+  </div>
+</sc-if>
+<sc-if value="{{ inGame }}" hint-placeholder-val="{{ false }}">
+  <x-import component-from-global-scope="erosion-game" from="./game.js" mode="{{ mode }}" room="{{ room }}" diff="{{ diff }}" waves="{{ waves }}" buildtime="{{ buildTime }}" hint-size="100%,100vh"></x-import>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;difficulty&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;easy&quot;, &quot;normal&quot;, &quot;hard&quot;], &quot;default&quot;: &quot;normal&quot;, &quot;section&quot;: &quot;게임 규칙&quot;}, &quot;waves&quot;: {&quot;editor&quot;: &quot;int&quot;, &quot;default&quot;: 8, &quot;min&quot;: 4, &quot;max&quot;: 15, &quot;unit&quot;: &quot;웨이브&quot;, &quot;section&quot;: &quot;게임 규칙&quot;}, &quot;buildTime&quot;: {&quot;editor&quot;: &quot;int&quot;, &quot;default&quot;: 25, &quot;min&quot;: 15, &quot;max&quot;: 60, &quot;unit&quot;: &quot;초&quot;, &quot;section&quot;: &quot;게임 규칙&quot;}}">
+class Component extends DCLogic {
+  state = { inGame: false, mode: '', room: '', joinVal: '' };
+  componentDidMount() {
+    this._x = () => this.setState({ inGame: false });
+    document.addEventListener('erosion-exit', this._x);
+  }
+  componentWillUnmount() { document.removeEventListener('erosion-exit', this._x); }
+  _code() {
+    const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = '';
+    for (let i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)];
+    return s;
+  }
+  renderVals() {
+    const st = this.state;
+    return {
+      inLobby: !st.inGame, inGame: st.inGame, mode: st.mode, room: st.room,
+      joinVal: st.joinVal,
+      diff: this.props.difficulty ?? 'normal',
+      waves: String(this.props.waves ?? 8),
+      buildTime: String(this.props.buildTime ?? 25),
+      setJoin: e => this.setState({ joinVal: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') }),
+      createRoom: () => this.setState({ inGame: true, mode: 'host', room: this._code() }),
+      joinRoom: () => { if (st.joinVal.length === 4) this.setState({ inGame: true, mode: 'join', room: st.joinVal }); },
+      startSolo: () => this.setState({ inGame: true, mode: 'solo', room: '' }),
+      rules: [
+        { n: '01', t: '건설로 길을 막아라', d: '준비 단계에 벽·포탑을 배치. 적은 벽을 부수며 최단 경로로 코어를 노립니다.' },
+        { n: '02', t: '자원 = 전략', d: '처치·웨이브 보상 자원은 둘이 공유. 건설과 캐릭터·스킬·구조물 연구에 분배하세요.' },
+        { n: '03', t: 'RPG 성장', d: '경험치 레벨업마다 강화 카드 3택1. 충격파 스킬과 필드 아이템까지 빌드의 일부.' },
+        { n: '04', t: '코어 사수 + 구조', d: '정화 코어가 부서지면 패배. 쓰러진 동료는 곁에서 2.5초 유지로 부활.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
