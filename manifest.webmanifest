@@ -1,0 +1,16 @@
+{
+  "name": "침식 프로토콜 — EROSION PROTOCOL",
+  "short_name": "침식 프로토콜",
+  "description": "2인 협동 기지 방어 — 벽으로 길을 막고, 포탑으로 요격하고, 정화 코어를 사수하라.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0b0c10",
+  "theme_color": "#0b0c10",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
