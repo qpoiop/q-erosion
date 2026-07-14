@@ -920,9 +920,10 @@ class ErosionGame extends HTMLElement {
     let gx, gz;
     if (me.down) { gx = me.x; gz = me.z; }
     else if (th) { const d = Math.sqrt(dist2(b.x, b.z, th.x, th.z)) || 1; const keep = 6; gx = th.x + (b.x - th.x) / d * keep; gz = th.z + (b.z - th.z) / d * keep; }
+    else if (this.phase === 'build') { gx = cx + 4.5; gz = cz + 3; } // prep phase: hold position near the core
     else { gx = me.x + 2.2; gz = me.z + 1.5; }
     const dx = gx - b.x, dz = gz - b.z, d = Math.hypot(dx, dz);
-    if (d > .6) { const nx = b.x + dx / d * b.speed * dt, nz = b.z + dz / d * b.speed * dt; if (!this._blockedAt(nx, b.z)) b.x = nx; if (!this._blockedAt(b.x, nz)) b.z = nz; }
+    if (d > .6) { const nx = b.x + dx / d * b.speed * dt, nz = b.z + dz / d * b.speed * dt; if (!this._blockedAt(nx, b.z)) b.x = nx; if (!this._blockedAt(b.x, nz)) b.z = nz; if (!th) b.a = Math.atan2(dz, dx); }
     b.x = clamp(b.x, 1 - HALF, HALF - 1); b.z = clamp(b.z, 1 - HALF, HALF - 1);
     b.hp = Math.min(b.maxhp, b.hp + (1 + b.regen) * dt * .5);
     if (b.item && this.enemies.size > 6) { this._applyItemFx(b.item, b.x, b.z, false); if (b.item === 'kit') b.hp = b.maxhp; b.item = null; }
@@ -1130,7 +1131,7 @@ class ErosionGame extends HTMLElement {
     // players
     const setP = (g, p, isMe) => {
       g.position.set(p.x, Math.sin(now * 2.6 + (isMe ? 0 : 2)) * .06, p.z);
-      g.rotation.y = -p.a - Math.PI / 2;
+      g.rotation.y = -p.a + Math.PI / 2; // model nose = +z; aligns facing with move/aim angle
       g.rotation.z = 0;
       if (p.down) { g.rotation.z = 1.2; g.position.y = -.15; g.accents.forEach(a => a.material = ((now * 4 | 0) % 2) ? this.mGlowRed : g.accentMat); }
       else g.accents.forEach(a => a.material = g.accentMat);
