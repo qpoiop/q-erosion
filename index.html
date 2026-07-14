@@ -147,6 +147,9 @@
   input.addEventListener('input', () => {
     input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
   });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && input.value.length === 4) enterGame('join', input.value);
+  });
   document.getElementById('btn-create').addEventListener('click', () => enterGame('host', code()));
   document.getElementById('btn-join').addEventListener('click', () => {
     if (input.value.length === 4) enterGame('join', input.value);
