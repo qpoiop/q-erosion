@@ -580,15 +580,15 @@ class ErosionGame extends HTMLElement {
     this.ban = H('div', 'position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(12,14,20,.6);border:1px solid rgba(58,64,82,.55);backdrop-filter:blur(4px);color:' + PAL.text + ';font:700 12px ' + FONT + ';padding:6px 13px;letter-spacing:.07em;display:none;white-space:nowrap;border-left:3px solid ' + PAL.red, hud);
     this.revEl = H('div', 'position:absolute;left:50%;top:58%;transform:translateX(-50%);display:none;' + panel + 'padding:7px 14px;font:700 12px ' + FONT, hud);
     // level-up sheet — fullscreen overlay, gameplay pauses beneath it (solo)
-    this.upEl = H('div', 'position:absolute;inset:0;display:none;flex-direction:column;gap:16px;align-items:center;justify-content:center;background:rgba(5,6,10,.72);backdrop-filter:blur(3px);' + pe, hud);
+    this.upEl = H('div', 'position:absolute;inset:0;display:none;flex-direction:column;gap:16px;align-items:center;justify-content:center;background:rgba(5,6,10,.72);backdrop-filter:blur(3px);z-index:40;' + pe, hud);
     this.upTitle = H('div', 'background:' + PAL.red + ';color:#fff;font:700 15px ' + FONT + ';padding:8px 20px;letter-spacing:.12em;box-shadow:0 0 20px rgba(255,59,42,.55)', this.upEl);
     this.upRow = H('div', 'display:flex;gap:12px;flex-wrap:wrap;justify-content:center;max-width:92vw', this.upEl);
     this.upHint = H('div', 'font:400 11px ' + FONT + ';color:' + PAL.dim + ';letter-spacing:.06em', this.upEl);
     this.upHint.textContent = '카드를 선택하면 게임이 재개됩니다';
     // shop sheet
-    this.shopBg = H('div', 'position:absolute;inset:0;display:none;background:rgba(5,6,10,.45);' + pe, hud);
+    this.shopBg = H('div', 'position:absolute;inset:0;display:none;background:rgba(5,6,10,.45);z-index:20;' + pe, hud);
     this.shopBg.addEventListener('pointerdown', e => { e.stopPropagation(); this._toggleShop(); });
-    this.shopEl = H('div', 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;flex-direction:column;gap:8px;' + pe + panel + 'padding:16px;max-width:min(92vw,560px);max-height:76vh;overflow:auto', hud);
+    this.shopEl = H('div', 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;flex-direction:column;gap:8px;z-index:21;' + pe + panel + 'padding:16px;max-width:min(92vw,560px);max-height:76vh;overflow:auto', hud);
     // overlay
     this.ov = H('div', 'position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,7,10,.82);backdrop-filter:blur(4px);' + pe, hud);
     this.ovIn = H('div', 'max-width:430px;width:min(86vw,430px);border:1px solid ' + PAL.line + ';border-top:3px solid ' + PAL.red + ';background:rgba(13,15,21,.96);padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.6)', this.ov);
