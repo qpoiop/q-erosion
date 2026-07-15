@@ -310,6 +310,11 @@ class ErosionGame extends HTMLElement {
       if (g.gx === 0 || g.gx === N - 1) gr.rotation.y = Math.PI / 2;
       this.scene.add(gr); return gr;
     });
+    // ally pointer arrow (orbits my unit, aimed at the teammate)
+    this.allyArrG = new T.Group();
+    this.allyArr = new T.Mesh(new T.ConeGeometry(.26, .75, 3), new T.MeshBasicMaterial({ color: PAL.amberHex, transparent: true, opacity: .8, blending: T.AdditiveBlending, depthWrite: false }));
+    this.allyArr.rotation.x = Math.PI / 2; // lie flat, apex toward group +z
+    this.allyArrG.add(this.allyArr); this.allyArrG.visible = false; this.scene.add(this.allyArrG);
     // players
     this.meG = this._mkPlayer(true); this.allyG = this._mkPlayer(false);
     this.scene.add(this.meG); this.scene.add(this.allyG);
@@ -508,12 +513,6 @@ class ErosionGame extends HTMLElement {
     const pulseCss = document.createElement('style');
     pulseCss.textContent = '@keyframes egUpPulse { 0%,100% { box-shadow:0 0 4px rgba(37,216,255,.3); } 50% { box-shadow:0 0 16px rgba(37,216,255,.75); } } @keyframes egGateBlink { 0%,100% { opacity:.55; } 50% { opacity:1; } }';
     this.appendChild(pulseCss);
-    // active-gate edge arrow (visible when the rift is off-screen)
-    this.gateArr = H('div', 'position:absolute;display:none;flex-direction:column;align-items:center;gap:2px;pointer-events:none', hud);
-    this.gateArrGlyph = H('div', 'font:700 26px ' + FONT + ';color:' + PAL.red + ';text-shadow:0 0 16px rgba(255,59,42,.95);line-height:1;animation:egGateBlink .9s ease-in-out infinite', this.gateArr);
-    this.gateArrGlyph.textContent = '➤';
-    const gaLb = H('div', 'font:700 9px ' + FONT + ';letter-spacing:.1em;color:' + PAL.red + ';background:rgba(12,14,20,.65);padding:2px 6px;border:1px solid rgba(255,59,42,.5)', this.gateArr);
-    gaLb.textContent = '균열';
     // first-wave controls hint
     this.hintEl = H('div', 'position:absolute;bottom:88px;left:50%;transform:translateX(-50%);font:400 11px ' + FONT + ';color:' + PAL.dim + ';letter-spacing:.05em;display:none;text-align:center;background:rgba(12,14,20,.45);padding:4px 12px;border:1px solid rgba(58,64,82,.4)', hud);
     this.hintEl.textContent = ('ontouchstart' in window) ? '드래그 이동 · 대시(무적 돌진)/아이템 버튼 · 건설/연구는 좌하단' : '이동 WASD · 대시 Space(무적 돌진) · 아이템 E · 건설/연구는 좌하단';
@@ -1380,24 +1379,19 @@ class ErosionGame extends HTMLElement {
       g.beam.visible = active && (this.phase === 'build' || this.phase === 'assault');
       if (g.beam.visible) g.beam.material.opacity = .13 + Math.sin(now * 2.4) * .07 + (this.phase === 'assault' ? .08 : 0);
     });
-    // off-screen indicator: screen-edge arrow tracking the active gate
+    // ally pointer: small arrow orbiting MY unit, aimed at the teammate
     {
-      const ag = this.gates[this.activeGate];
-      const show = ag && (this.phase === 'build' || this.phase === 'assault') && !this.over;
+      const me = this.me, al = this.ally;
+      const far = this.allyOn && dist2(me.x, me.z, al.x, al.z) > 90; // teammate ~9.5+ units away
+      const show = this.allyOn && !this.over && (far || al.down) && (this.phase === 'build' || this.phase === 'assault');
+      this.allyArrG.visible = show;
       if (show) {
-        const v = new T.Vector3(ag.x, 1.5, ag.z).project(this.cam);
-        const on = v.x > -.86 && v.x < .86 && v.y > -.78 && v.y < .78;
-        if (on) this.gateArr.style.display = 'none';
-        else {
-          const w = this.clientWidth || innerWidth, h = this.clientHeight || innerHeight;
-          const m = Math.max(Math.abs(v.x) / .86, Math.abs(v.y) / .78);
-          const px = ((v.x / m) * .5 + .5) * w, py = (-(v.y / m) * .5 + .5) * h;
-          this.gateArr.style.display = 'flex';
-          this.gateArr.style.left = Math.max(8, Math.min(w - 56, px - 24)) + 'px';
-          this.gateArr.style.top = Math.max(8, Math.min(h - 64, py - 24)) + 'px';
-          this.gateArrGlyph.style.transform = 'rotate(' + Math.atan2(py - h / 2, px - w / 2) + 'rad)';
-        }
-      } else this.gateArr.style.display = 'none';
+        const a = Math.atan2(al.z - me.z, al.x - me.x);
+        this.allyArrG.position.set(me.x + Math.cos(a) * 1.7, .55 + Math.sin(now * 4) * .12, me.z + Math.sin(a) * 1.7);
+        this.allyArrG.rotation.y = -a + Math.PI / 2;
+        this.allyArr.material.color.setHex(al.down ? PAL.redHex : PAL.amberHex);
+        this.allyArr.material.opacity = al.down ? (((now * 4 | 0) % 2) ? .95 : .35) : .5 + Math.sin(now * 3) * .25;
+      }
     }
     // players
     const setP = (g, p, isMe) => {
