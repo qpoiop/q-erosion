@@ -304,6 +304,8 @@ class ErosionGame extends HTMLElement {
       const rift = new T.Mesh(new T.PlaneGeometry(6.4, 3.4), new T.MeshBasicMaterial({ color: PAL.redHex, transparent: true, opacity: .5, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
       rift.position.y = 1.8; gr.add(rift); gr.rift = rift;
       const lamp2 = new T.PointLight(PAL.redHex, 1.4, 12); lamp2.position.y = 2; gr.add(lamp2); gr.lamp = lamp2;
+      const beam = new T.Mesh(new T.CylinderGeometry(.25, .6, 26, 8, 1, true), new T.MeshBasicMaterial({ color: PAL.redHex, transparent: true, opacity: .16, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+      beam.position.y = 13; gr.add(beam); gr.beam = beam; // sky pillar marks the ACTIVE gate from anywhere
       gr.position.set(g2w(g.gx) + (g.gz === 0 || g.gz === N - 1 ? TS / 2 : 0), 0, g2w(g.gz) + (g.gx === 0 || g.gx === N - 1 ? TS / 2 : 0));
       if (g.gx === 0 || g.gx === N - 1) gr.rotation.y = Math.PI / 2;
       this.scene.add(gr); return gr;
@@ -504,8 +506,14 @@ class ErosionGame extends HTMLElement {
     this.upChip = H('button', pe + 'font:700 11px ' + FONT + ';border:1px solid ' + PAL.cyan + ';background:rgba(37,216,255,.14);color:' + PAL.cyan + ';padding:5px 11px;cursor:pointer;letter-spacing:.06em;display:none;animation:egUpPulse 1.1s ease-in-out infinite', bc);
     this.upChip.onclick = () => { if (this.pendUp > 0 && this.upEl.style.display === 'none') this._showUpgrades(); };
     const pulseCss = document.createElement('style');
-    pulseCss.textContent = '@keyframes egUpPulse { 0%,100% { box-shadow:0 0 4px rgba(37,216,255,.3); } 50% { box-shadow:0 0 16px rgba(37,216,255,.75); } }';
+    pulseCss.textContent = '@keyframes egUpPulse { 0%,100% { box-shadow:0 0 4px rgba(37,216,255,.3); } 50% { box-shadow:0 0 16px rgba(37,216,255,.75); } } @keyframes egGateBlink { 0%,100% { opacity:.55; } 50% { opacity:1; } }';
     this.appendChild(pulseCss);
+    // active-gate edge arrow (visible when the rift is off-screen)
+    this.gateArr = H('div', 'position:absolute;display:none;flex-direction:column;align-items:center;gap:2px;pointer-events:none', hud);
+    this.gateArrGlyph = H('div', 'font:700 26px ' + FONT + ';color:' + PAL.red + ';text-shadow:0 0 16px rgba(255,59,42,.95);line-height:1;animation:egGateBlink .9s ease-in-out infinite', this.gateArr);
+    this.gateArrGlyph.textContent = '➤';
+    const gaLb = H('div', 'font:700 9px ' + FONT + ';letter-spacing:.1em;color:' + PAL.red + ';background:rgba(12,14,20,.65);padding:2px 6px;border:1px solid rgba(255,59,42,.5)', this.gateArr);
+    gaLb.textContent = '균열';
     // first-wave controls hint
     this.hintEl = H('div', 'position:absolute;bottom:88px;left:50%;transform:translateX(-50%);font:400 11px ' + FONT + ';color:' + PAL.dim + ';letter-spacing:.05em;display:none;text-align:center;background:rgba(12,14,20,.45);padding:4px 12px;border:1px solid rgba(58,64,82,.4)', hud);
     this.hintEl.textContent = ('ontouchstart' in window) ? '드래그 이동 · 대시(무적 돌진)/아이템 버튼 · 건설/연구는 좌하단' : '이동 WASD · 대시 Space(무적 돌진) · 아이템 E · 건설/연구는 좌하단';
@@ -1369,7 +1377,28 @@ class ErosionGame extends HTMLElement {
       const active = i === this.activeGate;
       g.rift.material.opacity = (active ? .5 : .12) + Math.sin(now * 3 + i) * (active ? .2 : .04) + (active && this.phase === 'assault' ? .25 : 0);
       g.lamp.intensity = active ? 1.6 + Math.sin(now * 4) * .5 : .3;
+      g.beam.visible = active && (this.phase === 'build' || this.phase === 'assault');
+      if (g.beam.visible) g.beam.material.opacity = .13 + Math.sin(now * 2.4) * .07 + (this.phase === 'assault' ? .08 : 0);
     });
+    // off-screen indicator: screen-edge arrow tracking the active gate
+    {
+      const ag = this.gates[this.activeGate];
+      const show = ag && (this.phase === 'build' || this.phase === 'assault') && !this.over;
+      if (show) {
+        const v = new T.Vector3(ag.x, 1.5, ag.z).project(this.cam);
+        const on = v.x > -.86 && v.x < .86 && v.y > -.78 && v.y < .78;
+        if (on) this.gateArr.style.display = 'none';
+        else {
+          const w = this.clientWidth || innerWidth, h = this.clientHeight || innerHeight;
+          const m = Math.max(Math.abs(v.x) / .86, Math.abs(v.y) / .78);
+          const px = ((v.x / m) * .5 + .5) * w, py = (-(v.y / m) * .5 + .5) * h;
+          this.gateArr.style.display = 'flex';
+          this.gateArr.style.left = Math.max(8, Math.min(w - 56, px - 24)) + 'px';
+          this.gateArr.style.top = Math.max(8, Math.min(h - 64, py - 24)) + 'px';
+          this.gateArrGlyph.style.transform = 'rotate(' + Math.atan2(py - h / 2, px - w / 2) + 'rad)';
+        }
+      } else this.gateArr.style.display = 'none';
+    }
     // players
     const setP = (g, p, isMe) => {
       g.position.set(p.x, Math.sin(now * 2.6 + (isMe ? 0 : 2)) * .06, p.z);
