@@ -418,6 +418,8 @@ class ErosionGame extends HTMLElement {
       const crown = new T.Mesh(new T.OctahedronGeometry(.6), this.mGlowRed); crown.position.y = 2.1; g.add(crown);
       const band = new T.Mesh(new T.BoxGeometry(2.1, .2, 2.1), this.mGlowRed7); band.position.y = .85; g.add(band);
       const lamp = new T.PointLight(PAL.redHex, 1.2, 8); lamp.position.y = 2; g.add(lamp);
+      const aura = new T.Mesh(new T.RingGeometry(1.5, 1.85, 40), new T.MeshBasicMaterial({ color: PAL.redHex, transparent: true, opacity: .5, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+      aura.rotation.x = -Math.PI / 2; aura.position.y = .07; g.add(aura); g.aura = aura;
     }
     body.castShadow = true; g.add(body); g.body = body;
     if (e.final) g.scale.setScalar(2); // final boss towers over the mid-boss
@@ -510,7 +512,7 @@ class ErosionGame extends HTMLElement {
     this.coreLab = H('div', 'font-size:9px;font-weight:700;letter-spacing:.04em;color:' + PAL.dim + ';white-space:nowrap', cbRow);
     this.goBtn = H('button', pe + 'font:700 11px ' + FONT + ';border:1px solid ' + PAL.red + ';background:rgba(255,59,42,.15);color:' + PAL.red + ';padding:4px 0;width:100%;cursor:pointer;letter-spacing:.06em;display:none', tl);
     this.goBtn.textContent = '습격 즉시 개시 ▶';
-    this.goBtn.onclick = () => { if (this.isHostish() && this.phase === 'build') this.phT = Math.min(this.phT, 1); };
+    this.goBtn.onclick = () => { if (this.isHostish() && this.phase === 'build' && this.phT > 1.2) { this.phT = Math.min(this.phT, 1); this._banner('⚔ 습격 개시!', 1800); this._beep(240, .2, 'sawtooth', .07); this.goBtn.textContent = '습격 개시!'; this.goBtn.style.background = PAL.red; this.goBtn.style.color = '#fff'; setTimeout(() => { this.goBtn.textContent = '습격 즉시 개시 ▶'; this.goBtn.style.background = 'rgba(255,59,42,.15)'; this.goBtn.style.color = PAL.red; }, 1200); } };
     H('div', 'border-top:1px solid ' + PAL.line, tl);
     this.pbar = {}; ['me', 'ally'].forEach(k => {
       const row = H('div', 'display:flex;flex-direction:column;gap:3px', tl);
@@ -858,7 +860,7 @@ class ErosionGame extends HTMLElement {
     const seen = new Set();
     (m.en || []).forEach(a => { const [id, ty, x, z, hp] = a; seen.add(id); let e = this.enemies.get(id);
       if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss && this.wave >= this.maxWave) e.final = true; this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.final ? '⚠ 최종 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
-      e.tx = x / 10; e.tz = z / 10; e.hp = hp; });
+      e.tx = x / 10; e.tz = z / 10; e.hp = hp; if (!e.mhp || hp > e.mhp) e.mhp = hp; });
     for (const [id, e] of this.enemies) if (!seen.has(id)) { this._killFx(e); this.enemies.delete(id); }
     if (m.st) this._structUnpack(m.st);
     this.fitems = (m.itm || []).map(t => ({ id: t[0], k: t[1], x: t[2] / 10, z: t[3] / 10 }));
@@ -897,7 +899,7 @@ class ErosionGame extends HTMLElement {
       if (Math.random() < .04 && this.fitems.length < 2) this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: e.x, z: e.z });
     }
   }
-  _killFx(e) { this._fx(e.x, e.z, !!ETYPES[e.ty]?.boss, PAL.redHex); const m = this.eMeshes.get(e.id); if (m) { this.scene.remove(m); this.eMeshes.delete(e.id); } }
+  _killFx(e) { this._fx(e.x, e.z, !!ETYPES[e.ty]?.boss, PAL.redHex); const m = this.eMeshes.get(e.id); if (m) { if (m.bossBar) this.scene.remove(m.bossBar); this.scene.remove(m); this.eMeshes.delete(e.id); } }
   isHostish() { return this.mode === 'solo' || this.isHost; }
   _grantXp(v) { this._setXp(this.xp + v); }
   _setXp(v) {
@@ -1058,6 +1060,10 @@ class ErosionGame extends HTMLElement {
     if (!this.spawnQ.length) return;
     this.spawnT -= dt; if (this.spawnT > 0) return;
     this.spawnT = Math.max(.24, (.7 - this.wave * .035) * (DIFF_SPT[this.diffKey] || 1));
+    const burst = Math.min(3, 1 + ((this.wave / 3) | 0)); // w1-2: 1, w3-5: 2, w6+: 3 at once
+    for (let bn = 0; bn < burst && this.spawnQ.length; bn++) this._spawnOne();
+  }
+  _spawnOne() {
     const ty = this.spawnQ.shift();
     const g = this.gates[this.activeGate]; // the whole wave streams through the active gate
     const id = this.eid++;
@@ -1065,8 +1071,9 @@ class ErosionGame extends HTMLElement {
     // spawn OUTSIDE the gate, spread across its widened front, walk in
     const nx = g.gx === 0 ? -1 : g.gx === N - 1 ? 1 : 0, nz = g.gz === 0 ? -1 : g.gz === N - 1 ? 1 : 0;
     const off = rnd(1.8, 4), lat = rnd(-4.6, 4.6);
-    const e = { id, ty, x: g.x + nx * off + lat * (nz ? 1 : 0), z: g.z + nz * off + lat * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x + lat * (nz ? 1 : 0), gz: g.z + lat * (nx ? 1 : 0) };
+    const e = { id, ty, x: g.x + nx * off + lat * (nz ? 1 : 0), z: g.z + nz * off + lat * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x + lat * (nz ? 1 : 0), gz: g.z + lat * (nx ? 1 : 0), wsp: 1 + (this.wave - 1) * .035 };
     if (ETYPES[ty].boss && this.wave >= this.maxWave) { e.final = true; e.hp *= 10; } // final boss — beefed up
+    e.mhp = e.hp;
     this.enemies.set(id, e);
     if (ETYPES[ty].boss) { this._banner(e.final ? '⚠ 최종 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5); }
   }
@@ -1076,7 +1083,7 @@ class ErosionGame extends HTMLElement {
     const players = [this.me]; if (this.allyOn) players.push(this.ally);
     for (const e of this.enemies.values()) {
       const et = ETYPES[e.ty];
-      let sp = et.sp * slow * this.diffMul * (et.boss ? 1 : 1);
+      let sp = et.sp * slow * this.diffMul * (e.wsp || 1);
       e.cool -= dt;
       // spawned outside: walk in through the gate before anything else
       if (e.entering) {
@@ -1200,7 +1207,7 @@ class ErosionGame extends HTMLElement {
   }
   /* ---------- revive ---------- */
   _reviveSim(dt) {
-    const near = (a, b) => dist2(a.x, a.z, b.x, b.z) < 2.6;
+    const near = (a, b) => dist2(a.x, a.z, b.x, b.z) < 7.3; // ~2.7 units — ships got bigger
     const doRev = (p, helper) => {
       if (!p.down) return;
       p.downT -= dt;
@@ -1210,6 +1217,11 @@ class ErosionGame extends HTMLElement {
     doRev(this.me, this.allyOn ? this.ally : null);
     if (this.mode === 'solo') doRev(this.ally, this.me);
     if (this.me.down) { this.revEl.style.display = 'block'; this.revEl.textContent = this.me.revP > 0 ? '구조 중… ' + Math.round(this.me.revP * 100) + '%' : '쓰러짐 — 동료가 접근해야 함 (' + Math.ceil(this.me.downT) + 's)'; }
+    else if (this.allyOn && this.ally.down) { // rescuer view
+      this.revEl.style.display = 'block';
+      const nearAlly = dist2(this.me.x, this.me.z, this.ally.x, this.ally.z) < 7.3;
+      this.revEl.textContent = nearAlly ? (this.mode === 'solo' && this.ally.revP > 0 ? '동료 구조 중… ' + Math.round(this.ally.revP * 100) + '%' : '동료 구조 중… 곁을 지켜라') : '동료 다운! 화살표를 따라가 구조하라';
+    }
     else this.revEl.style.display = 'none';
     if (this.isHostish() && !this.over) {
       const allyDown = this.allyOn ? this.ally.down : false;
@@ -1477,6 +1489,12 @@ class ErosionGame extends HTMLElement {
     for (const [id, e] of this.enemies) {
       let m = this.eMeshes.get(id); if (!m) { m = this._eMesh(e); this.eMeshes.set(id, m); }
       m.position.set(e.x, 0, e.z); m.rotation.y += dt * (e.ty === 2 ? 1.5 : .6);
+      if (ETYPES[e.ty] && ETYPES[e.ty].boss) { // boss: big red HP bar overhead + pulsing aura
+        if (!m.bossBar) { m.bossBar = this._mkBar(e.x, e.z, 3.6); m.bossBar.position.y = e.final ? 6.2 : 3.4; }
+        m.bossBar.position.x = e.x; m.bossBar.position.z = e.z;
+        this._setBar(m.bossBar, clamp(e.hp / (e.mhp || e.hp || 1), 0, 1), PAL.redHex);
+        if (m.aura) { m.aura.scale.setScalar(1 + Math.sin(now * 3.2) * .12); m.aura.material.opacity = .4 + Math.sin(now * 3.2) * .2; }
+      }
       if (e.ty === 0) m.position.y = Math.abs(Math.sin(now * 6 + id)) * .12;
       if (e.flash > 0) { e.flash -= dt; m.body.material = this.mFlash; } else m.body.material = this.mEnemy;
     }
