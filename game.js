@@ -88,6 +88,7 @@ class ErosionGame extends HTMLElement {
     this.allyOn = this.mode === 'solo';
     this.occ = new Uint8Array(N * N); this.shp = new Float32Array(N * N);
     this.bld = new Float32Array(N * N); this.building = new Set(); this._mapRound = 0;
+    this._al50 = this._al25 = false; this._coreHitT = -9; this._lastCore = undefined;
     this.enemies = new Map(); this.eid = 1; this.bullets = []; this.ebullets = []; this.fitems = [];
     this.tm = 0; this.xp = 0; this.lv = 1; this.kills = 0; this.pendUp = 0; this.slowT = 0;
     this.scrap = 50; this.g = { wallMul: 1, turMul: 1, costMul: 1 };
@@ -659,7 +660,11 @@ class ErosionGame extends HTMLElement {
   }
   _applyState(m) {
     this.tm = m.tm; if (m.xp !== undefined) this._setXp(m.xp);
-    this.scrap = m.sc; this.coreHp = m.core; this.wave = m.wv; this._qn = m.qn || 0;
+    this.scrap = m.sc;
+    this.coreHp = m.core;
+    if (this._lastCore !== undefined && m.core < this._lastCore) this._coreHitFx();
+    this._lastCore = m.core;
+    this.wave = m.wv; this._qn = m.qn || 0;
     const wasPhase = this.phase;
     if (this.phase !== 'over' && this.phase !== 'count' && m.ph) { if (m.ph !== this.phase) { this.phase = m.ph; if (m.ph === 'assault') this._banner('WAVE ' + this.wave + ' — 습격!'); else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); } } this.phT = m.pt; }
     const seen = new Set();
@@ -905,8 +910,18 @@ class ErosionGame extends HTMLElement {
   _dmgCoreBy(v, e) {
     this.coreHp -= v; this.shake = Math.max(this.shake || 0, .3);
     this._burst(this.coreMesh.position.x + rnd(-1, 1), this.coreMesh.position.z + rnd(-1, 1), PAL.cyanHex, 5, 4);
-    if (!this._coreBanT || this.tm - this._coreBanT > 4) { this._coreBanT = this.tm; this._banner('⚠ 코어 피격!'); this._beep(120, .2, 'sawtooth', .07); }
+    this._coreHitFx();
     if (this.coreHp <= 0) { this.coreHp = 0; this._gameOver(false, '코어 파괴됨'); }
+  }
+  _coreHitFx() { // shared by host (direct damage) and joiner (state diff): alert + escalating alarms
+    this._coreHitT = this.tm;
+    if (!this._coreBanT || this.tm - this._coreBanT > 4) {
+      this._coreBanT = this.tm; this._banner('⚠ 코어 피격!'); this._beep(120, .2, 'sawtooth', .07);
+      this.dmgFlash = Math.max(this.dmgFlash || 0, .45);
+    }
+    const r = this.coreHp / this.coreMax;
+    if (r <= .25 && !this._al25) { this._al25 = this._al50 = true; this._banner('⚠ 코어 위험 — 25% 미만! 방어선을 복구하라', 3800); this._beep(90, .4, 'sawtooth', .09); this._beep(140, .4, 'sawtooth', .07); this.shake = Math.max(this.shake || 0, .5); }
+    else if (r <= .5 && !this._al50) { this._al50 = true; this._banner('코어 손상 심각 — 잔량 50%', 3200); this._beep(110, .3, 'sawtooth', .08); }
   }
   _dealToPlayer(p, v) {
     if (p === this.me) this._hurt(this.me, v);
@@ -1244,7 +1259,8 @@ class ErosionGame extends HTMLElement {
     for (let z = 0; z < N; z++)for (let x = 0; x < N; x++) {
       const o = this.occ[ti(x, z)];
       if (!o) continue;
-      ctx.fillStyle = o === 1 ? '#cfd6e4' : o === 2 ? PAL.cyan : o === 3 ? PAL.cyan : o === 5 ? '#8a8298' : PAL.red;
+      const coreBlink = o === 3 && this.tm - this._coreHitT < 1.5 && ((this.tm * 6 | 0) % 2);
+      ctx.fillStyle = coreBlink ? PAL.red : o === 1 ? '#cfd6e4' : o === 2 ? PAL.cyan : o === 3 ? PAL.cyan : o === 5 ? '#8a8298' : PAL.red;
       ctx.globalAlpha = o === 3 || o === 4 ? .9 : .8;
       ctx.fillRect(x * S, z * S, S, S);
     }
