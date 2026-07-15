@@ -814,7 +814,7 @@ class ErosionGame extends HTMLElement {
     this._syncStruct(); this._unstuck(this.me);
   }
   _startOnline() {
-    this._lastStateAt = performance.now(); this._hostLost = false; this._peerPaused = false;
+    this._lastStateAt = performance.now(); this._peerSeenAt = performance.now(); this._hostLost = false; this._peerPaused = false;
     this.phase = 'count'; this.countT = 3; this.allyOn = true; this.allyG.visible = true;
     this.pbar.ally.lab.textContent = '동료 · ' + (this.isHost ? '유닛-B' : '유닛-A');
     this.ov.style.display = 'none';
@@ -835,7 +835,7 @@ class ErosionGame extends HTMLElement {
         this._structUnpack(m.st); this._startOnline();
       } break;
       case 'busy': if (!this.isHost && this.phase === 'wait') { this._overlay(`<div style="font:700 20px ${FONT}">방이 가득 찼습니다</div><div style="margin-top:14px"><button id="egCancel" style="${this._obtn(false)}">돌아가기</button></div>`); this.ovIn.querySelector('#egCancel').onclick = () => this._exit(); } break;
-      case 'p': { const a = this.ally; a.lastSeen = this.tm; a.tx = m.x; a.tz = m.z; a.ta = m.a; a.hp = m.hp; a.maxhp = m.mh; a.down = m.dn; a.lv = m.lv; this._peerPaused = !!m.bg; if (m.sm) a.scrapMul = m.sm;
+      case 'p': { this._peerSeenAt = performance.now(); const a = this.ally; a.lastSeen = this.tm; a.tx = m.x; a.tz = m.z; a.ta = m.a; a.hp = m.hp; a.maxhp = m.mh; a.down = m.dn; a.lv = m.lv; this._peerPaused = !!m.bg; if (m.sm) a.scrapMul = m.sm;
         (m.sh || []).forEach(s => this._spawnBullet(s[0], s[1], s[2], s[3], { ghost: true, ally: true }));
         break; }
       case 'hit': if (this.isHost) { const e = this.enemies.get(m.id); if (e) this._dmgEnemy(e, m.d, { ally: true }); } break;
@@ -860,7 +860,7 @@ class ErosionGame extends HTMLElement {
   }
   _applyState(m) {
     this.tm = m.tm; if (m.xp !== undefined) this._setXpTotal(m.xp);
-    this._lastStateAt = performance.now(); this._hostLost = false;
+    this._lastStateAt = performance.now(); this._peerSeenAt = performance.now(); this._hostLost = false;
     if (!this.isHost) this._peerPaused = !!m.bg;
     this.scrap = m.asc !== undefined ? m.asc : m.sc;
     this.coreHp = m.core;
@@ -1314,6 +1314,7 @@ class ErosionGame extends HTMLElement {
     // pause sources: solo augment sheet, tab in background (mine OR peer's), host silent
     const inPhase = this.phase === 'build' || this.phase === 'assault';
     if (!this.isHostish() && inPhase && this._lastStateAt) this._hostLost = performance.now() - this._lastStateAt > 5000;
+    if (this._peerPaused && performance.now() - (this._peerSeenAt || 0) > 4000) this._peerPaused = false; // partner gone silent — treat as disconnected, not paused
     const sheetPause = this.mode === 'solo' && this.upEl.style.display !== 'none';
     const paused = !this.over && (sheetPause || this._bgPaused || this._peerPaused || this._hostLost);
     const playing = inPhase && !paused;
