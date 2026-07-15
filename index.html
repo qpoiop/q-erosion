@@ -102,7 +102,7 @@
   };
   const props = {
     difficulty: ['easy', 'normal', 'hard'].includes(q.get('diff')) ? q.get('diff') : 'normal',
-    waves: clampInt(q.get('waves'), 8, 4, 15),
+    waves: clampInt(q.get('waves'), 10, 4, 15),
     buildTime: clampInt(q.get('buildtime'), 40, 15, 60),
   };
 
