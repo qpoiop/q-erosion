@@ -17,15 +17,56 @@ const ETYPES = [
   { hp: 55, sp: 2.5, dmg: 0, sdmg: 18, xp: 15, sc: 4, r: .6, rng: true }, // hex gunner
   { hp: 700, sp: 1.5, dmg: 45, sdmg: 130, xp: 80, sc: 30, r: 1.1, boss: true }, // boss
 ];
+/* card rarity tiers — each line levels 기본→레어→에픽→레전드; a tier only
+   appears after the previous tier of the same line was taken */
+const RAR = [
+  { n: '기본', c: '#9aa3b5' },
+  { n: '레어', c: '#25d8ff' },
+  { n: '에픽', c: '#b26bff' },
+  { n: '레전드', c: '#ffb020' },
+];
+const ROMAN = ['I', 'II', 'III', 'IV'];
 const UPG = [
-  { k: 'frate', n: '연사 계통', d: '발사 속도 +20%', f: p => p.frate *= 1.2 },
-  { k: 'dmg', n: '위력 증폭', d: '탄환 피해 +22%', f: p => p.dmg *= 1.22 },
-  { k: 'shots', n: '확산 사격', d: '탄환 +1 (피해 −15%)', f: p => { p.shots++; p.dmg *= .85; } },
-  { k: 'pierce', n: '관통탄', d: '관통 +1', f: p => p.pierce++ },
-  { k: 'speed', n: '기동 개선', d: '이동 속도 +10%', f: p => p.speed *= 1.1 },
-  { k: 'regen', n: '자가 수복', d: '초당 HP +1.2', f: p => p.regen += 1.2 },
-  { k: 'maxhp', n: '장갑 보강', d: '최대 HP +30, 즉시 회복', f: p => { p.maxhp += 30; p.hp = Math.min(p.maxhp, p.hp + 30); } },
-  { k: 'scrap', n: '회수 장치', d: '처치 자원 +30%', f: p => p.scrapMul = (p.scrapMul || 1) * 1.3 },
+  { k: 'frate', n: '연사 계통', t: [
+    { d: '발사 속도 +20%', f: p => p.frate *= 1.2 },
+    { d: '발사 속도 +25%', f: p => p.frate *= 1.25 },
+    { d: '발사 속도 +32%', f: p => p.frate *= 1.32 },
+    { d: '발사 속도 +45%', f: p => p.frate *= 1.45 }] },
+  { k: 'dmg', n: '위력 증폭', t: [
+    { d: '탄환 피해 +22%', f: p => p.dmg *= 1.22 },
+    { d: '탄환 피해 +28%', f: p => p.dmg *= 1.28 },
+    { d: '탄환 피해 +36%', f: p => p.dmg *= 1.36 },
+    { d: '탄환 피해 +50%', f: p => p.dmg *= 1.5 }] },
+  { k: 'shots', n: '확산 사격', t: [
+    { d: '탄환 +1 (피해 −15%)', f: p => { p.shots++; p.dmg *= .85; } },
+    { d: '탄환 +1 (피해 −12%)', f: p => { p.shots++; p.dmg *= .88; } },
+    { d: '탄환 +1 (피해 −8%)', f: p => { p.shots++; p.dmg *= .92; } },
+    { d: '탄환 +2', f: p => p.shots += 2 }] },
+  { k: 'pierce', n: '관통탄', t: [
+    { d: '관통 +1', f: p => p.pierce++ },
+    { d: '관통 +1', f: p => p.pierce++ },
+    { d: '관통 +2', f: p => p.pierce += 2 },
+    { d: '관통 +3', f: p => p.pierce += 3 }] },
+  { k: 'speed', n: '기동 개선', t: [
+    { d: '이동 속도 +10%', f: p => p.speed *= 1.1 },
+    { d: '이동 속도 +12%', f: p => p.speed *= 1.12 },
+    { d: '이동 속도 +15%', f: p => p.speed *= 1.15 },
+    { d: '이속 +20% · 대시 쿨 −10%', f: p => { p.speed *= 1.2; p.dashCd *= .9; } }] },
+  { k: 'regen', n: '자가 수복', t: [
+    { d: '초당 HP +1.2', f: p => p.regen += 1.2 },
+    { d: '초당 HP +1.6', f: p => p.regen += 1.6 },
+    { d: '초당 HP +2.2', f: p => p.regen += 2.2 },
+    { d: '초당 HP +3.5', f: p => p.regen += 3.5 }] },
+  { k: 'maxhp', n: '장갑 보강', t: [
+    { d: '최대 HP +30, 즉시 회복', f: p => { p.maxhp += 30; p.hp = Math.min(p.maxhp, p.hp + 30); } },
+    { d: '최대 HP +40, 즉시 회복', f: p => { p.maxhp += 40; p.hp = Math.min(p.maxhp, p.hp + 40); } },
+    { d: '최대 HP +55, 즉시 회복', f: p => { p.maxhp += 55; p.hp = Math.min(p.maxhp, p.hp + 55); } },
+    { d: '최대 HP +80, 완전 회복', f: p => { p.maxhp += 80; p.hp = p.maxhp; } }] },
+  { k: 'scrap', n: '회수 장치', t: [
+    { d: '처치 자원 +30%', f: p => p.scrapMul = (p.scrapMul || 1) * 1.3 },
+    { d: '처치 자원 +35%', f: p => p.scrapMul = (p.scrapMul || 1) * 1.35 },
+    { d: '처치 자원 +45%', f: p => p.scrapMul = (p.scrapMul || 1) * 1.45 },
+    { d: '처치 자원 +60%', f: p => p.scrapMul = (p.scrapMul || 1) * 1.6 }] },
 ];
 const SHOP = [
   { id: 'php', c: '캐릭터', n: '장갑 보강', d: '최대 HP +25', cost: 30, per: true, f: p => { p.maxhp += 25; p.hp += 25; } },
@@ -260,6 +301,12 @@ class ErosionGame extends HTMLElement {
     // ghost placement cursor
     this.ghost = new T.Mesh(new T.BoxGeometry(TS * .92, 1.4, TS * .92), new T.MeshBasicMaterial({ color: PAL.cyanHex, transparent: true, opacity: .3, depthWrite: false }));
     this.ghost.visible = false; this.scene.add(this.ghost);
+    // build-mode overlay: placeable tiles glow green
+    const bovC = document.createElement('canvas'); bovC.width = bovC.height = N;
+    this._bovCtx = bovC.getContext('2d');
+    this._bovTex = new T.CanvasTexture(bovC); this._bovTex.magFilter = T.NearestFilter; this._bovTex.minFilter = T.NearestFilter; this._bovTex.flipY = false;
+    this.buildOv = new T.Mesh(new T.PlaneGeometry(N * TS, N * TS), new T.MeshBasicMaterial({ map: this._bovTex, transparent: true, depthWrite: false }));
+    this.buildOv.rotation.x = -Math.PI / 2; this.buildOv.position.y = .04; this.buildOv.visible = false; this.scene.add(this.buildOv);
     this.eMeshes = new Map(); this.bMeshes = []; this.sMeshes = new Map(); this.fxs = []; this.sparks = []; this.itemMs = [];
     this._onRz = () => {
       const w = this.clientWidth || innerWidth, h = this.clientHeight || innerHeight;
@@ -440,8 +487,9 @@ class ErosionGame extends HTMLElement {
     const pulseCss = document.createElement('style');
     pulseCss.textContent = '@keyframes egUpPulse { 0%,100% { box-shadow:0 0 4px rgba(37,216,255,.3); } 50% { box-shadow:0 0 16px rgba(37,216,255,.75); } }';
     this.appendChild(pulseCss);
-    // awakened synergy badges
-    this.synEl = H('div', 'position:absolute;bottom:42px;left:50%;transform:translateX(-50%);display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:60vw', hud);
+    // owned card lines (tier-colored) + awakened synergy badges
+    this.ownedEl = H('div', 'position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-width:64vw', hud);
+    this.synEl = H('div', 'position:absolute;bottom:64px;left:50%;transform:translateX(-50%);display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:60vw', hud);
     // action buttons (right)
     const br = H('div', 'position:absolute;bottom:18px;right:14px;display:flex;gap:10px;align-items:flex-end', hud);
     const mkBtn = (label) => { const b = H('button', pe + 'width:68px;height:68px;border:1px solid ' + PAL.line + ';background:' + PAL.panel + ';color:' + PAL.text + ';font:700 12px ' + FONT + ';cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;padding:7px;gap:2px;text-align:left;backdrop-filter:blur(6px)', br); b.textContent = label; return b; };
@@ -703,7 +751,7 @@ class ErosionGame extends HTMLElement {
       this._spawnBullet(p.x, p.z, dx, dz, { dmg: p.dmg, pierce: p.pierce, ghost: false, ally: !mine });
       if (mine) this.shotQ.push([+p.x.toFixed(1), +p.z.toFixed(1), +dx.toFixed(1), +dz.toFixed(1)]);
     }
-    p.a = base;
+    if (!mine || !this._meMoving) p.a = base; // aim-facing only when idle; movement owns facing otherwise
   }
   _autoCombat(p, dt, mine) {
     if (p.down) return;
@@ -734,22 +782,32 @@ class ErosionGame extends HTMLElement {
   }
   _showUpgrades() {
     const p = this.me;
-    const pool = UPG.filter(u => !(u.once && p.taken[u.k]));
+    const pool = UPG.map(u => ({ u, tier: p.taken[u.k] || 0 })).filter(c => c.tier < c.u.t.length);
+    if (!pool.length) { this.pendUp = 0; return; }
     const picks = []; while (picks.length < 3 && pool.length) picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-    this.upTitle.textContent = 'LV ' + this.lv + ' — 강화 선택' + (this.pendUp > 1 ? ' (+' + (this.pendUp - 1) + ' 대기)' : '');
+    this._upBase = 'LV ' + this.lv + ' — 강화 선택' + (this.pendUp > 1 ? ' (+' + (this.pendUp - 1) + ' 대기)' : '');
+    this._upDeadline = performance.now() + 30000; // 30s to choose, then the first card auto-picks
+    this.upTitle.textContent = this._upBase + ' · 30s';
     this.upRow.innerHTML = '';
-    picks.forEach(u => {
+    picks.forEach(({ u, tier }) => {
+      const r = RAR[tier], tt = u.t[tier];
       const c = document.createElement('button');
-      c.style.cssText = `width:118px;border:1px solid ${PAL.line};border-top:2px solid ${PAL.cyan};background:${PAL.panel};color:${PAL.text};padding:10px;cursor:pointer;text-align:left;font-family:${FONT};display:flex;flex-direction:column;gap:4px;backdrop-filter:blur(6px)`;
-      c.innerHTML = `<span style="font:700 9px ${FONT};letter-spacing:.14em;color:${PAL.cyan}">${u.k.toUpperCase()}</span><span style="font:700 14px ${FONT}">${u.n}</span><span style="font:400 11px ${FONT};line-height:1.45;color:${PAL.dim}">${u.d}</span>`;
-      const hint = SYN.find(s => !(p.syn || {})[s.id] && s.need.includes(u.k) && s.need.every(k => k === u.k || p.taken[k]));
+      c.style.cssText = `width:122px;border:1px solid ${PAL.line};border-top:3px solid ${r.c};background:${PAL.panel};color:${PAL.text};padding:10px;cursor:pointer;text-align:left;font-family:${FONT};display:flex;flex-direction:column;gap:4px;backdrop-filter:blur(6px);box-shadow:0 0 ${6 + tier * 5}px ${r.c}33`;
+      c.innerHTML = `<span style="font:700 9px ${FONT};letter-spacing:.14em;color:${r.c}">${r.n} · ${u.k.toUpperCase()}</span><span style="font:700 14px ${FONT}">${u.n} ${ROMAN[tier]}</span><span style="font:400 11px ${FONT};line-height:1.45;color:${PAL.dim}">${tt.d}</span>`;
+      const hint = SYN.find(s => !(p.syn || {})[s.id] && s.need.includes(u.k) && !p.taken[u.k] && s.need.every(k => k === u.k || p.taken[k]));
       if (hint) c.innerHTML += `<span style="font:700 10px ${FONT};color:${PAL.amber}">✦ 시너지 각성: ${hint.n}</span>`;
-      c.onclick = () => { u.f(p); p.taken[u.k] = 1; this._checkSyn(p, true); this.pendUp--; this.upEl.style.display = 'none'; this._beep(750, .08); if (this.pendUp > 0) this._showUpgrades(); };
+      c.onclick = () => { tt.f(p); p.taken[u.k] = tier + 1; this._checkSyn(p, true); this.pendUp--; this.upEl.style.display = 'none'; this._upDeadline = 0; this._beep(750, .08); if (this.pendUp > 0) this._showUpgrades(); };
       this.upRow.appendChild(c);
     });
     this.upEl.style.display = 'flex';
   }
-  _botUpgrade() { const p = this.ally; const pool = UPG.filter(u => !(u.once && p.taken[u.k])); const u = pool[Math.floor(Math.random() * pool.length)]; u.f(p); p.taken[u.k] = 1; this._checkSyn(p, false); }
+  _botUpgrade() {
+    const p = this.ally;
+    const pool = UPG.filter(u => (p.taken[u.k] || 0) < u.t.length);
+    if (!pool.length) return;
+    const u = pool[Math.floor(Math.random() * pool.length)], tier = p.taken[u.k] || 0;
+    u.t[tier].f(p); p.taken[u.k] = tier + 1; this._checkSyn(p, false);
+  }
   _checkSyn(p, mine) { // combo of taken card lines → one-time evolution bonus
     p.syn = p.syn || {};
     for (const s of SYN) {
@@ -1096,8 +1154,9 @@ class ErosionGame extends HTMLElement {
       if (!this._blockedAt(p.x, nz + Math.sign(rz) * .3)) p.z = nz;
       p.x = clamp(p.x, 1 - HALF, HALF - 1); p.z = clamp(p.z, 1 - HALF, HALF - 1);
       p.tilt = 1;
-      if (this.enemies.size === 0 && m > .01) p.a = Math.atan2(rz, rx);
-    } else p.tilt = 0;
+      this._meMoving = m > .01;
+      if (this._meMoving) p.a = Math.atan2(rz, rx); // facing follows movement while moving
+    } else { p.tilt = 0; this._meMoving = false; }
   }
   _bulletSim(dt) {
     const host = this.isHostish();
@@ -1152,6 +1211,17 @@ class ErosionGame extends HTMLElement {
   _render(dt) {
     const T = THREE, now = performance.now() / 1000;
     if (this.dust) this.dust.rotation.y += dt * .01;
+    // build-mode overlay: refresh placeable tiles 4x/s
+    const bovOn = this.buildMode && this.buildSel !== 3 && !this.over;
+    this.buildOv.visible = bovOn;
+    if (bovOn && now - (this._bovT || 0) > .25) {
+      this._bovT = now;
+      const ctx = this._bovCtx;
+      ctx.clearRect(0, 0, N, N);
+      ctx.fillStyle = 'rgba(70,235,120,.28)';
+      for (let gz = 0; gz < N; gz++) for (let gx = 0; gx < N; gx++) if (this._canPlace(ti(gx, gz))) ctx.fillRect(gx, gz, 1, 1);
+      this._bovTex.needsUpdate = true;
+    }
     // structures
     if (this._structDirty) {
       this._structDirty = false;
@@ -1266,6 +1336,21 @@ class ErosionGame extends HTMLElement {
     this.upChip.style.display = this.pendUp > 0 && !sheetOpen ? 'block' : 'none';
     if (this.pendUp > 0) this.upChip.textContent = `⬆ 강화 카드 ${this.pendUp} — 클릭`;
     if (this.phase === 'build' && this.pendUp > 0 && !sheetOpen && !this.over) this._showUpgrades();
+    // card sheet countdown — expiry auto-picks the first card
+    if (sheetOpen && this._upDeadline) {
+      const rem = Math.ceil((this._upDeadline - performance.now()) / 1000);
+      if (rem <= 0) { const first = this.upRow.querySelector('button'); this._upDeadline = 0; if (first) { this._banner('시간 초과 — 첫 번째 카드 자동 선택', 2200); first.click(); } }
+      else this.upTitle.textContent = this._upBase + ' · ' + rem + 's';
+    }
+    // owned card lines (tier-colored)
+    const ownKey = JSON.stringify(this.me.taken);
+    if (ownKey !== this._ownKey) {
+      this._ownKey = ownKey;
+      this.ownedEl.innerHTML = UPG.filter(u => this.me.taken[u.k]).map(u => {
+        const tier = Math.min(this.me.taken[u.k], u.t.length) - 1, r = RAR[tier];
+        return `<div style="background:rgba(12,14,20,.6);border:1px solid ${r.c};color:${r.c};font:700 10px ${FONT};padding:2px 7px;letter-spacing:.04em">${u.n.slice(0, 2)} ${ROMAN[tier]}</div>`;
+      }).join('');
+    }
     const synKey = Object.keys(this.me.syn || {}).join(',');
     if (synKey !== this._synKey) {
       this._synKey = synKey;
