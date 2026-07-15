@@ -100,7 +100,8 @@ const DIFF_SPT = { easy: 1.15, normal: 1, hard: .88 }; // spawn interval multipl
 const RELAY = 'wss://q-erosion-relay.qpoiop3.workers.dev'; // dedicated DO relay (public MQTT is the fallback)
 const GATE_DIR = ['북', '남', '서', '동']; // matches gates[] order
 const SHIP_MODEL = 'assets/scv.glb'; // set to null to revert to the primitive ships
-const SHIP_MODEL_YAW = Math.PI;      // rotate model so its front matches game +z
+const SHIP_MODEL_YAW = 0;            // rotate model so its front matches game +z
+const XP_NEED = lv => 45 + lv * 30;  // steeper curve — augments should take real kills
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
 
@@ -381,7 +382,7 @@ class ErosionGame extends HTMLElement {
       const src = gl.scene;
       const box = new T.Box3().setFromObject(src);
       const size = box.getSize(new T.Vector3()), ctr = box.getCenter(new T.Vector3());
-      const s = 1.9 / Math.max(size.x, size.z, .001);
+      const s = 2.5 / Math.max(size.x, size.z, .001);
       src.position.set(-ctr.x, -box.min.y, -ctr.z);
       const tpl = new T.Group(); tpl.add(src);
       tpl.scale.setScalar(s);
@@ -509,7 +510,7 @@ class ErosionGame extends HTMLElement {
     this.pbar = {}; ['me', 'ally'].forEach(k => {
       const row = H('div', 'display:flex;flex-direction:column;gap:3px', tl);
       const lab = H('div', 'font-size:10px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;color:' + PAL.dim, row);
-      const bo = H('div', 'height:10px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', row);
+      const bo = H('div', 'height:15px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', row);
       const f = H('div', 'height:100%;width:100%;transition:width .15s', bo);
       this.pbar[k] = { lab, f, row };
     });
@@ -880,8 +881,8 @@ class ErosionGame extends HTMLElement {
   _setXp(v) {
     this.xp = v;
     const lv0 = this.lv;
-    let need = 25 + this.lv * 18;
-    while (this.xp >= need) { this.xp -= need; this.lv++; need = 25 + this.lv * 18; this.pendUp++; if (this.mode === 'solo') this._botUpgrade(); this._beep(600, .12, 'square', .06); this._beep(900, .18, 'square', .05); }
+    let need = XP_NEED(this.lv);
+    while (this.xp >= need) { this.xp -= need; this.lv++; need = XP_NEED(this.lv); this.pendUp++; if (this.mode === 'solo') this._botUpgrade(); this._beep(600, .12, 'square', .06); this._beep(900, .18, 'square', .05); }
     if (this.lv > lv0 && this.scene) { // level-up flair on the units + HUD
       const milestone = this.lv % 5 === 0 || this.lv - lv0 > 1;
       this._fx(this.me.x, this.me.z, milestone, PAL.cyanHex);
@@ -1230,7 +1231,7 @@ class ErosionGame extends HTMLElement {
     if (!this.renderer) return;
     if (this.phase === 'count') {
       this.countT -= dt;
-      this._overlay(`<div style="font:700 11px ${FONT};letter-spacing:.18em;color:${PAL.red}">EROSION PROTOCOL</div><div style="font:700 68px ${FONT};color:${PAL.cyan};text-shadow:0 0 24px rgba(37,216,255,.5)">${Math.ceil(this.countT)}</div><div style="font:400 13px ${FONT};line-height:1.7;color:${PAL.dim}">4개의 균열에서 침식체가 몰려온다.<br>벽과 포탑으로 길을 막고, 중앙의 정화 코어를 ${this.maxWave}웨이브 동안 지켜라.</div>`);
+      this._overlay(`<div style="font:700 11px ${FONT};letter-spacing:.18em;color:${PAL.red}">EROSION PROTOCOL</div><div style="font:700 68px ${FONT};color:${PAL.cyan};text-shadow:0 0 24px rgba(37,216,255,.5)">${Math.ceil(this.countT)}</div><div style="font:400 13px ${FONT};line-height:1.7;color:${PAL.dim}">웨이브마다 무작위 균열 하나가 열린다.<br>붉게 빛나는 균열을 벽과 포탑으로 막고, 중앙의 정화 코어를 ${this.maxWave}웨이브 동안 지켜라.</div>`);
       if (this.countT <= 0) { this.phase = 'none'; this.ov.style.display = 'none'; if (this.isHostish()) this._startBuild(); }
     }
     // solo: the augment sheet freezes the whole simulation (wave timer, enemies, bullets)
@@ -1335,7 +1336,7 @@ class ErosionGame extends HTMLElement {
       if (!this._lostBan || this.tm - this._lostBan > 6) { this._lostBan = this.tm; this._banner('동료 연결 대기 중…', 3000); }
     }
   }
-  xpTotal() { let need = 0; for (let l = 1; l < this.lv; l++) need += 25 + l * 18; return need + this.xp; }
+  xpTotal() { let need = 0; for (let l = 1; l < this.lv; l++) need += XP_NEED(l); return need + this.xp; }
   /* ---------- render ---------- */
   _render(dt) {
     const T = THREE, now = performance.now() / 1000;
