@@ -989,7 +989,10 @@ class ErosionGame extends HTMLElement {
     const g = this.gates[Math.floor(Math.random() * 4)];
     const id = this.eid++;
     const hpMul = (1 + (this.wave - 1) * .18) * this.diffMul;
-    const e = { id, ty, x: g.x + rnd(-.5, .5), z: g.z + rnd(-.5, .5), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2) };
+    // spawn OUTSIDE the gate and walk in through the doorway
+    const nx = g.gx === 0 ? -1 : g.gx === N - 1 ? 1 : 0, nz = g.gz === 0 ? -1 : g.gz === N - 1 ? 1 : 0;
+    const off = rnd(1.6, 3.2);
+    const e = { id, ty, x: g.x + nx * off + rnd(-.5, .5) * (nz ? 1 : 0), z: g.z + nz * off + rnd(-.5, .5) * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x, gz: g.z };
     if (ETYPES[ty].boss && this.wave >= this.maxWave) { e.final = true; e.hp *= 10; } // final boss — beefed up
     this.enemies.set(id, e);
     if (ETYPES[ty].boss) { this._banner(e.final ? '⚠ 최종 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5); }
@@ -1002,6 +1005,12 @@ class ErosionGame extends HTMLElement {
       const et = ETYPES[e.ty];
       let sp = et.sp * slow * this.diffMul * (et.boss ? 1 : 1);
       e.cool -= dt;
+      // spawned outside: walk in through the gate before anything else
+      if (e.entering) {
+        const dx = e.gx - e.x, dz = e.gz - e.z, d = Math.hypot(dx, dz);
+        if (d > .4) { e.x += dx / d * sp * dt; e.z += dz / d * sp * dt; continue; }
+        e.entering = false;
+      }
       // nearest live player
       let np = null, npd = 1e9; for (const p of players) { if (p.down) continue; const d = dist2(e.x, e.z, p.x, p.z); if (d < npd) { npd = d; np = p; } }
       // ranged behaviour
@@ -1449,9 +1458,9 @@ class ErosionGame extends HTMLElement {
     this.lvEl.textContent = 'LV ' + this.lv;
     this.xpF.style.width = (this.xp / (25 + this.lv * 18) * 100) + '%';
     const p = this.me;
-    this.dashBtn.textContent = p.dashT > 0 ? '대시 ' + p.dashT.toFixed(1) : '대시';
+    this.dashBtn.innerHTML = p.dashT > 0 ? '대시<br>' + p.dashT.toFixed(1) + 's' : '대시';
     this.dashBtn.style.opacity = p.dashT > 0 ? .45 : 1;
-    this.sklBtn.textContent = p.sklT > 0 ? '충격파 ' + Math.ceil(p.sklT) : '충격파 Lv' + p.sklLv;
+    this.sklBtn.innerHTML = p.sklT > 0 ? '충격파<br>' + Math.ceil(p.sklT) + 's' : '충격파<br>Lv' + p.sklLv;
     this.sklBtn.style.opacity = p.sklT > 0 ? .45 : 1;
     this.sklBtn.style.borderColor = p.sklT > 0 ? PAL.line : PAL.cyan; this.sklBtn.style.color = p.sklT > 0 ? PAL.text : PAL.cyan;
     if (p.item) this.itemBtn.textContent = ITEMS[p.item].n; else this.itemBtn.innerHTML = '아이템<br>없음';
