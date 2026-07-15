@@ -16,6 +16,7 @@
 | `index.html` | 로비 + 앱 셸 (PWA) |
 | `game.js` | `<erosion-game>` 커스텀 엘리먼트 — 게임 전체 |
 | `sw.js`, `manifest.webmanifest`, `icons/` | PWA |
+| `relay/` | 전용 멀티플레이 릴레이 — Cloudflare Worker + Durable Object |
 | `design/` | claude.ai/design 원본 시안 스냅샷 |
 | `docs/` | 게임 가이드·설계 문서 |
 

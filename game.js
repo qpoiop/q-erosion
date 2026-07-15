@@ -92,6 +92,7 @@ const ITEM_KEYS = Object.keys(ITEMS);
 const DIFF = { easy: .75, normal: 1, hard: 1.35 };
 const DIFF_CNT = { easy: .8, normal: 1, hard: 1.25 };  // wave size multiplier
 const DIFF_SPT = { easy: 1.15, normal: 1, hard: .88 }; // spawn interval multiplier
+const RELAY = 'wss://q-erosion-relay.qpoiop3.workers.dev'; // dedicated DO relay (public MQTT is the fallback)
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
 
@@ -667,18 +668,50 @@ class ErosionGame extends HTMLElement {
       const d = this.ovIn.querySelector('#egWaitMsg');
       if (d) { d.textContent = '아직 응답이 없습니다 — 코드가 정확한지, 방장이 대기 화면을 열어두었는지 확인하세요.'; d.style.color = PAL.amber; }
     }, 12000);
+    this._connectRelay();
+    this.sendPoseT = 0; this.sendStateT = 0; this.sendStT = 0;
+  }
+  _onNetReady() { // shared post-connect handshake (relay & mqtt paths)
+    if (!this.isHost) {
+      clearInterval(this._helloIv);
+      this._helloIv = setInterval(() => { if (this.phase === 'wait') this._send({ t: 'hello' }); else clearInterval(this._helloIv); }, 1500);
+      this._send({ t: 'hello' });
+    }
+  }
+  _connectRelay() { // dedicated Cloudflare DO relay first; public MQTT as fallback
+    if (this._dead) return;
+    let settled = false;
+    try {
+      const ws = new WebSocket(RELAY + '/room/' + this.room + '?role=' + (this.isHost ? 'h' : 'g'));
+      const to = setTimeout(() => { if (!settled) { settled = true; try { ws.close(); } catch (e) {} this._connectMqtt(); } }, 5000);
+      ws.onopen = () => {
+        if (settled) { try { ws.close(); } catch (e) {} return; }
+        settled = true; clearTimeout(to);
+        this.net = { ws, connected: true, publish: (t, m) => { try { ws.send(m); } catch (e) {} }, end: () => { try { ws.close(); } catch (e) {} } };
+        this._netUp = true;
+        ws.onmessage = ev => { try { this._onMsg(JSON.parse(ev.data)); } catch (e) {} };
+        ws.onclose = () => {
+          if (this.net && this.net.ws === ws) this.net.connected = false;
+          if (!this._dead && this.phase !== 'over') setTimeout(() => { if (!this._dead && this.net && !this.net.connected) this._connectRelay(); }, 1500);
+        };
+        this._onNetReady();
+      };
+      ws.onerror = () => { if (!settled) { settled = true; clearTimeout(to); this._connectMqtt(); } };
+    } catch (e) { this._connectMqtt(); }
+  }
+  _connectMqtt() {
+    if (this._dead) return;
     const urls = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
     let ui = 0;
     const connect = () => {
       if (this._dead) return;
       const c = mqtt.connect(urls[ui], { clientId: 'eg_' + Math.random().toString(16).slice(2, 10), clean: true, connectTimeout: 8000, reconnectPeriod: 3000 });
       this.net = c;
-      c.on('connect', () => { c.subscribe(this.subT); if (!this.isHost) { this._helloIv = setInterval(() => { if (this.phase === 'wait') this._send({ t: 'hello' }); else clearInterval(this._helloIv); }, 1500); this._send({ t: 'hello' }); } });
+      c.on('connect', () => { c.subscribe(this.subT); this._onNetReady(); });
       c.on('message', (t, m) => { try { this._onMsg(JSON.parse(m.toString())); } catch (e) {} });
       c.on('error', () => { if (ui === 0 && !this._netUp) { ui = 1; try { c.end(true); } catch (e) {} connect(); } });
     };
     connect();
-    this.sendPoseT = 0; this.sendStateT = 0; this.sendStT = 0;
   }
   _send(o) { if (this.net && this.net.connected) { this._netUp = true; this.net.publish(this.pubT, JSON.stringify(o)); } }
   _structPack() { const a = []; for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2 || this.occ[i] === 5) a.push([i, this.occ[i], Math.round(this.shp[i]), +this.bld[i].toFixed(2)]); return a; }

@@ -62,8 +62,10 @@
 
 ## 네트워킹
 
-- 공개 MQTT 릴레이 (emqx → 실패 시 hivemq 폴백), 토픽 `dc-erosion/v3/<방코드>`
-- 호스트 권위: 적 스폰/AI/피해 판정/자원/웨이브 전환. state 패킷 0.13초, struct 패킷 1.4초(맵 변경 시 즉시)
+- **전용 릴레이 (1순위)**: Cloudflare Workers + Durable Object (`relay/`, `q-erosion-relay.qpoiop3.workers.dev`). 방 코드당 DO 1개, WebSocket 허브. 실측: 매칭 1.2초, 이벤트 전파 ~82ms
+- **과금 방어**: SQLite 클래스 DO(무료 플랜 호환) · WebSocket Hibernation(유휴 duration 과금 0) · 방당 소켓 2개 하드캡+역할 중복 거부 · 소켓당 60msg/s 제한(초과 시 종료, 정상 피크 ~25/s) · 메시지 8KB 캡 · 방 TTL 2시간 알람 · 경로 정규식 불일치 시 DO 미인스턴스화
+- **폴백 (2순위)**: 릴레이 5초 내 연결 실패 시 공개 MQTT (emqx → hivemq), 토픽 `dc-erosion/v3/<방코드>`
+- 호스트 권위: 적 스폰/AI/피해 판정/자원/웨이브 전환. state 패킷 0.13초, struct 패킷 1.4초(변경 시 즉시)
 - 조인: 포즈·사격 전송, 로컬 예측 렌더. 건설/구매/판매는 호스트에 요청(bld/buy/sel)
 - 진행도(건설 게이지)는 양측 로컬 틱 + struct 패킷 전방 보정
 
