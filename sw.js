@@ -1,6 +1,7 @@
 /* EROSION PROTOCOL service worker
    - app shell (/, index.html, game.js): network-first so deploys reach users immediately; cache fallback for offline
    - CDN assets (unpkg three/mqtt, google fonts): cache-first — URLs are version-pinned, safe to keep forever */
+const BUILD = '__BUILD__'; // stamped by CI per deploy so the browser sees a new SW → update toast
 const CACHE = 'erosion-v1';
 const APP_SHELL = ['/', '/index.html', '/game.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-512-maskable.png'];
 const CDN = [
