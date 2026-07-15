@@ -434,6 +434,12 @@ class ErosionGame extends HTMLElement {
     this.lvEl = H('div', 'font-size:13px;font-weight:700;letter-spacing:.08em;color:' + PAL.cyan, bc);
     const xpb = H('div', 'width:140px;height:6px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', bc);
     this.xpF = H('div', 'height:100%;width:0%;background:' + PAL.cyan + ';box-shadow:0 0 8px ' + PAL.cyan, xpb);
+    // pending level-up chip (assault: cards wait here instead of auto-opening)
+    this.upChip = H('button', pe + 'font:700 11px ' + FONT + ';border:1px solid ' + PAL.cyan + ';background:rgba(37,216,255,.14);color:' + PAL.cyan + ';padding:5px 11px;cursor:pointer;letter-spacing:.06em;display:none;animation:egUpPulse 1.1s ease-in-out infinite', bc);
+    this.upChip.onclick = () => { if (this.pendUp > 0 && this.upEl.style.display === 'none') this._showUpgrades(); };
+    const pulseCss = document.createElement('style');
+    pulseCss.textContent = '@keyframes egUpPulse { 0%,100% { box-shadow:0 0 4px rgba(37,216,255,.3); } 50% { box-shadow:0 0 16px rgba(37,216,255,.75); } }';
+    this.appendChild(pulseCss);
     // awakened synergy badges
     this.synEl = H('div', 'position:absolute;bottom:42px;left:50%;transform:translateX(-50%);display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:60vw', hud);
     // action buttons (right)
@@ -722,7 +728,9 @@ class ErosionGame extends HTMLElement {
     this.xp = v;
     let need = 25 + this.lv * 18;
     while (this.xp >= need) { this.xp -= need; this.lv++; need = 25 + this.lv * 18; this.pendUp++; if (this.mode === 'solo') this._botUpgrade(); this._beep(600, .12, 'square', .06); this._beep(900, .18, 'square', .05); }
-    if (this.pendUp > 0 && this.upEl.style.display === 'none' && !this.over) this._showUpgrades();
+    // build phase: open the card sheet immediately. assault: hold as a pending
+    // chip (see _hudTick) so the sheet doesn't force a choice mid-combat.
+    if (this.pendUp > 0 && this.upEl.style.display === 'none' && !this.over && this.phase !== 'assault') this._showUpgrades();
   }
   _showUpgrades() {
     const p = this.me;
@@ -1253,6 +1261,11 @@ class ErosionGame extends HTMLElement {
     this.coreF.style.width = Math.max(0, chp * 100) + '%';
     this.coreF.style.background = chp < .3 ? PAL.red : `linear-gradient(90deg,${PAL.cyan},#7ee8ff)`;
     this.coreLab.textContent = '코어 ' + Math.max(0, Math.round(this.coreHp)) + '/' + this.coreMax;
+    // pending upgrades: chip during assault, auto-open when the build phase arrives
+    const sheetOpen = this.upEl.style.display !== 'none';
+    this.upChip.style.display = this.pendUp > 0 && !sheetOpen ? 'block' : 'none';
+    if (this.pendUp > 0) this.upChip.textContent = `⬆ 강화 카드 ${this.pendUp} — 클릭`;
+    if (this.phase === 'build' && this.pendUp > 0 && !sheetOpen && !this.over) this._showUpgrades();
     const synKey = Object.keys(this.me.syn || {}).join(',');
     if (synKey !== this._synKey) {
       this._synKey = synKey;
