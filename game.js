@@ -334,7 +334,7 @@ class ErosionGame extends HTMLElement {
     // build-mode overlay: placeable tiles glow green
     const bovC = document.createElement('canvas'); bovC.width = bovC.height = N;
     this._bovCtx = bovC.getContext('2d');
-    this._bovTex = new T.CanvasTexture(bovC); this._bovTex.magFilter = T.NearestFilter; this._bovTex.minFilter = T.NearestFilter; this._bovTex.flipY = false;
+    this._bovTex = new T.CanvasTexture(bovC); this._bovTex.magFilter = T.NearestFilter; this._bovTex.minFilter = T.NearestFilter; // default flipY=true: canvas row gz maps to world +z correctly
     this.buildOv = new T.Mesh(new T.PlaneGeometry(N * TS, N * TS), new T.MeshBasicMaterial({ map: this._bovTex, transparent: true, depthWrite: false }));
     this.buildOv.rotation.x = -Math.PI / 2; this.buildOv.position.y = .04; this.buildOv.visible = false; this.scene.add(this.buildOv);
     this.eMeshes = new Map(); this.bMeshes = []; this.sMeshes = new Map(); this.fxs = []; this.sparks = []; this.itemMs = [];
@@ -446,7 +446,7 @@ class ErosionGame extends HTMLElement {
     const bg = new T.Mesh(new T.BoxGeometry(w, .12, .12), new T.MeshBasicMaterial({ color: 0x10131c }));
     const fill = new T.Mesh(new T.BoxGeometry(w, .14, .14), new T.MeshBasicMaterial({ color: PAL.cyanHex }));
     gr.add(bg); gr.add(fill); gr.fill = fill; gr.w = w;
-    gr.position.set(x, 2.25, z); gr.rotation.y = -Math.PI / 4;
+    gr.position.set(x, 2.25, z); gr.rotation.y = Math.PI / 4; // aligned to the screen horizontal
     this.scene.add(gr); return gr;
   }
   _setBar(bar, p, colHex) {
@@ -515,7 +515,7 @@ class ErosionGame extends HTMLElement {
     this.pbar = {}; ['me', 'ally'].forEach(k => {
       const row = H('div', 'display:flex;flex-direction:column;gap:3px', tl);
       const lab = H('div', 'font-size:10px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;color:' + PAL.dim, row);
-      const bo = H('div', 'height:15px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', row);
+      const bo = H('div', 'height:8px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', row);
       const f = H('div', 'height:100%;width:100%;transition:width .15s', bo);
       this.pbar[k] = { lab, f, row };
     });
