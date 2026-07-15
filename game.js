@@ -91,8 +91,6 @@ const ITEM_KEYS = Object.keys(ITEMS);
 const DIFF = { easy: .75, normal: 1, hard: 1.35 };
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
-/* deterministic PRNG — round-map layouts must be identical on host & joiner */
-const mulberry32 = s => () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
 class ErosionGame extends HTMLElement {
   connectedCallback() { this._dead = false; this._booted = false; setTimeout(() => { if (this.isConnected) this._init(); }, 0); }
@@ -136,7 +134,7 @@ class ErosionGame extends HTMLElement {
     this.me = mk(-2.5, 5); this.ally = mk(2.5, 5);
     this.allyOn = this.mode === 'solo';
     this.occ = new Uint8Array(N * N); this.shp = new Float32Array(N * N);
-    this.bld = new Float32Array(N * N); this.building = new Set(); this._mapRound = 0;
+    this.bld = new Float32Array(N * N); this.building = new Set();
     this._al50 = this._al25 = false; this._coreHitT = -9; this._lastCore = undefined;
     this.enemies = new Map(); this.eid = 1; this.bullets = []; this.ebullets = []; this.fitems = [];
     this.tm = 0; this.xp = 0; this.lv = 1; this.kills = 0; this.pendUp = 0; this.slowT = 0;
@@ -858,38 +856,8 @@ class ErosionGame extends HTMLElement {
     if (p === this.me) { this.dmgFlash = 1; this.shake = Math.max(this.shake || 0, .35); }
     if (p.hp <= 0) { p.hp = 0; p.down = true; p.downT = 40; p.revP = 0; if (p === this.me) this._banner('쓰러짐 — 동료의 구조 대기'); }
   }
-  /* ---------- round map (deterministic per wave — identical on host & joiner) ---------- */
-  _applyRoundMap(round) {
-    if (!this.isHostish()) return; // joiner receives rocks via struct sync
-    if (round === this._mapRound) return; this._mapRound = round;
-    for (let i = 0; i < N * N; i++) if (this.occ[i] === 5) this.occ[i] = 0;
-    const rng = mulberry32(((round * 2654435761) >>> 0) ^ (this.maxWave * 97));
-    const shapes = [[[0, 0]], [[0, 0], [1, 0]], [[0, 0], [0, 1]], [[0, 0], [1, 0], [0, 1]], [[0, 0], [1, 0], [1, 1]]];
-    const clusters = 4 + Math.min(6, round);
-    let placed = 0, guard = 0;
-    while (placed < clusters && guard++ < 250) {
-      const sh = shapes[(rng() * shapes.length) | 0];
-      const bx = 3 + ((rng() * (N - 7)) | 0), bz = 3 + ((rng() * (N - 7)) | 0);
-      const tiles = [];
-      let ok = true;
-      for (const [dx, dz] of sh) {
-        const x = bx + dx, z = bz + dz;
-        if (!inG(x, z) || this.occ[ti(x, z)]) { ok = false; break; }
-        if (x >= 9 && x <= 16 && z >= 9 && z <= 16) { ok = false; break; } // core buffer
-        if (this.gates.some(g => Math.abs(x - g.gx) <= 3 && Math.abs(z - g.gz) <= 3)) { ok = false; break; } // gate buffer
-        tiles.push(ti(x, z));
-      }
-      if (!ok) continue;
-      for (const j of tiles) this.occ[j] = 5;
-      this._flow();
-      if (this.gates.some(g => this.flowD[ti(g.gx, g.gz)] > 1e8)) { for (const j of tiles) this.occ[j] = 0; continue; } // would seal a gate
-      placed++;
-      if (this.scene) this._fx(g2w(tiles[0] % N), g2w((tiles[0] / N) | 0), false, PAL.red7Hex);
-    }
-    this._flow(); this._syncStruct(); this.sendStT = 0; // push rocks to joiner on next state tick
-    this._unstuck(this.me);
-    if (this.allyOn && this.mode === 'solo') this._unstuck(this.ally);
-  }
+  /* round-map rock obstacles were removed by user request — occ=5 handling
+     below stays as defensive support for older peers' struct packets */
   _unstuck(p) { // shove a unit off a tile that just became solid
     if (!this._blockedAt(p.x, p.z)) return;
     const gx = w2g(p.x), gz = w2g(p.z);
@@ -902,9 +870,8 @@ class ErosionGame extends HTMLElement {
   /* ---------- waves (host) ---------- */
   _startBuild() {
     this.phase = 'build'; this.phT = this.wave === 0 ? this.buildTime + 10 : this.buildTime;
-    this._applyRoundMap(this.wave + 1);
     const bonus = 30 + this.wave * 12; this.scrap += bonus;
-    if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus} · 구역 재구성`, 3400); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
+    if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus}`, 3000); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
     else this._banner('준비 단계 — 벽과 포탑을 건설하라 (건설 버튼)', 4000);
     if (this.fitems.length < 2 && this.wave > 0) { const g = this.gates[Math.floor(Math.random() * 4)]; this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: rnd(-8, 8), z: rnd(-8, 8) }); }
   }
