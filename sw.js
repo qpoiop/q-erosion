@@ -40,6 +40,17 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   const sameOrigin = url.origin === self.location.origin;
 
+  if (sameOrigin && url.pathname.startsWith('/assets/')) {
+    // large binary assets (3D models): cache-first, version by filename
+    e.respondWith((async () => {
+      const hit = await caches.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok) (await caches.open(CACHE)).put(req, res.clone());
+      return res;
+    })());
+    return;
+  }
   if (sameOrigin) {
     // network-first: fresh deploys win, cache is the offline fallback
     e.respondWith((async () => {

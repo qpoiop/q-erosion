@@ -99,6 +99,8 @@ const DIFF_CNT = { easy: .8, normal: 1, hard: 1.25 };  // wave size multiplier
 const DIFF_SPT = { easy: 1.15, normal: 1, hard: .88 }; // spawn interval multiplier
 const RELAY = 'wss://q-erosion-relay.qpoiop3.workers.dev'; // dedicated DO relay (public MQTT is the fallback)
 const GATE_DIR = ['북', '남', '서', '동']; // matches gates[] order
+const SHIP_MODEL = 'assets/scv.glb'; // set to null to revert to the primitive ships
+const SHIP_MODEL_YAW = Math.PI;      // rotate model so its front matches game +z
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
 
@@ -317,6 +319,7 @@ class ErosionGame extends HTMLElement {
     this.allyArrG.add(this.allyArr); this.allyArrG.visible = false; this.scene.add(this.allyArrG);
     // players
     this.meG = this._mkPlayer(true); this.allyG = this._mkPlayer(false);
+    this._loadShipModel();
     this.scene.add(this.meG); this.scene.add(this.allyG);
     this.allyG.visible = this.allyOn;
     // ghost placement cursor
@@ -366,7 +369,30 @@ class ErosionGame extends HTMLElement {
     }
     const lamp = new T.PointLight(isMe ? PAL.cyanHex : PAL.amberHex, .8, 5); lamp.position.y = .8; g.add(lamp);
     g.body = hull; g.accents = [canopy, e1, e2]; g.ring = ring; g.accentMat = accent;
+    g.shipParts = [hull, nose, canopy, wl, wr, e1, e2]; // hidden when a GLB ship model is applied
     return g;
+  }
+  /* optional GLB ship (SHIP_MODEL) — primitive ship stays as automatic fallback */
+  _loadShipModel() {
+    if (!SHIP_MODEL || !THREE.GLTFLoader) return;
+    const T = THREE;
+    new T.GLTFLoader().load(SHIP_MODEL, gl => {
+      if (this._dead) return;
+      const src = gl.scene;
+      const box = new T.Box3().setFromObject(src);
+      const size = box.getSize(new T.Vector3()), ctr = box.getCenter(new T.Vector3());
+      const s = 1.9 / Math.max(size.x, size.z, .001);
+      src.position.set(-ctr.x, -box.min.y, -ctr.z);
+      const tpl = new T.Group(); tpl.add(src);
+      tpl.scale.setScalar(s);
+      tpl.rotation.y = SHIP_MODEL_YAW; // model-forward → +z (game nose convention)
+      [[this.meG, 0x0e3038], [this.allyG, 0x38280c]].forEach(([g, tint], idx) => {
+        const m = idx === 0 ? tpl : tpl.clone(true);
+        m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); o.material.color = new T.Color(0x9aa4b8); o.material.emissive = new T.Color(tint); if ('metalness' in o.material) { o.material.metalness = .55; o.material.roughness = .5; } } });
+        g.shipParts.forEach(pp => pp.visible = false);
+        g.add(m); g.model = m;
+      });
+    }, undefined, e => console.warn('[erosion] ship model load failed — primitive ship kept', e));
   }
   _eMesh(e) {
     const T = THREE, g = new T.Group();
