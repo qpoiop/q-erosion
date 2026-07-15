@@ -546,7 +546,7 @@ class ErosionGame extends HTMLElement {
     // bottom-center XP
     const bc = H('div', 'position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;' + panel + 'padding:6px 12px', hud);
     this.lvEl = H('div', 'font-size:13px;font-weight:700;letter-spacing:.08em;color:' + PAL.cyan, bc);
-    const xpb = H('div', 'width:140px;height:6px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', bc);
+    const xpb = H('div', 'width:140px;height:6px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5);overflow:hidden', bc);
     this.xpF = H('div', 'height:100%;width:0%;background:' + PAL.cyan + ';box-shadow:0 0 8px ' + PAL.cyan, xpb);
     // pending level-up chip (assault: cards wait here instead of auto-opening)
     this.upChip = H('button', pe + 'font:700 11px ' + FONT + ';border:1px solid ' + PAL.cyan + ';background:rgba(37,216,255,.14);color:' + PAL.cyan + ';padding:5px 11px;cursor:pointer;letter-spacing:.06em;display:none;animation:egUpPulse 1.1s ease-in-out infinite', bc);
@@ -1610,7 +1610,7 @@ class ErosionGame extends HTMLElement {
     this.pbar.ally.row.style.display = this.allyOn ? 'flex' : 'none';
     if (this.allyOn) { setBar('ally', this.ally, PAL.amber); this.pbar.ally.lab.textContent = (this.mode === 'solo' ? '유닛-B · 봇' : '동료') + (this.ally.down ? ' — 쓰러짐!' : ''); }
     this.lvEl.textContent = 'LV ' + this.lv;
-    this.xpF.style.width = (this.xp / (25 + this.lv * 18) * 100) + '%';
+    this.xpF.style.width = Math.min(100, this.xp / XP_NEED(this.lv) * 100) + '%';
     const p = this.me;
     this.dashBtn.innerHTML = p.dashT > 0 ? '대시<br>' + p.dashT.toFixed(1) + 's' : '대시';
     this.dashBtn.style.opacity = p.dashT > 0 ? .45 : 1;
