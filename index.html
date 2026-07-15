@@ -148,6 +148,7 @@
     return s;
   };
 
+  let inGameHist = false;
   const enterGame = (mode, room) => {
     if (slot.firstChild) return;
     lobby.style.display = 'none';
@@ -159,11 +160,20 @@
     g.setAttribute('buildtime', String(props.buildTime));
     g.style.cssText = 'display:block;width:100%;height:100vh';
     slot.appendChild(g);
+    history.pushState({ eg: 1 }, ''); // trap browser-back so it confirms instead of leaving
+    inGameHist = true;
   };
+
+  window.addEventListener('popstate', () => {
+    const g = slot.querySelector('erosion-game');
+    if (g) { history.pushState({ eg: 1 }, ''); if (g._exitConfirm) g._exitConfirm(); }
+    else inGameHist = false;
+  });
 
   document.addEventListener('erosion-exit', () => {
     slot.innerHTML = '';
     lobby.style.display = '';
+    if (inGameHist) { inGameHist = false; if (history.state && history.state.eg) history.back(); }
   });
 
   input.addEventListener('input', () => {
