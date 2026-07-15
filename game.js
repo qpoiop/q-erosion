@@ -37,6 +37,14 @@ const SHOP = [
   { id: 'gtur', c: '구조물', n: '포탑 화력', d: '포탑 공격 +25% (공용)', cost: 40, g: true, f: g => g.turMul *= 1.25 },
   { id: 'gcost', c: '구조물', n: '건설 자동화', d: '건설 비용 −15% (공용)', cost: 45, g: true, max: 3, f: g => g.costMul *= .85 },
 ];
+/* synergies: taking both level-up card lines awakens a one-time evolution bonus */
+const SYN = [
+  { id: 'storm', need: ['frate', 'shots'], n: '폭풍 사격', d: '연사 +15% 추가', f: p => p.frate *= 1.15 },
+  { id: 'ap', need: ['dmg', 'pierce'], n: '철갑 관통', d: '관통 +1 · 피해 +10%', f: p => { p.pierce++; p.dmg *= 1.1; } },
+  { id: 'rush', need: ['speed', 'regen'], n: '전투 기동', d: '대시 쿨다운 −25%', f: p => p.dashCd *= .75 },
+  { id: 'fort', need: ['maxhp', 'regen'], n: '재생 장갑', d: '자가 수복 ×1.6', f: p => p.regen *= 1.6 },
+  { id: 'greed', need: ['scrap', 'dmg'], n: '약탈 프로토콜', d: '처치 자원 +20% 추가', f: p => p.scrapMul = (p.scrapMul || 1) * 1.2 },
+];
 const ITEMS = { bomb: { n: '융단 폭격' }, turret: { n: '즉석 포탑' }, kit: { n: '응급 키트' }, slow: { n: '지연 필드' } };
 const ITEM_KEYS = Object.keys(ITEMS);
 const DIFF = { easy: .75, normal: 1, hard: 1.35 };
@@ -426,6 +434,8 @@ class ErosionGame extends HTMLElement {
     this.lvEl = H('div', 'font-size:13px;font-weight:700;letter-spacing:.08em;color:' + PAL.cyan, bc);
     const xpb = H('div', 'width:140px;height:6px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', bc);
     this.xpF = H('div', 'height:100%;width:0%;background:' + PAL.cyan + ';box-shadow:0 0 8px ' + PAL.cyan, xpb);
+    // awakened synergy badges
+    this.synEl = H('div', 'position:absolute;bottom:42px;left:50%;transform:translateX(-50%);display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:60vw', hud);
     // action buttons (right)
     const br = H('div', 'position:absolute;bottom:18px;right:14px;display:flex;gap:10px;align-items:flex-end', hud);
     const mkBtn = (label) => { const b = H('button', pe + 'width:68px;height:68px;border:1px solid ' + PAL.line + ';background:' + PAL.panel + ';color:' + PAL.text + ';font:700 12px ' + FONT + ';cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;padding:7px;gap:2px;text-align:left;backdrop-filter:blur(6px)', br); b.textContent = label; return b; };
@@ -724,12 +734,22 @@ class ErosionGame extends HTMLElement {
       const c = document.createElement('button');
       c.style.cssText = `width:118px;border:1px solid ${PAL.line};border-top:2px solid ${PAL.cyan};background:${PAL.panel};color:${PAL.text};padding:10px;cursor:pointer;text-align:left;font-family:${FONT};display:flex;flex-direction:column;gap:4px;backdrop-filter:blur(6px)`;
       c.innerHTML = `<span style="font:700 9px ${FONT};letter-spacing:.14em;color:${PAL.cyan}">${u.k.toUpperCase()}</span><span style="font:700 14px ${FONT}">${u.n}</span><span style="font:400 11px ${FONT};line-height:1.45;color:${PAL.dim}">${u.d}</span>`;
-      c.onclick = () => { u.f(p); p.taken[u.k] = 1; this.pendUp--; this.upEl.style.display = 'none'; this._beep(750, .08); if (this.pendUp > 0) this._showUpgrades(); };
+      const hint = SYN.find(s => !(p.syn || {})[s.id] && s.need.includes(u.k) && s.need.every(k => k === u.k || p.taken[k]));
+      if (hint) c.innerHTML += `<span style="font:700 10px ${FONT};color:${PAL.amber}">✦ 시너지 각성: ${hint.n}</span>`;
+      c.onclick = () => { u.f(p); p.taken[u.k] = 1; this._checkSyn(p, true); this.pendUp--; this.upEl.style.display = 'none'; this._beep(750, .08); if (this.pendUp > 0) this._showUpgrades(); };
       this.upRow.appendChild(c);
     });
     this.upEl.style.display = 'flex';
   }
-  _botUpgrade() { const p = this.ally; const pool = UPG.filter(u => !(u.once && p.taken[u.k])); const u = pool[Math.floor(Math.random() * pool.length)]; u.f(p); p.taken[u.k] = 1; }
+  _botUpgrade() { const p = this.ally; const pool = UPG.filter(u => !(u.once && p.taken[u.k])); const u = pool[Math.floor(Math.random() * pool.length)]; u.f(p); p.taken[u.k] = 1; this._checkSyn(p, false); }
+  _checkSyn(p, mine) { // combo of taken card lines → one-time evolution bonus
+    p.syn = p.syn || {};
+    for (const s of SYN) {
+      if (p.syn[s.id] || !s.need.every(k => p.taken[k])) continue;
+      p.syn[s.id] = 1; s.f(p);
+      if (mine) { this._banner(`✦ 시너지 각성 — ${s.n}! ${s.d}`, 3800); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
+    }
+  }
   _dash(p) {
     if (p.down || p.dashT > 0 || this.phase !== 'assault' && this.phase !== 'build') return;
     p.dashT = p.dashCd; p.dashing = .18; this._beep(300, .07, 'triangle', .04);
@@ -832,7 +852,7 @@ class ErosionGame extends HTMLElement {
     const nB = w >= 3 ? Math.round(count * .25) : 0;
     for (let i = 0; i < count; i++) q.push(i < nG ? 2 : i < nG + nB ? 1 : 0);
     for (let i = q.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [q[i], q[j]] = [q[j], q[i]]; }
-    if (w % 4 === 0) q.push(3);
+    if (w % 5 === 0 || w === this.maxWave) q.push(3); // boss every 5th wave and on the final wave
     this.spawnQ = q; this.spawnT = .5;
   }
   _spawnLogic(dt) {
@@ -1168,8 +1188,8 @@ class ErosionGame extends HTMLElement {
     c.cry.scale.set(.7 + .3 * chp, 1.9 * (.7 + .3 * chp), .7 + .3 * chp);
     c.lamp.intensity = 1.2 + Math.sin(now * 2.5) * .4;
     if (!this.coreBar) { this.coreBar = this._mkBar(c.position.x, c.position.z, 4.2); this.coreBar.position.y = 5.6; }
-    this.coreBar.visible = chp < .999;
-    if (this.coreBar.visible) this._setBar(this.coreBar, chp, this._hpColor(chp));
+    this.coreBar.visible = true; // always visible — the core is the win/lose condition
+    this._setBar(this.coreBar, chp, this._hpColor(chp));
     // gates pulse
     this.gateMs.forEach((g, i) => { g.rift.material.opacity = .35 + Math.sin(now * 3 + i) * .15 + (this.phase === 'assault' ? .2 : 0); });
     // players
@@ -1233,6 +1253,12 @@ class ErosionGame extends HTMLElement {
     this.coreF.style.width = Math.max(0, chp * 100) + '%';
     this.coreF.style.background = chp < .3 ? PAL.red : `linear-gradient(90deg,${PAL.cyan},#7ee8ff)`;
     this.coreLab.textContent = '코어 ' + Math.max(0, Math.round(this.coreHp)) + '/' + this.coreMax;
+    const synKey = Object.keys(this.me.syn || {}).join(',');
+    if (synKey !== this._synKey) {
+      this._synKey = synKey;
+      this.synEl.innerHTML = SYN.filter(s => this.me.syn && this.me.syn[s.id])
+        .map(s => `<div style="background:rgba(12,14,20,.6);border:1px solid ${PAL.amber};color:${PAL.amber};font:700 10px ${FONT};padding:3px 8px;letter-spacing:.05em" title="${s.d}">✦ ${s.n}</div>`).join('');
+    }
     const scNow = Math.floor(this.scrap);
     if (this._scLast !== undefined && scNow !== this._scLast && this.scEl.animate) this.scEl.animate([{ transform: 'scale(1.3)' }, { transform: 'scale(1)' }], { duration: 240 });
     this._scLast = scNow;
