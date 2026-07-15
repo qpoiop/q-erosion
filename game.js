@@ -446,7 +446,7 @@ class ErosionGame extends HTMLElement {
       const base = new T.Mesh(new T.BoxGeometry(.9, .5, .9), this.mWallS); base.position.y = .25; base.castShadow = true; g.add(base);
       const pod = new T.Mesh(new T.BoxGeometry(.55, .45, .8), this.mBody); pod.position.y = .75; pod.castShadow = true; g.add(pod); g.pod = pod;
       const gun = new T.Mesh(new T.BoxGeometry(.12, .12, .7), this.mGlowCyan); gun.position.set(0, .78, .5); pod.add ? g.add(gun) : 0; g.gun = gun;
-      const lamp = new T.PointLight(PAL.cyanHex, .5, 4); lamp.position.y = 1.2; g.add(lamp);
+      const cap2 = new T.Mesh(new T.BoxGeometry(.3, .08, .3), this.mGlowCyan); cap2.position.y = 1.02; g.add(cap2); // emissive glow instead of a per-turret PointLight
     }
     this.scene.add(g); return g;
   }
