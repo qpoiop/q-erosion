@@ -90,6 +90,8 @@ const SYN = [
 const ITEMS = { bomb: { n: '융단 폭격' }, turret: { n: '즉석 포탑' }, kit: { n: '응급 키트' }, slow: { n: '지연 필드' } };
 const ITEM_KEYS = Object.keys(ITEMS);
 const DIFF = { easy: .75, normal: 1, hard: 1.35 };
+const DIFF_CNT = { easy: .8, normal: 1, hard: 1.25 };  // wave size multiplier
+const DIFF_SPT = { easy: 1.15, normal: 1, hard: .88 }; // spawn interval multiplier
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
 
@@ -111,7 +113,8 @@ class ErosionGame extends HTMLElement {
     const A = k => this.getAttribute(k) || this[k];
     this.mode = A('mode') || 'solo';
     this.room = (A('room') || '').toUpperCase();
-    this.diffMul = DIFF[A('diff')] ?? 1;
+    this.diffKey = DIFF[A('diff')] !== undefined ? A('diff') : 'normal';
+    this.diffMul = DIFF[this.diffKey];
     this.maxWave = parseInt(A('waves')) || 10;
     this.buildTime = parseInt(A('buildtime')) || 40;
     this._buildDOM(); this._initAudio(); this._reset();
@@ -890,7 +893,7 @@ class ErosionGame extends HTMLElement {
     this.wave++; this.phase = 'assault';
     this._banner('WAVE ' + this.wave + ' — 습격!'); this._beep(180, .3, 'sawtooth', .07);
     const w = this.wave, q = [];
-    const count = 14 + w * 6;
+    const count = Math.round((14 + w * 6) * (DIFF_CNT[this.diffKey] || 1));
     // guaranteed mix: ranged gunners from wave 2, breakers from wave 3, rest melee rushers
     const nG = w >= 2 ? Math.max(3, Math.round(count * .22)) : 0;
     const nB = w >= 3 ? Math.round(count * .25) : 0;
@@ -902,7 +905,7 @@ class ErosionGame extends HTMLElement {
   _spawnLogic(dt) {
     if (!this.spawnQ.length) return;
     this.spawnT -= dt; if (this.spawnT > 0) return;
-    this.spawnT = Math.max(.24, .7 - this.wave * .035);
+    this.spawnT = Math.max(.24, (.7 - this.wave * .035) * (DIFF_SPT[this.diffKey] || 1));
     const ty = this.spawnQ.shift();
     const g = this.gates[Math.floor(Math.random() * 4)];
     const id = this.eid++;

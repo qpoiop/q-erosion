@@ -81,6 +81,12 @@
           <button id="btn-solo" style="margin-top:auto;font:700 14px 'Noto Sans KR',sans-serif;background:transparent;color:#ffb020;border:1px solid #ffb020;padding:12px;cursor:pointer;letter-spacing:.06em">연습 개시 →</button>
         </div>
       </div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:16px 0 0">
+        <span style="font-size:11px;font-weight:700;letter-spacing:.14em;color:#9aa3b5">난이도</span>
+        <button class="diff-btn" data-diff="easy" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#9aa3b5;border:1px solid #3a4052;padding:7px 16px;cursor:pointer;letter-spacing:.04em">쉬움</button>
+        <button class="diff-btn" data-diff="normal" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#9aa3b5;border:1px solid #3a4052;padding:7px 16px;cursor:pointer;letter-spacing:.04em">보통</button>
+        <button class="diff-btn" data-diff="hard" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#9aa3b5;border:1px solid #3a4052;padding:7px 16px;cursor:pointer;letter-spacing:.04em">어려움</button>
+      </div>
       <div id="rules" style="display:flex;flex-wrap:wrap;gap:1px;background:#3a4052;border:1px solid #3a4052;margin:26px 0 0"></div>
       <div style="padding:16px 0 34px;font-size:11px;line-height:1.7;color:#5a6377;font-family:'Noto Sans KR',sans-serif;text-align:center">
         온라인 협동은 무료 공개 WebSocket 릴레이로 연결됩니다 — 서버 설치·비용 없음.<br>
@@ -105,6 +111,18 @@
     waves: clampInt(q.get('waves'), 10, 4, 15),
     buildTime: clampInt(q.get('buildtime'), 40, 15, 60),
   };
+
+  // difficulty selector (host/solo apply it; joiner inherits the host's)
+  const DIFF_COLOR = { easy: '#25d8ff', normal: '#e8eaf0', hard: '#ff3b2a' };
+  const diffBtns = [...document.querySelectorAll('.diff-btn')];
+  const syncDiff = () => diffBtns.forEach(b => {
+    const on = b.dataset.diff === props.difficulty;
+    b.style.color = on ? DIFF_COLOR[b.dataset.diff] : '#9aa3b5';
+    b.style.borderColor = on ? DIFF_COLOR[b.dataset.diff] : '#3a4052';
+    b.style.background = on ? 'rgba(255,255,255,.05)' : 'transparent';
+  });
+  diffBtns.forEach(b => b.addEventListener('click', () => { props.difficulty = b.dataset.diff; syncDiff(); }));
+  syncDiff();
 
   const rules = [
     { n: '01', t: '건설로 길을 막아라', d: '준비 단계에 벽·포탑을 배치. 적은 벽을 부수며 최단 경로로 코어를 노립니다.' },
