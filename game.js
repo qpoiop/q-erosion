@@ -1128,12 +1128,21 @@ class ErosionGame extends HTMLElement {
         if (d > 7) { e.x += (np.x - e.x) / d * sp * dt; e.z += (np.z - e.z) / d * sp * dt; }
         else if (d < 4.5) { e.x -= (np.x - e.x) / d * sp * dt; e.z -= (np.z - e.z) / d * sp * dt; }
         e.shootT -= dt;
-        if (e.shootT <= 0) { e.shootT = 2.1; const a = Math.atan2(np.z - e.z, np.x - e.x); const dx = Math.cos(a) * 10, dz = Math.sin(a) * 10;
+        if (e.shootT <= 0) { e.shootT = 2.8; const a = Math.atan2(np.z - e.z, np.x - e.x); const dx = Math.cos(a) * 8.5, dz = Math.sin(a) * 8.5;
           this.ebullets.push({ x: e.x, z: e.z, dx, dz, life: 3 }); if (this.mode !== 'solo') this._send({ t: 'eb', x: +e.x.toFixed(1), z: +e.z.toFixed(1), dx: +dx.toFixed(1), dz: +dz.toFixed(1) }); }
         continue;
       }
       // melee player if adjacent
-      if (np && npd < 1.3) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this.diffMul * (this.dmgWaveMul || 1)); } continue; }
+      if (np && npd < 5) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this.diffMul * (this.dmgWaveMul || 1)); } continue; }
+      // melee mobs hunt a nearby player; structures in the way get smashed
+      if (!et.rng && !et.boss && np && npd < 49) {
+        const dx = np.x - e.x, dz = np.z - e.z, d = Math.hypot(dx, dz) || 1;
+        const bi2 = ti(w2g(e.x + dx / d * 1.3), w2g(e.z + dz / d * 1.3));
+        const o2 = this.occ[bi2];
+        if (o2 === 1 || o2 === 2) { if (e.cool <= 0) this._atkStruct(e, et, bi2); }
+        else { e.x = clamp(e.x + dx / d * sp * dt, 1 - HALF, HALF - 1); e.z = clamp(e.z + dz / d * sp * dt, 1 - HALF, HALF - 1); }
+        continue;
+      }
       const gx = w2g(e.x), gz = w2g(e.z), here = ti(gx, gz);
       // breakers & bosses smash adjacent structures even when a path exists
       if ((e.ty === 1 || et.boss) && e.cool <= 0) {
@@ -1377,8 +1386,8 @@ class ErosionGame extends HTMLElement {
     for (const b of this.ebullets) {
       b.x += b.dx * dt; b.z += b.dz * dt; b.life -= dt;
       if (host) {
-        if (!this.me.down && dist2(b.x, b.z, this.me.x, this.me.z) < .49) { this._hurt(this.me, 9 * this.diffMul * (this.dmgWaveMul || 1)); b.life = 0; }
-        else if (this.allyOn && !this.ally.down && dist2(b.x, b.z, this.ally.x, this.ally.z) < .49) { this._dealToPlayer(this.ally, 9 * this.diffMul * (this.dmgWaveMul || 1)); b.life = 0; }
+        if (!this.me.down && dist2(b.x, b.z, this.me.x, this.me.z) < .49) { this._hurt(this.me, 6 * this.diffMul * (this.dmgWaveMul || 1)); b.life = 0; }
+        else if (this.allyOn && !this.ally.down && dist2(b.x, b.z, this.ally.x, this.ally.z) < .49) { this._dealToPlayer(this.ally, 6 * this.diffMul * (this.dmgWaveMul || 1)); b.life = 0; }
       } else if (!this.me.down && dist2(b.x, b.z, this.me.x, this.me.z) < .49) { b.life = 0; }
     }
     this.ebullets = this.ebullets.filter(b => b.life > 0);
