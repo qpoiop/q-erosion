@@ -98,6 +98,7 @@ const DIFF = { easy: .75, normal: 1, hard: 1.35 };
 const DIFF_CNT = { easy: .8, normal: 1, hard: 1.25 };  // wave size multiplier
 const DIFF_SPT = { easy: 1.15, normal: 1, hard: .88 }; // spawn interval multiplier
 const RELAY = 'wss://q-erosion-relay.qpoiop3.workers.dev'; // dedicated DO relay (public MQTT is the fallback)
+const GATE_DIR = ['북', '남', '서', '동']; // matches gates[] order
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
 
@@ -160,9 +161,10 @@ class ErosionGame extends HTMLElement {
     // core 2x2 at center
     this.coreTiles = [];
     for (let a = 12; a <= 13; a++)for (let b = 12; b <= 13; b++) { this.occ[ti(a, b)] = 3; this.coreTiles.push(ti(a, b)); }
-    // gates at 4 mid-edges
+    // wide gates (4 tiles) at 4 mid-edges; one is active per wave
     this.gates = [{ gx: 12, gz: 0 }, { gx: 12, gz: N - 1 }, { gx: 0, gz: 12 }, { gx: N - 1, gz: 12 }];
-    this.gates.forEach(g => { for (let o = 0; o < 2; o++) { const x = g.gx + (g.gz === 0 || g.gz === N - 1 ? o : 0), z = g.gz + (g.gx === 0 || g.gx === N - 1 ? o : 0); this.occ[ti(x, z)] = 4; } g.x = g2w(g.gx + (g.gz === 0 || g.gz === N - 1 ? .5 : 0) * 1); g.z = g2w(g.gz) + (g.gx === 0 || g.gx === N - 1 ? TS / 2 : 0); });
+    this.gates.forEach(g => { for (let o = -1; o < 3; o++) { const x = g.gx + (g.gz === 0 || g.gz === N - 1 ? o : 0), z = g.gz + (g.gx === 0 || g.gx === N - 1 ? o : 0); this.occ[ti(x, z)] = 4; } g.x = g2w(g.gx + (g.gz === 0 || g.gz === N - 1 ? .5 : 0) * 1); g.z = g2w(g.gz) + (g.gx === 0 || g.gx === N - 1 ? TS / 2 : 0); });
+    this.activeGate = Math.floor(Math.random() * 4);
     this._flow(); this._syncStruct();
     this._hudReset();
   }
@@ -296,12 +298,12 @@ class ErosionGame extends HTMLElement {
     // gates (red rift portals)
     this.gateMs = this.gates.map(g => {
       const gr = new T.Group();
-      const f1 = new T.Mesh(new T.BoxGeometry(.5, 3.4, .5), this.mEnemy); f1.position.set(-1.4, 1.7, 0); f1.castShadow = true; gr.add(f1);
-      const f2 = f1.clone(); f2.position.x = 1.4; gr.add(f2);
-      const top = new T.Mesh(new T.BoxGeometry(3.3, .5, .5), this.mEnemy); top.position.y = 3.4; gr.add(top);
-      const rift = new T.Mesh(new T.PlaneGeometry(2.4, 3), new T.MeshBasicMaterial({ color: PAL.redHex, transparent: true, opacity: .5, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
-      rift.position.y = 1.6; gr.add(rift); gr.rift = rift;
-      const lamp2 = new T.PointLight(PAL.redHex, 1.4, 10); lamp2.position.y = 2; gr.add(lamp2);
+      const f1 = new T.Mesh(new T.BoxGeometry(.5, 3.8, .5), this.mEnemy); f1.position.set(-3.4, 1.9, 0); f1.castShadow = true; gr.add(f1);
+      const f2 = f1.clone(); f2.position.x = 3.4; gr.add(f2);
+      const top = new T.Mesh(new T.BoxGeometry(7.3, .5, .5), this.mEnemy); top.position.y = 3.8; gr.add(top);
+      const rift = new T.Mesh(new T.PlaneGeometry(6.4, 3.4), new T.MeshBasicMaterial({ color: PAL.redHex, transparent: true, opacity: .5, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+      rift.position.y = 1.8; gr.add(rift); gr.rift = rift;
+      const lamp2 = new T.PointLight(PAL.redHex, 1.4, 12); lamp2.position.y = 2; gr.add(lamp2); gr.lamp = lamp2;
       gr.position.set(g2w(g.gx) + (g.gz === 0 || g.gz === N - 1 ? TS / 2 : 0), 0, g2w(g.gz) + (g.gx === 0 || g.gx === N - 1 ? TS / 2 : 0));
       if (g.gx === 0 || g.gx === N - 1) gr.rotation.y = Math.PI / 2;
       this.scene.add(gr); return gr;
@@ -798,6 +800,7 @@ class ErosionGame extends HTMLElement {
     if (this._lastCore !== undefined && m.core < this._lastCore) this._coreHitFx();
     this._lastCore = m.core;
     this.wave = m.wv; this._qn = m.qn || 0;
+    if (m.gt !== undefined && m.gt !== this.activeGate) { this.activeGate = m.gt; if (this.phase === 'build') this._banner(`다음 균열: ${GATE_DIR[m.gt]}쪽`, 2600); }
     const wasPhase = this.phase;
     if (this.phase !== 'over' && this.phase !== 'count' && m.ph) { if (m.ph !== this.phase) { this.phase = m.ph; if (m.ph === 'assault') this._banner('WAVE ' + this.wave + ' — 습격!'); else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); } } this.phT = m.pt; }
     const seen = new Set();
@@ -962,10 +965,11 @@ class ErosionGame extends HTMLElement {
   /* ---------- waves (host) ---------- */
   _startBuild() {
     this.phase = 'build'; this.phT = this.wave === 0 ? this.buildTime + 10 : this.buildTime;
+    this.activeGate = Math.floor(Math.random() * 4); // next assault pours through one random gate
     if (this.mode === 'solo') this._saveRun();
     const bonus = 30 + this.wave * 12; this.scrap += bonus;
-    if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus}`, 3000); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
-    else this._banner('준비 단계 — 벽과 포탑을 건설하라 (건설 버튼)', 4000);
+    if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus} · 다음 균열: ${GATE_DIR[this.activeGate]}쪽`, 3600); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
+    else this._banner(`준비 단계 — ${GATE_DIR[this.activeGate]}쪽 균열을 막아라 (건설 버튼)`, 4200);
     if (this.fitems.length < 2 && this.wave > 0) { const g = this.gates[Math.floor(Math.random() * 4)]; this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: rnd(-8, 8), z: rnd(-8, 8) }); }
   }
   _startAssault() {
@@ -986,13 +990,13 @@ class ErosionGame extends HTMLElement {
     this.spawnT -= dt; if (this.spawnT > 0) return;
     this.spawnT = Math.max(.24, (.7 - this.wave * .035) * (DIFF_SPT[this.diffKey] || 1));
     const ty = this.spawnQ.shift();
-    const g = this.gates[Math.floor(Math.random() * 4)];
+    const g = this.gates[this.activeGate]; // the whole wave streams through the active gate
     const id = this.eid++;
     const hpMul = (1 + (this.wave - 1) * .18) * this.diffMul;
-    // spawn OUTSIDE the gate and walk in through the doorway
+    // spawn OUTSIDE the gate, spread across its widened front, walk in
     const nx = g.gx === 0 ? -1 : g.gx === N - 1 ? 1 : 0, nz = g.gz === 0 ? -1 : g.gz === N - 1 ? 1 : 0;
-    const off = rnd(1.6, 3.2);
-    const e = { id, ty, x: g.x + nx * off + rnd(-.5, .5) * (nz ? 1 : 0), z: g.z + nz * off + rnd(-.5, .5) * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x, gz: g.z };
+    const off = rnd(1.6, 3.4), lat = rnd(-2.8, 2.8);
+    const e = { id, ty, x: g.x + nx * off + lat * (nz ? 1 : 0), z: g.z + nz * off + lat * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x + lat * (nz ? 1 : 0), gz: g.z + lat * (nx ? 1 : 0) };
     if (ETYPES[ty].boss && this.wave >= this.maxWave) { e.final = true; e.hp *= 10; } // final boss — beefed up
     this.enemies.set(id, e);
     if (ETYPES[ty].boss) { this._banner(e.final ? '⚠ 최종 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5); }
@@ -1279,7 +1283,7 @@ class ErosionGame extends HTMLElement {
       this.sendStateT -= dt;
       if (this.sendStateT <= 0) {
         this.sendStateT = .13; this.sendStT -= .13;
-        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length,
+        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate,
           en: [...this.enemies.values()].map(e => [e.id, e.ty, Math.round(e.x * 10), Math.round(e.z * 10), Math.round(e.hp)]),
           itm: this.fitems.map(f => [f.id, f.k, Math.round(f.x * 10), Math.round(f.z * 10)]) };
         if (this.sendStT <= 0) { this.sendStT = 1.4; o.st = this._structPack(); }
@@ -1353,7 +1357,11 @@ class ErosionGame extends HTMLElement {
     this.coreBar.visible = true; // always visible — the core is the win/lose condition
     this._setBar(this.coreBar, chp, this._hpColor(chp));
     // gates pulse
-    this.gateMs.forEach((g, i) => { g.rift.material.opacity = .35 + Math.sin(now * 3 + i) * .15 + (this.phase === 'assault' ? .2 : 0); });
+    this.gateMs.forEach((g, i) => {
+      const active = i === this.activeGate;
+      g.rift.material.opacity = (active ? .5 : .12) + Math.sin(now * 3 + i) * (active ? .2 : .04) + (active && this.phase === 'assault' ? .25 : 0);
+      g.lamp.intensity = active ? 1.6 + Math.sin(now * 4) * .5 : .3;
+    });
     // players
     const setP = (g, p, isMe) => {
       g.position.set(p.x, Math.sin(now * 2.6 + (isMe ? 0 : 2)) * .06, p.z);
@@ -1477,9 +1485,16 @@ class ErosionGame extends HTMLElement {
       const o = this.occ[ti(x, z)];
       if (!o) continue;
       const coreBlink = o === 3 && this.tm - this._coreHitT < 1.5 && ((this.tm * 6 | 0) % 2);
-      ctx.fillStyle = coreBlink ? PAL.red : o === 1 ? '#cfd6e4' : o === 2 ? PAL.cyan : o === 3 ? PAL.cyan : o === 5 ? '#8a8298' : PAL.red;
+      ctx.fillStyle = coreBlink ? PAL.red : o === 1 ? '#cfd6e4' : o === 2 ? PAL.cyan : o === 3 ? PAL.cyan : o === 5 ? '#8a8298' : '#5f2f36';
       ctx.globalAlpha = o === 3 || o === 4 ? .9 : .8;
       ctx.fillRect(x * S, z * S, S, S);
+    }
+    { // active gate blinks bright red on the minimap
+      const ag = this.gates[this.activeGate];
+      if (ag) {
+        ctx.fillStyle = PAL.red; ctx.globalAlpha = .55 + Math.sin(this.tm * 5) * .35;
+        for (let o = -1; o < 3; o++) { const x = ag.gx + (ag.gz === 0 || ag.gz === N - 1 ? o : 0), z = ag.gz + (ag.gx === 0 || ag.gx === N - 1 ? o : 0); ctx.fillRect(x * S, z * S, S, S); }
+      }
     }
     ctx.globalAlpha = 1;
     ctx.fillStyle = PAL.amber;
