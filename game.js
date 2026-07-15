@@ -394,10 +394,10 @@ class ErosionGame extends HTMLElement {
     });
     this.pbar.me.lab.textContent = '나 · 유닛-A';
     // scrap
-    const sc = H('div', 'display:flex;align-items:center;gap:6px;border-top:1px solid ' + PAL.line + ';padding-top:7px;margin-top:2px', tl);
-    H('div', 'width:9px;height:9px;background:' + PAL.amber + ';box-shadow:0 0 8px ' + PAL.amber, sc);
-    this.scEl = H('div', 'font:700 15px ' + FONT + ';color:' + PAL.amber, sc);
-    H('div', 'font-size:10px;color:' + PAL.dim + ';letter-spacing:.1em', sc).textContent = '자원';
+    const sc = H('div', 'display:flex;align-items:center;gap:7px;border-top:1px solid ' + PAL.line + ';padding-top:7px;margin-top:2px', tl);
+    H('div', 'width:10px;height:10px;background:' + PAL.amber + ';box-shadow:0 0 10px ' + PAL.amber, sc);
+    this.scEl = H('div', 'font:700 19px ' + FONT + ';color:' + PAL.amber + ';text-shadow:0 0 10px rgba(255,176,32,.45)', sc);
+    H('div', 'font-size:10px;color:' + PAL.dim + ';letter-spacing:.08em', sc).textContent = '보유 자원';
     // top-center: wave + core hp — compact strip so the play field stays visible
     const tc = H('div', 'position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:3px;background:rgba(12,14,20,.5);border:1px solid rgba(58,64,82,.55);backdrop-filter:blur(4px);padding:5px 12px', hud);
     const tcRow = H('div', 'display:flex;align-items:baseline;gap:8px', tc);
@@ -822,12 +822,11 @@ class ErosionGame extends HTMLElement {
     this._banner('WAVE ' + this.wave + ' — 습격!'); this._beep(180, .3, 'sawtooth', .07);
     const w = this.wave, q = [];
     const count = 10 + w * 5;
-    for (let i = 0; i < count; i++) {
-      let ty = 0;
-      const r = Math.random();
-      if (w >= 2 && r < .25) ty = 2; else if (w >= 3 && r < .45) ty = 1;
-      q.push(ty);
-    }
+    // guaranteed mix: ranged gunners from wave 2, breakers from wave 3, rest melee rushers
+    const nG = w >= 2 ? Math.max(3, Math.round(count * .22)) : 0;
+    const nB = w >= 3 ? Math.round(count * .25) : 0;
+    for (let i = 0; i < count; i++) q.push(i < nG ? 2 : i < nG + nB ? 1 : 0);
+    for (let i = q.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [q[i], q[j]] = [q[j], q[i]]; }
     if (w % 4 === 0) q.push(3);
     this.spawnQ = q; this.spawnT = .5;
   }
@@ -1219,7 +1218,10 @@ class ErosionGame extends HTMLElement {
     this.coreF.style.width = Math.max(0, chp * 100) + '%';
     this.coreF.style.background = chp < .3 ? PAL.red : `linear-gradient(90deg,${PAL.cyan},#7ee8ff)`;
     this.coreLab.textContent = '코어 ' + Math.max(0, Math.round(this.coreHp)) + '/' + this.coreMax;
-    this.scEl.textContent = '◈ ' + Math.floor(this.scrap);
+    const scNow = Math.floor(this.scrap);
+    if (this._scLast !== undefined && scNow !== this._scLast && this.scEl.animate) this.scEl.animate([{ transform: 'scale(1.3)' }, { transform: 'scale(1)' }], { duration: 240 });
+    this._scLast = scNow;
+    this.scEl.textContent = '◈ ' + scNow;
     const setBar = (k, p, col) => { this.pbar[k].f.style.width = Math.max(0, p.hp / p.maxhp * 100) + '%'; const c2 = p.down ? PAL.red : col; this.pbar[k].f.style.background = c2; this.pbar[k].f.style.boxShadow = '0 0 8px ' + c2; };
     setBar('me', this.me, PAL.cyan);
     this.pbar.ally.row.style.display = this.allyOn ? 'flex' : 'none';
