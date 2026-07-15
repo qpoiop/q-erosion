@@ -17,6 +17,7 @@ jobs:
           mkdir -p dist
           cp index.html game.js sw.js manifest.webmanifest dist/
           cp -r icons dist/icons
+          cp -r assets dist/assets
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
