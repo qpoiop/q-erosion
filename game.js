@@ -131,7 +131,11 @@ class ErosionGame extends HTMLElement {
       return;
     }
     this._bindInput();
-    if (this.mode === 'solo') { this.phase = 'count'; this.countT = 3; }
+    if (this.mode === 'solo') {
+      let resumed = false;
+      if (A('resume') === '1') { try { const s = JSON.parse(localStorage.getItem('eg_save') || 'null'); if (s && s.v === 1) { this._loadRun(s); resumed = true; } } catch (e) {} }
+      if (!resumed) { this.phase = 'count'; this.countT = 3; }
+    }
     else { this.phase = 'wait'; this._initNet(); }
     this._last = performance.now();
     const loop = (t) => { if (this._dead) return; this._raf = requestAnimationFrame(loop); const dt = Math.min(.05, (t - this._last) / 1000); this._last = t; this._tick(dt); };
@@ -446,7 +450,7 @@ class ErosionGame extends HTMLElement {
   }
   /* ---------- DOM / HUD ---------- */
   _buildDOM() {
-    this.style.cssText = 'position:fixed;inset:0;z-index:50;display:block;background:#0b0c10;font-family:' + FONT + ';color:' + PAL.text + ';touch-action:none;user-select:none;-webkit-user-select:none;overflow:hidden';
+    this.style.cssText = 'position:fixed;inset:0;z-index:50;display:block;background:#0b0c10;font-family:' + FONT + ';color:' + PAL.text + ';touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;overflow:hidden';
     const H = (t, s, parent) => { const e = document.createElement(t); e.style.cssText = s; (parent || this).appendChild(e); return e; };
     this.H = H;
     this.cv = H('canvas', 'position:absolute;inset:0;width:100%;height:100%;display:block');
@@ -532,10 +536,12 @@ class ErosionGame extends HTMLElement {
     // banner / revive
     this.ban = H('div', 'position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(12,14,20,.6);border:1px solid rgba(58,64,82,.55);backdrop-filter:blur(4px);color:' + PAL.text + ';font:700 12px ' + FONT + ';padding:6px 13px;letter-spacing:.07em;display:none;white-space:nowrap;border-left:3px solid ' + PAL.red, hud);
     this.revEl = H('div', 'position:absolute;left:50%;top:58%;transform:translateX(-50%);display:none;' + panel + 'padding:7px 14px;font:700 12px ' + FONT, hud);
-    // level-up sheet
-    this.upEl = H('div', 'position:absolute;left:50%;bottom:96px;transform:translateX(-50%);display:none;flex-direction:column;gap:6px;align-items:center;' + pe, hud);
-    this.upTitle = H('div', 'background:' + PAL.red + ';color:#fff;font:700 12px ' + FONT + ';padding:5px 12px;letter-spacing:.1em;box-shadow:0 0 14px rgba(255,59,42,.5)', this.upEl);
-    this.upRow = H('div', 'display:flex;gap:8px', this.upEl);
+    // level-up sheet — fullscreen overlay, gameplay pauses beneath it (solo)
+    this.upEl = H('div', 'position:absolute;inset:0;display:none;flex-direction:column;gap:16px;align-items:center;justify-content:center;background:rgba(5,6,10,.72);backdrop-filter:blur(3px);' + pe, hud);
+    this.upTitle = H('div', 'background:' + PAL.red + ';color:#fff;font:700 15px ' + FONT + ';padding:8px 20px;letter-spacing:.12em;box-shadow:0 0 20px rgba(255,59,42,.55)', this.upEl);
+    this.upRow = H('div', 'display:flex;gap:12px;flex-wrap:wrap;justify-content:center;max-width:92vw', this.upEl);
+    this.upHint = H('div', 'font:400 11px ' + FONT + ';color:' + PAL.dim + ';letter-spacing:.06em', this.upEl);
+    this.upHint.textContent = '카드를 선택하면 게임이 재개됩니다';
     // shop sheet
     this.shopEl = H('div', 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;flex-direction:column;gap:8px;' + pe + panel + 'padding:16px;max-width:min(92vw,560px);max-height:76vh;overflow:auto', hud);
     // overlay
@@ -839,9 +845,9 @@ class ErosionGame extends HTMLElement {
     this.xp = v;
     let need = 25 + this.lv * 18;
     while (this.xp >= need) { this.xp -= need; this.lv++; need = 25 + this.lv * 18; this.pendUp++; if (this.mode === 'solo') this._botUpgrade(); this._beep(600, .12, 'square', .06); this._beep(900, .18, 'square', .05); }
-    // build phase: open the card sheet immediately. assault: hold as a pending
-    // chip (see _hudTick) so the sheet doesn't force a choice mid-combat.
-    if (this.pendUp > 0 && this.upEl.style.display === 'none' && !this.over && this.phase !== 'assault') this._showUpgrades();
+    // solo pauses while the sheet is open, so it can open any time. multiplayer:
+    // build phase opens immediately, assault holds as a chip (see _hudTick).
+    if (this.pendUp > 0 && this.upEl.style.display === 'none' && !this.over && (this.mode === 'solo' || this.phase !== 'assault')) this._showUpgrades();
   }
   _showUpgrades() {
     const p = this.me;
@@ -855,10 +861,12 @@ class ErosionGame extends HTMLElement {
     picks.forEach(({ u, tier }) => {
       const r = RAR[tier], tt = u.t[tier];
       const c = document.createElement('button');
-      c.style.cssText = `width:122px;border:1px solid ${PAL.line};border-top:3px solid ${r.c};background:${PAL.panel};color:${PAL.text};padding:10px;cursor:pointer;text-align:left;font-family:${FONT};display:flex;flex-direction:column;gap:4px;backdrop-filter:blur(6px);box-shadow:0 0 ${6 + tier * 5}px ${r.c}33`;
-      c.innerHTML = `<span style="font:700 9px ${FONT};letter-spacing:.14em;color:${r.c}">${r.n} · ${u.k.toUpperCase()}</span><span style="font:700 14px ${FONT}">${u.n} ${ROMAN[tier]}</span><span style="font:400 11px ${FONT};line-height:1.45;color:${PAL.dim}">${tt.d}</span>`;
+      c.style.cssText = `width:190px;min-height:150px;border:1px solid ${PAL.line};border-top:4px solid ${r.c};background:${PAL.panel};color:${PAL.text};padding:16px;cursor:pointer;text-align:left;font-family:${FONT};display:flex;flex-direction:column;gap:7px;backdrop-filter:blur(6px);box-shadow:0 0 ${10 + tier * 8}px ${r.c}44;transition:transform .1s`;
+      c.onmouseenter = () => c.style.transform = 'translateY(-4px)';
+      c.onmouseleave = () => c.style.transform = '';
+      c.innerHTML = `<span style="font:700 10px ${FONT};letter-spacing:.14em;color:${r.c}">${r.n} · ${u.k.toUpperCase()}</span><span style="font:700 18px ${FONT}">${u.n} ${ROMAN[tier]}</span><span style="font:400 12.5px ${FONT};line-height:1.5;color:${PAL.dim}">${tt.d}</span>`;
       const hint = SYN.find(s => !(p.syn || {})[s.id] && s.need.includes(u.k) && !p.taken[u.k] && s.need.every(k => k === u.k || p.taken[k]));
-      if (hint) c.innerHTML += `<span style="font:700 10px ${FONT};color:${PAL.amber}">✦ 시너지 각성: ${hint.n}</span>`;
+      if (hint) c.innerHTML += `<span style="font:700 11px ${FONT};color:${PAL.amber};margin-top:auto">✦ 시너지 각성: ${hint.n}</span>`;
       c.onclick = () => { tt.f(p); p.taken[u.k] = tier + 1; this._checkSyn(p, true); this.pendUp--; this.upEl.style.display = 'none'; this._upDeadline = 0; this._beep(750, .08); if (this.pendUp > 0) this._showUpgrades(); };
       this.upRow.appendChild(c);
     });
@@ -932,9 +940,29 @@ class ErosionGame extends HTMLElement {
       if (inG(X, Z) && !this.occ[ti(X, Z)]) { p.x = g2w(X); p.z = g2w(Z); return; }
     }
   }
+  /* ---------- run save / resume (solo) ---------- */
+  _saveRun() {
+    try {
+      const st = [];
+      for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2) st.push([i, this.occ[i], Math.round(this.shp[i])]);
+      const pick = q => ({ hp: q.hp, maxhp: q.maxhp, speed: q.speed, dmg: q.dmg, frate: q.frate, shots: q.shots, pierce: q.pierce, regen: q.regen, dashCd: q.dashCd, dashDur: q.dashDur, sklLv: q.sklLv, scrapMul: q.scrapMul, taken: q.taken, syn: q.syn || {}, buys: q.buys });
+      localStorage.setItem('eg_save', JSON.stringify({ v: 1, wave: this.wave, core: Math.round(this.coreHp), scrap: Math.round(this.scrap), lv: this.lv, xp: Math.round(this.xp), kills: this.kills, tm: Math.round(this.tm), g: this.g, st, me: pick(this.me), ally: pick(this.ally), diff: this.diffKey, waves: this.maxWave, bt: this.buildTime }));
+    } catch (e) {}
+  }
+  _loadRun(s) {
+    this.wave = s.wave; this.coreHp = s.core; this.scrap = s.scrap; this.lv = s.lv; this.xp = s.xp; this.kills = s.kills; this.tm = s.tm;
+    Object.assign(this.g, s.g);
+    for (const [i, k, hp] of s.st) { this.occ[i] = k; this.shp[i] = hp; this.bld[i] = 1; }
+    Object.assign(this.me, s.me); Object.assign(this.ally, s.ally);
+    this._flow(); this._syncStruct();
+    this.phase = 'build'; this.phT = this.buildTime;
+    this.ov.style.display = 'none';
+    this._banner(`이어하기 — WAVE ${this.wave + 1} 준비`, 3200);
+  }
   /* ---------- waves (host) ---------- */
   _startBuild() {
     this.phase = 'build'; this.phT = this.wave === 0 ? this.buildTime + 10 : this.buildTime;
+    if (this.mode === 'solo') this._saveRun();
     const bonus = 30 + this.wave * 12; this.scrap += bonus;
     if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus}`, 3000); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
     else this._banner('준비 단계 — 벽과 포탑을 건설하라 (건설 버튼)', 4000);
@@ -1111,6 +1139,16 @@ class ErosionGame extends HTMLElement {
   _gameOver(win, why, fromNet) {
     if (this.over) return; this.over = { win, why };
     this.phase = 'over';
+    if (this.mode === 'solo') { // run ended: clear resume save, record stats
+      try {
+        localStorage.removeItem('eg_save');
+        const st = JSON.parse(localStorage.getItem('eg_stats') || '{}');
+        st.plays = (st.plays || 0) + 1;
+        if (win) st.wins = (st.wins || 0) + 1;
+        st.bestWave = Math.max(st.bestWave || 0, win ? this.maxWave : this.wave);
+        localStorage.setItem('eg_stats', JSON.stringify(st));
+      } catch (e) {}
+    }
     if (this.isHostish() && this.mode !== 'solo' && !fromNet) this._send({ t: 'end', win, why });
     this._beep(win ? 700 : 120, .5, win ? 'square' : 'sawtooth', .07); if (win) this._beep(1050, .6, 'square', .05);
     const mm = String(Math.floor(this.tm / 60)).padStart(2, '0'), ss = String(Math.floor(this.tm % 60)).padStart(2, '0');
@@ -1141,7 +1179,9 @@ class ErosionGame extends HTMLElement {
       this._overlay(`<div style="font:700 11px ${FONT};letter-spacing:.18em;color:${PAL.red}">EROSION PROTOCOL</div><div style="font:700 68px ${FONT};color:${PAL.cyan};text-shadow:0 0 24px rgba(37,216,255,.5)">${Math.ceil(this.countT)}</div><div style="font:400 13px ${FONT};line-height:1.7;color:${PAL.dim}">4개의 균열에서 침식체가 몰려온다.<br>벽과 포탑으로 길을 막고, 중앙의 정화 코어를 ${this.maxWave}웨이브 동안 지켜라.</div>`);
       if (this.countT <= 0) { this.phase = 'none'; this.ov.style.display = 'none'; if (this.isHostish()) this._startBuild(); }
     }
-    const playing = this.phase === 'build' || this.phase === 'assault';
+    // solo: the augment sheet freezes the whole simulation (wave timer, enemies, bullets)
+    const paused = this.mode === 'solo' && this.upEl.style.display !== 'none' && !this.over;
+    const playing = !paused && (this.phase === 'build' || this.phase === 'assault');
     if (playing && !this.over) {
       this.tm += dt; this.slowT = Math.max(0, this.slowT - dt);
       this._movePlayer(dt); this._buildSim(dt);
@@ -1376,7 +1416,7 @@ class ErosionGame extends HTMLElement {
     const sheetOpen = this.upEl.style.display !== 'none';
     this.upChip.style.display = this.pendUp > 0 && !sheetOpen ? 'block' : 'none';
     if (this.pendUp > 0) this.upChip.textContent = `⬆ 강화 카드 ${this.pendUp} — 클릭`;
-    if (this.phase === 'build' && this.pendUp > 0 && !sheetOpen && !this.over) this._showUpgrades();
+    if ((this.phase === 'build' || this.mode === 'solo') && this.pendUp > 0 && !sheetOpen && !this.over && this.phase !== 'count' && this.phase !== 'wait') this._showUpgrades();
     // card sheet countdown — expiry auto-picks the first card
     if (sheetOpen && this._upDeadline) {
       const rem = Math.ceil((this._upDeadline - performance.now()) / 1000);

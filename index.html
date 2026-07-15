@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>침식 프로토콜 — EROSION PROTOCOL</title>
 <meta name="theme-color" content="#0b0c10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
@@ -21,9 +23,17 @@
 <style>
   html, body { margin: 0; padding: 0; background: #0b0c10; }
   body { font-family: "Chakra Petch", "Noto Sans KR", sans-serif; color: #e8eaf0; }
+  * { -webkit-tap-highlight-color: transparent; }
   a { color: #25d8ff; } a:hover { color: #7ee8ff; }
   input::placeholder { color: #4a5266; }
   @keyframes egGlow { 0%,100% { text-shadow: 0 0 24px rgba(255,59,42,.55), 0 0 60px rgba(255,59,42,.25); } 50% { text-shadow: 0 0 40px rgba(255,59,42,.85), 0 0 90px rgba(255,59,42,.4); } }
+  /* erosion glitch: brief corruption bursts on the main logo */
+  @keyframes egGlitch {
+    0%, 86%, 93.5%, 100% { transform: none; filter: none; clip-path: none; }
+    87% { transform: translate(-4px, 1px) skewX(5deg); filter: drop-shadow(5px 0 rgba(37,216,255,.85)) drop-shadow(-5px 0 rgba(255,59,42,.7)); clip-path: polygon(0 0, 100% 0, 100% 46%, 0 46%, 0 58%, 100% 58%, 100% 100%, 0 100%); }
+    89% { transform: translate(4px, -2px) skewX(-4deg); filter: drop-shadow(-5px 0 rgba(37,216,255,.85)) drop-shadow(4px 0 rgba(255,59,42,.7)); }
+    91% { transform: translate(-2px, 0) skewX(2deg); filter: drop-shadow(3px 0 rgba(37,216,255,.6)); clip-path: polygon(0 0, 100% 0, 100% 30%, 0 30%, 0 38%, 100% 38%, 100% 100%, 0 100%); }
+  }
   @keyframes egScan { from { background-position: 0 0; } to { background-position: 0 8px; } }
   @keyframes egDrift { from { background-position: 0 0; } to { background-position: 64px 64px; } }
   /* design pseudo-states: style-hover / style-active / style-focus */
@@ -50,7 +60,7 @@
       </div>
       <div style="padding:44px 0 10px;text-align:center">
         <div style="font-size:12px;font-weight:700;letter-spacing:.3em;color:#25d8ff;text-shadow:0 0 16px rgba(37,216,255,.5)">CO-OP TACTICAL SURVIVAL</div>
-        <h1 style="font-size:clamp(44px,8.5vw,96px);line-height:1;margin:14px 0 6px;font-weight:900;letter-spacing:.02em;color:#ff3b2a;animation:egGlow 3s ease-in-out infinite;font-family:'Noto Sans KR',sans-serif">침식 프로토콜</h1>
+        <h1 style="font-size:clamp(44px,8.5vw,96px);line-height:1;margin:14px 0 6px;font-weight:900;letter-spacing:.02em;color:#ff3b2a;animation:egGlow 3s ease-in-out infinite,egGlitch 4.8s linear infinite;font-family:'Noto Sans KR',sans-serif">침식 프로토콜</h1>
         <div style="font-size:clamp(13px,2vw,17px);letter-spacing:.42em;color:#e8eaf0;font-weight:600;margin-bottom:18px">E R O S I O N</div>
         <p style="max-width:600px;margin:0 auto;font-size:14.5px;line-height:1.8;color:#9aa3b5;font-family:'Noto Sans KR',sans-serif">
           4개의 균열에서 침식체가 파도처럼 몰려온다.<br>
@@ -78,7 +88,9 @@
           <div style="font-size:10px;font-weight:700;letter-spacing:.2em;color:#ffb020">SOLO</div>
           <div style="font-size:19px;font-weight:700;font-family:'Noto Sans KR',sans-serif">혼자 연습</div>
           <div style="font-size:12.5px;line-height:1.65;color:#9aa3b5;font-family:'Noto Sans KR',sans-serif">AI 봇 동료 <b style="color:#ffb020">유닛-B</b>와 함께. 조작과 전략을 익히기 좋습니다.</div>
+          <div id="my-stats" style="display:none;font-size:11px;color:#5a6377;font-family:'Noto Sans KR',sans-serif"></div>
           <button id="btn-solo" style="margin-top:auto;font:700 14px 'Noto Sans KR',sans-serif;background:transparent;color:#ffb020;border:1px solid #ffb020;padding:12px;cursor:pointer;letter-spacing:.06em">연습 개시 →</button>
+          <button id="btn-resume" style="display:none;font:700 13px 'Noto Sans KR',sans-serif;background:rgba(255,176,32,.12);color:#ffb020;border:1px dashed #ffb020;padding:10px;cursor:pointer;letter-spacing:.04em"></button>
         </div>
       </div>
       <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:16px 0 0">
@@ -127,7 +139,7 @@
   const rules = [
     { n: '01', t: '건설로 길을 막아라', d: '준비 단계에 벽·포탑을 배치. 적은 벽을 부수며 최단 경로로 코어를 노립니다.' },
     { n: '02', t: '자원 = 전략', d: '처치·웨이브 보상 자원은 둘이 공유. 건설과 캐릭터·스킬·구조물 연구에 분배하세요.' },
-    { n: '03', t: 'RPG 성장', d: '경험치 레벨업마다 강화 카드 3택1. 충격파 스킬과 필드 아이템까지 빌드의 일부.' },
+    { n: '03', t: '증강 & 시너지', d: '레벨업마다 강화 카드 3택1 — 기본→레전드 4등급 테크. 두 계통 조합 시 시너지 각성, 충격파·대시·아이템까지 빌드의 일부.' },
     { n: '04', t: '코어 사수 + 구조', d: '정화 코어가 부서지면 패배. 쓰러진 동료는 곁에서 2.5초 유지로 부활.' },
   ];
   const rulesEl = document.getElementById('rules');
@@ -149,20 +161,36 @@
   };
 
   let inGameHist = false;
-  const enterGame = (mode, room) => {
+  const enterGame = (mode, room, extra) => {
     if (slot.firstChild) return;
     lobby.style.display = 'none';
     const g = document.createElement('erosion-game');
     g.setAttribute('mode', mode);
     g.setAttribute('room', room);
-    g.setAttribute('diff', props.difficulty);
-    g.setAttribute('waves', String(props.waves));
-    g.setAttribute('buildtime', String(props.buildTime));
-    g.style.cssText = 'display:block;width:100%;height:100vh';
+    g.setAttribute('diff', (extra && extra.diff) || props.difficulty);
+    g.setAttribute('waves', String((extra && extra.waves) || props.waves));
+    g.setAttribute('buildtime', String((extra && extra.bt) || props.buildTime));
+    if (extra && extra.resume) g.setAttribute('resume', '1');
+    g.style.cssText = 'display:block;width:100%;height:100vh;height:100dvh';
     slot.appendChild(g);
     history.pushState({ eg: 1 }, ''); // trap browser-back so it confirms instead of leaving
     inGameHist = true;
   };
+
+  // solo records + resume slot
+  const refreshSoloMeta = () => {
+    try {
+      const st = JSON.parse(localStorage.getItem('eg_stats') || 'null');
+      const el = document.getElementById('my-stats');
+      if (st && st.plays) { el.style.display = 'block'; el.textContent = `내 기록 · 최고 WAVE ${st.bestWave || 0} · 승리 ${st.wins || 0}/${st.plays}판`; }
+      else el.style.display = 'none';
+      const sv = JSON.parse(localStorage.getItem('eg_save') || 'null');
+      const rb = document.getElementById('btn-resume');
+      if (sv && sv.v === 1) { rb.style.display = 'block'; rb.textContent = `이어하기 — WAVE ${sv.wave + 1} 준비부터 ▶`; rb.onclick = () => enterGame('solo', '', { resume: 1, diff: sv.diff, waves: sv.waves, bt: sv.bt }); }
+      else rb.style.display = 'none';
+    } catch (e) {}
+  };
+  refreshSoloMeta();
 
   window.addEventListener('popstate', () => {
     const g = slot.querySelector('erosion-game');
@@ -174,6 +202,7 @@
     slot.innerHTML = '';
     lobby.style.display = '';
     if (inGameHist) { inGameHist = false; if (history.state && history.state.eg) history.back(); }
+    refreshSoloMeta();
   });
 
   input.addEventListener('input', () => {
