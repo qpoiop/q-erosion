@@ -284,8 +284,10 @@ class ErosionGame extends HTMLElement {
     this.mFlash = new T.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.6 });
     this.mWallS = new T.MeshStandardMaterial({ color: 0x232836, roughness: .4, metalness: .75 });
     this.mObs = new T.MeshStandardMaterial({ color: 0x241f31, roughness: .85, metalness: .25 });
-    this.bulletG = new T.BoxGeometry(.6, .1, .1);
+    this.bulletG = new T.BoxGeometry(1.8, .07, .07); // laser streak, oriented along velocity
     this.ebulletG = new T.SphereGeometry(.16, 8, 8);
+    this.mBeamCyan = new T.MeshBasicMaterial({ color: 0x8ff2ff, transparent: true, opacity: .95, blending: T.AdditiveBlending, depthWrite: false });
+    this.mBeamAmber = new T.MeshBasicMaterial({ color: 0xffd070, transparent: true, opacity: .95, blending: T.AdditiveBlending, depthWrite: false });
     // core (cyan crystal at center)
     const cg = new T.Group();
     const cb = new T.Mesh(new T.CylinderGeometry(2.4, 2.8, .6, 8), this.mBody); cb.position.y = .3; cb.castShadow = cb.receiveShadow = true; cg.add(cb);
@@ -304,8 +306,6 @@ class ErosionGame extends HTMLElement {
       const rift = new T.Mesh(new T.PlaneGeometry(6.4, 3.4), new T.MeshBasicMaterial({ color: PAL.redHex, transparent: true, opacity: .5, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
       rift.position.y = 1.8; gr.add(rift); gr.rift = rift;
       const lamp2 = new T.PointLight(PAL.redHex, 1.4, 12); lamp2.position.y = 2; gr.add(lamp2); gr.lamp = lamp2;
-      const beam = new T.Mesh(new T.CylinderGeometry(.25, .6, 26, 8, 1, true), new T.MeshBasicMaterial({ color: PAL.redHex, transparent: true, opacity: .16, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
-      beam.position.y = 13; gr.add(beam); gr.beam = beam; // sky pillar marks the ACTIVE gate from anywhere
       gr.position.set(g2w(g.gx) + (g.gz === 0 || g.gz === N - 1 ? TS / 2 : 0), 0, g2w(g.gz) + (g.gx === 0 || g.gx === N - 1 ? TS / 2 : 0));
       if (g.gx === 0 || g.gx === N - 1) gr.rotation.y = Math.PI / 2;
       this.scene.add(gr); return gr;
@@ -1374,10 +1374,11 @@ class ErosionGame extends HTMLElement {
     // gates pulse
     this.gateMs.forEach((g, i) => {
       const active = i === this.activeGate;
-      g.rift.material.opacity = (active ? .5 : .12) + Math.sin(now * 3 + i) * (active ? .2 : .04) + (active && this.phase === 'assault' ? .25 : 0);
-      g.lamp.intensity = active ? 1.6 + Math.sin(now * 4) * .5 : .3;
-      g.beam.visible = active && (this.phase === 'build' || this.phase === 'assault');
-      if (g.beam.visible) g.beam.material.opacity = .13 + Math.sin(now * 2.4) * .07 + (this.phase === 'assault' ? .08 : 0);
+      // inactive rifts turn gray so the live gate is unmistakable
+      g.rift.material.color.setHex(active ? PAL.redHex : 0x6a7180);
+      g.rift.material.opacity = active ? .5 + Math.sin(now * 3 + i) * .2 + (this.phase === 'assault' ? .25 : 0) : .16;
+      g.lamp.color.setHex(active ? PAL.redHex : 0x6a7180);
+      g.lamp.intensity = active ? 1.6 + Math.sin(now * 4) * .5 : .25;
     });
     // ally pointer: small arrow orbiting MY unit, aimed at the teammate
     {
@@ -1419,9 +1420,9 @@ class ErosionGame extends HTMLElement {
     }
     for (const [id, m] of this.eMeshes) if (!this.enemies.has(id)) { this.scene.remove(m); this.eMeshes.delete(id); }
     // bullets
-    while (this.bMeshes.length < this.bullets.length + this.ebullets.length) { const m = new T.Mesh(this.bulletG, this.mGlowCyan); this.scene.add(m); this.bMeshes.push(m); }
+    while (this.bMeshes.length < this.bullets.length + this.ebullets.length) { const m = new T.Mesh(this.bulletG, this.mBeamCyan); this.scene.add(m); this.bMeshes.push(m); }
     let bi = 0;
-    for (const b of this.bullets) { const m = this.bMeshes[bi++]; m.visible = true; m.geometry = this.bulletG; m.material = b.ally ? this.mGlowAmber : this.mGlowCyan; m.position.set(b.x, .55, b.z); m.rotation.y = -Math.atan2(b.dz, b.dx); }
+    for (const b of this.bullets) { const m = this.bMeshes[bi++]; m.visible = true; m.geometry = this.bulletG; m.material = b.ally ? this.mBeamAmber : this.mBeamCyan; m.position.set(b.x, .55, b.z); m.rotation.y = -Math.atan2(b.dz, b.dx); }
     for (const b of this.ebullets) { const m = this.bMeshes[bi++]; m.visible = true; m.geometry = this.ebulletG; m.material = this.mGlowRed; m.position.set(b.x, .55, b.z); }
     for (; bi < this.bMeshes.length; bi++) this.bMeshes[bi].visible = false;
     // items
