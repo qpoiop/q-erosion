@@ -325,14 +325,20 @@ class ErosionGame extends HTMLElement {
     }
     this.scene.add(g); return g;
   }
-  _mkBar(x, z) { // construction progress gauge above a structure
-    const T = THREE, gr = new T.Group();
-    const bg = new T.Mesh(new T.BoxGeometry(1.5, .12, .12), new T.MeshBasicMaterial({ color: 0x10131c }));
-    const fill = new T.Mesh(new T.BoxGeometry(1.5, .14, .14), new T.MeshBasicMaterial({ color: PAL.cyanHex }));
-    gr.add(bg); gr.add(fill); gr.fill = fill;
+  _mkBar(x, z, w) { // progress/HP gauge above a structure
+    const T = THREE, gr = new T.Group(); w = w || 1.5;
+    const bg = new T.Mesh(new T.BoxGeometry(w, .12, .12), new T.MeshBasicMaterial({ color: 0x10131c }));
+    const fill = new T.Mesh(new T.BoxGeometry(w, .14, .14), new T.MeshBasicMaterial({ color: PAL.cyanHex }));
+    gr.add(bg); gr.add(fill); gr.fill = fill; gr.w = w;
     gr.position.set(x, 2.25, z); gr.rotation.y = -Math.PI / 4;
     this.scene.add(gr); return gr;
   }
+  _setBar(bar, p, colHex) {
+    bar.fill.scale.x = Math.max(.001, p);
+    bar.fill.position.x = -bar.w / 2 * (1 - p);
+    bar.fill.material.color.setHex(colHex);
+  }
+  _hpColor(p) { return p > .6 ? PAL.cyanHex : p > .3 ? PAL.amberHex : PAL.redHex; }
   _structDone(i) { // construction complete
     const x = g2w(i % N), z = g2w((i / N) | 0);
     this._fx(x, z, false, PAL.cyanHex);
@@ -857,8 +863,18 @@ class ErosionGame extends HTMLElement {
       }
       // melee player if adjacent
       if (np && npd < 1.3) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this.diffMul); } continue; }
-      // flow move
       const gx = w2g(e.x), gz = w2g(e.z), here = ti(gx, gz);
+      // breakers & bosses smash adjacent structures even when a path exists
+      if ((e.ty === 1 || et.boss) && e.cool <= 0) {
+        let hit = -1;
+        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
+          const j = ti(X, Z), o2 = this.occ[j];
+          if ((o2 === 1 || o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < 3.6) { hit = j; break; }
+        }
+        if (hit >= 0) { this._atkStruct(e, et, hit); continue; }
+      }
+      // flow move
       let bi = -1, bd = this.flowD[here];
       for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
@@ -871,8 +887,7 @@ class ErosionGame extends HTMLElement {
       const o = this.occ[bi];
       const bx = g2w(bi % N), bz = g2w((bi / N) | 0);
       if (o === 1 || o === 2) { // blocked: attack structure
-        if (e.cool <= 0) { e.cool = .8; this.shp[bi] -= et.sdmg * this.diffMul; this._burst(bx, bz, PAL.redHex, 4, 4); this._beep(190, .05, 'square', .02);
-          if (this.shp[bi] <= 0) { this._fx(bx, bz, false, PAL.red7Hex); this._remove(bi); } }
+        if (e.cool <= 0) this._atkStruct(e, et, bi);
         continue;
       }
       if (o === 3) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this.diffMul * 2, e); } continue; }
@@ -880,6 +895,13 @@ class ErosionGame extends HTMLElement {
       e.x += dx / d * sp * dt; e.z += dz / d * sp * dt;
       e.x = clamp(e.x, 1 - HALF, HALF - 1); e.z = clamp(e.z, 1 - HALF, HALF - 1);
     }
+  }
+  _atkStruct(e, et, j) {
+    e.cool = .8;
+    const x = g2w(j % N), z = g2w((j / N) | 0);
+    this.shp[j] -= et.sdmg * this.diffMul;
+    this._burst(x, z, PAL.redHex, 4, 4); this._beep(190, .05, 'square', .02);
+    if (this.shp[j] <= 0) { this._fx(x, z, false, PAL.red7Hex); this._remove(j); }
   }
   _dmgCoreBy(v, e) {
     this.coreHp -= v; this.shake = Math.max(this.shake || 0, .3);
@@ -1105,10 +1127,13 @@ class ErosionGame extends HTMLElement {
         if (b < 1) { // rising from the ground + progress gauge
           g.scale.y = .12 + .88 * b;
           if (!g.bar) g.bar = this._mkBar(g.position.x, g.position.z);
-          g.bar.fill.scale.x = Math.max(.001, b);
-          g.bar.fill.position.x = -.75 * (1 - b);
+          this._setBar(g.bar, b, PAL.cyanHex);
         } else {
-          if (g.bar) { this.scene.remove(g.bar); g.bar = null; }
+          const hpP = clamp(this.shp[i] / this._structHp(g.kind), 0, 1);
+          if (hpP < .999) { // damaged: same slot becomes an HP gauge
+            if (!g.bar) g.bar = this._mkBar(g.position.x, g.position.z);
+            this._setBar(g.bar, hpP, this._hpColor(hpP));
+          } else if (g.bar) { this.scene.remove(g.bar); g.bar = null; }
           let sy = 1;
           if (g.userData.pop > 0) { g.userData.pop -= dt; sy = 1 + .22 * Math.sin(Math.min(1, 1 - g.userData.pop / .28) * Math.PI); }
           g.scale.y = sy;
@@ -1124,10 +1149,13 @@ class ErosionGame extends HTMLElement {
     // core
     const c = this.coreMesh;
     c.cry.rotation.y += dt * .8; c.ring.rotation.z += dt * 1.2;
-    const chp = this.coreHp / this.coreMax;
+    const chp = clamp(this.coreHp / this.coreMax, 0, 1);
     c.cry.material = (this._coreBanT && this.tm - this._coreBanT < .5) ? this.mFlash : this.mGlowCyan;
     c.cry.scale.set(.7 + .3 * chp, 1.9 * (.7 + .3 * chp), .7 + .3 * chp);
     c.lamp.intensity = 1.2 + Math.sin(now * 2.5) * .4;
+    if (!this.coreBar) { this.coreBar = this._mkBar(c.position.x, c.position.z, 4.2); this.coreBar.position.y = 5.6; }
+    this.coreBar.visible = chp < .999;
+    if (this.coreBar.visible) this._setBar(this.coreBar, chp, this._hpColor(chp));
     // gates pulse
     this.gateMs.forEach((g, i) => { g.rift.material.opacity = .35 + Math.sin(now * 3 + i) * .15 + (this.phase === 'assault' ? .2 : 0); });
     // players
