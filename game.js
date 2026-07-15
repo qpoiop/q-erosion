@@ -586,6 +586,8 @@ class ErosionGame extends HTMLElement {
     this.upHint = H('div', 'font:400 11px ' + FONT + ';color:' + PAL.dim + ';letter-spacing:.06em', this.upEl);
     this.upHint.textContent = '카드를 선택하면 게임이 재개됩니다';
     // shop sheet
+    this.shopBg = H('div', 'position:absolute;inset:0;display:none;background:rgba(5,6,10,.45);' + pe, hud);
+    this.shopBg.addEventListener('pointerdown', e => { e.stopPropagation(); this._toggleShop(); });
     this.shopEl = H('div', 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;flex-direction:column;gap:8px;' + pe + panel + 'padding:16px;max-width:min(92vw,560px);max-height:76vh;overflow:auto', hud);
     // overlay
     this.ov = H('div', 'position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,7,10,.82);backdrop-filter:blur(4px);' + pe, hud);
@@ -601,7 +603,7 @@ class ErosionGame extends HTMLElement {
     [this.wallChip, this.turChip, this.sellChip].forEach((c, i) => { const on = sel === i + 1; c.style.borderColor = on ? PAL.cyan : PAL.line; c.style.color = on ? PAL.cyan : PAL.text; c.style.background = on ? 'rgba(37,216,255,.14)' : PAL.panel; });
   }
   _obtn(primary) { return `font:700 13px ${FONT};border:1px solid ${primary ? PAL.red : PAL.line};background:${primary ? PAL.red : 'transparent'};color:${primary ? '#fff' : PAL.text};padding:10px 16px;cursor:pointer;letter-spacing:.04em`; }
-  _hudReset() { if (this.upEl) { this.upEl.style.display = 'none'; this.shopEl.style.display = 'none'; this.ov.style.display = 'none'; this.buildMode = false; this._buildBarSync(); } }
+  _hudReset() { if (this.upEl) { this.upEl.style.display = 'none'; this.shopEl.style.display = 'none'; if (this.shopBg) { this.shopBg.style.display = 'none'; this.shopBtn.textContent = '연구'; this.shopBtn.style.background = PAL.panel; } this.ov.style.display = 'none'; this.buildMode = false; this._buildBarSync(); } }
   _banner(t, ms) { this.ban.textContent = t; this.ban.style.display = 'block'; clearTimeout(this._banT); this._banT = setTimeout(() => this.ban.style.display = 'none', ms || 2600); }
   _exit() { this.dispatchEvent(new CustomEvent('erosion-exit', { bubbles: true, composed: true })); }
   _exitConfirm() { // exit button & browser-back both land here
@@ -620,8 +622,12 @@ class ErosionGame extends HTMLElement {
   _buyCount(id) { return this.me.buys[id] || 0; }
   _shopCost(u) { return Math.round(u.cost * Math.pow(1.5, this._buyCount(u.id))); }
   _toggleShop() {
-    if (this.shopEl.style.display === 'flex') { this.shopEl.style.display = 'none'; return; }
-    this._renderShop(); this.shopEl.style.display = 'flex';
+    const open = this.shopEl.style.display !== 'flex';
+    this.shopEl.style.display = open ? 'flex' : 'none';
+    this.shopBg.style.display = open ? 'block' : 'none';
+    this.shopBtn.textContent = open ? '연구 중지' : '연구';
+    this.shopBtn.style.background = open ? 'rgba(255,176,32,.18)' : PAL.panel;
+    if (open) this._renderShop();
   }
   _renderShop() {
     const el = this.shopEl; el.innerHTML = '';
@@ -629,7 +635,7 @@ class ErosionGame extends HTMLElement {
     head.style.cssText = `display:flex;align-items:center;gap:10px;font:700 14px ${FONT};letter-spacing:.1em`;
     head.innerHTML = `<span style="color:${PAL.amber}">연구 — 업그레이드</span><span style="margin-left:auto;color:${PAL.amber};font-size:13px">◈ ${Math.floor(this.scrap)}</span>`;
     const close = document.createElement('button'); close.textContent = '✕'; close.style.cssText = `border:1px solid ${PAL.line};background:transparent;color:${PAL.text};cursor:pointer;padding:2px 8px;font:700 12px ${FONT}`;
-    close.onclick = () => this.shopEl.style.display = 'none'; head.appendChild(close);
+    close.onclick = () => this._toggleShop(); head.appendChild(close);
     el.appendChild(head);
     let cat = '';
     for (const u of SHOP) {
