@@ -336,6 +336,12 @@ class ErosionGame extends HTMLElement {
     const e2 = e1.clone(); e2.position.x = .3; g.add(e2);
     const ring = new T.Mesh(new T.RingGeometry(.7, .86, 32), new T.MeshBasicMaterial({ color: isMe ? PAL.cyanHex : PAL.amberHex, transparent: true, opacity: isMe ? .55 : .35, side: T.DoubleSide }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = .06; g.add(ring);
+    // ground ripple: expanding fading rings so your unit reads instantly
+    g.ripples = [];
+    for (let i = 0; i < 3; i++) {
+      const rp = new T.Mesh(new T.RingGeometry(.58, .7, 28), new T.MeshBasicMaterial({ color: isMe ? PAL.cyanHex : PAL.amberHex, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide }));
+      rp.rotation.x = -Math.PI / 2; rp.position.y = .05; g.add(rp); g.ripples.push(rp);
+    }
     const lamp = new T.PointLight(isMe ? PAL.cyanHex : PAL.amberHex, .8, 5); lamp.position.y = .8; g.add(lamp);
     g.body = hull; g.accents = [canopy, e1, e2]; g.ring = ring; g.accentMat = accent;
     return g;
@@ -486,6 +492,9 @@ class ErosionGame extends HTMLElement {
     const pulseCss = document.createElement('style');
     pulseCss.textContent = '@keyframes egUpPulse { 0%,100% { box-shadow:0 0 4px rgba(37,216,255,.3); } 50% { box-shadow:0 0 16px rgba(37,216,255,.75); } }';
     this.appendChild(pulseCss);
+    // first-wave controls hint
+    this.hintEl = H('div', 'position:absolute;bottom:88px;left:50%;transform:translateX(-50%);font:400 11px ' + FONT + ';color:' + PAL.dim + ';letter-spacing:.05em;display:none;text-align:center;background:rgba(12,14,20,.45);padding:4px 12px;border:1px solid rgba(58,64,82,.4)', hud);
+    this.hintEl.textContent = ('ontouchstart' in window) ? '드래그 이동 · 대시(무적 돌진)/아이템 버튼 · 건설/연구는 좌하단' : '이동 WASD · 대시 Space(무적 돌진) · 아이템 E · 건설/연구는 좌하단';
     // owned card lines (tier-colored) + awakened synergy badges
     this.ownedEl = H('div', 'position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-width:64vw', hud);
     this.synEl = H('div', 'position:absolute;bottom:64px;left:50%;transform:translateX(-50%);display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:60vw', hud);
@@ -714,7 +723,7 @@ class ErosionGame extends HTMLElement {
       case 'use': this._applyItemFx(m.k, m.x, m.z, false); break;
       case 'dmg': if (!this.isHost) this._hurt(this.me, m.v); break;
       case 'eb': this.ebullets.push({ x: m.x, z: m.z, dx: m.dx, dz: m.dz, life: 3, ghost: !this.isHost }); break;
-      case 'itm': if (!this.isHost) { if (m.who === 1) this.me.item = m.k; this.fitems = this.fitems.filter(f => f.id !== m.id); this._beep(700, .1); } break;
+      case 'itm': if (!this.isHost) { if (m.who === 1) { this.me.item = m.k; this._banner('아이템 획득 — ' + ITEMS[m.k].n + ' (E)', 2600); } this.fitems = this.fitems.filter(f => f.id !== m.id); this._beep(700, .1); } break;
       case 'ban': if (!this.isHost) this._banner(m.s); break;
       case 's': if (!this.isHost) this._applyState(m); break;
       case 'end': if (!this.isHost) this._gameOver(m.win, m.why, true); break;
@@ -732,7 +741,7 @@ class ErosionGame extends HTMLElement {
     if (this.phase !== 'over' && this.phase !== 'count' && m.ph) { if (m.ph !== this.phase) { this.phase = m.ph; if (m.ph === 'assault') this._banner('WAVE ' + this.wave + ' — 습격!'); else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); } } this.phT = m.pt; }
     const seen = new Set();
     (m.en || []).forEach(a => { const [id, ty, x, z, hp] = a; seen.add(id); let e = this.enemies.get(id);
-      if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; this.enemies.set(id, e); }
+      if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner('⚠ 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
       e.tx = x / 10; e.tz = z / 10; e.hp = hp; });
     for (const [id, e] of this.enemies) if (!seen.has(id)) { this._killFx(e); this.enemies.delete(id); }
     if (m.st) this._structUnpack(m.st);
@@ -898,6 +907,7 @@ class ErosionGame extends HTMLElement {
     const id = this.eid++;
     const hpMul = (1 + (this.wave - 1) * .18) * this.diffMul;
     this.enemies.set(id, { id, ty, x: g.x + rnd(-.5, .5), z: g.z + rnd(-.5, .5), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2) });
+    if (ETYPES[ty].boss) { this._banner('⚠ 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5); }
   }
   /* enemy AI: follow flow field; attack blocking structures / core / nearby players */
   _enemySim(dt) {
@@ -996,7 +1006,7 @@ class ErosionGame extends HTMLElement {
   _pickupSim() {
     for (const f of [...this.fitems]) {
       const meN = dist2(f.x, f.z, this.me.x, this.me.z) < 1.7, alN = this.allyOn && dist2(f.x, f.z, this.ally.x, this.ally.z) < 1.7;
-      if (meN && !this.me.down && !this.me.item) { this.me.item = f.k; this.fitems = this.fitems.filter(q => q !== f); this._beep(700, .1); if (this.mode !== 'solo') this._send({ t: 'itm', who: 0, id: f.id, k: f.k }); }
+      if (meN && !this.me.down && !this.me.item) { this.me.item = f.k; this.fitems = this.fitems.filter(q => q !== f); this._beep(700, .1); this._banner('아이템 획득 — ' + ITEMS[f.k].n + ' (E)', 2600); if (this.mode !== 'solo') this._send({ t: 'itm', who: 0, id: f.id, k: f.k }); }
       else if (alN && !this.ally.down && this.mode !== 'solo') { this.fitems = this.fitems.filter(q => q !== f); this._send({ t: 'itm', who: 1, id: f.id, k: f.k }); }
       else if (alN && this.mode === 'solo' && !this.ally.item) { this.ally.item = f.k; this.fitems = this.fitems.filter(q => q !== f); }
     }
@@ -1246,6 +1256,11 @@ class ErosionGame extends HTMLElement {
       if (p.down) { g.rotation.z = 1.2; g.position.y = -.15; g.accents.forEach(a => a.material = ((now * 4 | 0) % 2) ? this.mGlowRed : g.accentMat); }
       else g.accents.forEach(a => a.material = g.accentMat);
       g.ring.scale.setScalar(1 + Math.sin(now * 3) * .06);
+      g.ripples.forEach((rp, i) => { // outward-travelling water-ring pulse
+        const ph = (now * .55 + i / 3) % 1;
+        rp.scale.setScalar(.7 + ph * 1.9);
+        rp.material.opacity = Math.sin(Math.min(1, ph * 3) * Math.PI / 2) * (1 - ph) * (isMe ? .6 : .35);
+      });
       if (p.dashing > 0) this._burst(p.x, p.z, isMe ? PAL.cyanHex : PAL.amberHex, 2, 3);
     };
     setP(this.meG, this.me, true);
@@ -1299,6 +1314,7 @@ class ErosionGame extends HTMLElement {
     this.coreF.style.width = Math.max(0, chp * 100) + '%';
     this.coreF.style.background = chp < .3 ? PAL.red : `linear-gradient(90deg,${PAL.cyan},#7ee8ff)`;
     this.coreLab.textContent = '코어 ' + Math.max(0, Math.round(this.coreHp)) + '/' + this.coreMax;
+    this.hintEl.style.display = this.wave === 0 && this.phase === 'build' ? 'block' : 'none';
     // pending upgrades: chip during assault, auto-open when the build phase arrives
     const sheetOpen = this.upEl.style.display !== 'none';
     this.upChip.style.display = this.pendUp > 0 && !sheetOpen ? 'block' : 'none';
@@ -1357,6 +1373,8 @@ class ErosionGame extends HTMLElement {
       ctx.fillRect(x * S, z * S, S, S);
     }
     ctx.globalAlpha = 1;
+    ctx.fillStyle = PAL.amber;
+    for (const f of this.fitems) ctx.fillRect((w2g(f.x) + .5) * S - 1.5, (w2g(f.z) + .5) * S - 1.5, 3, 3);
     ctx.fillStyle = PAL.red;
     for (const e of this.enemies.values()) ctx.fillRect((w2g(e.x) + .5) * S - 1.5, (w2g(e.z) + .5) * S - 1.5, 3, 3);
     const dot = (x, z, c, r) => { ctx.fillStyle = c; ctx.fillRect((w2g(x) + .5) * S - r, (w2g(z) + .5) * S - r, r * 2, r * 2); };
