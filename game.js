@@ -112,7 +112,7 @@ class ErosionGame extends HTMLElement {
     this.mode = A('mode') || 'solo';
     this.room = (A('room') || '').toUpperCase();
     this.diffMul = DIFF[A('diff')] ?? 1;
-    this.maxWave = parseInt(A('waves')) || 8;
+    this.maxWave = parseInt(A('waves')) || 10;
     this.buildTime = parseInt(A('buildtime')) || 40;
     this._buildDOM(); this._initAudio(); this._reset();
     try { this._initThree(); } catch (e) {
@@ -366,6 +366,7 @@ class ErosionGame extends HTMLElement {
       const lamp = new T.PointLight(PAL.redHex, 1.2, 8); lamp.position.y = 2; g.add(lamp);
     }
     body.castShadow = true; g.add(body); g.body = body;
+    if (e.final) g.scale.setScalar(1.28); // final boss towers over the mid-boss
     this.scene.add(g); return g;
   }
   _sMesh(k, i) { // structure mesh
@@ -741,7 +742,7 @@ class ErosionGame extends HTMLElement {
     if (this.phase !== 'over' && this.phase !== 'count' && m.ph) { if (m.ph !== this.phase) { this.phase = m.ph; if (m.ph === 'assault') this._banner('WAVE ' + this.wave + ' — 습격!'); else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); } } this.phT = m.pt; }
     const seen = new Set();
     (m.en || []).forEach(a => { const [id, ty, x, z, hp] = a; seen.add(id); let e = this.enemies.get(id);
-      if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner('⚠ 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
+      if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss && this.wave >= this.maxWave) e.final = true; this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.final ? '⚠ 최종 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
       e.tx = x / 10; e.tz = z / 10; e.hp = hp; });
     for (const [id, e] of this.enemies) if (!seen.has(id)) { this._killFx(e); this.enemies.delete(id); }
     if (m.st) this._structUnpack(m.st);
@@ -906,8 +907,10 @@ class ErosionGame extends HTMLElement {
     const g = this.gates[Math.floor(Math.random() * 4)];
     const id = this.eid++;
     const hpMul = (1 + (this.wave - 1) * .18) * this.diffMul;
-    this.enemies.set(id, { id, ty, x: g.x + rnd(-.5, .5), z: g.z + rnd(-.5, .5), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2) });
-    if (ETYPES[ty].boss) { this._banner('⚠ 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5); }
+    const e = { id, ty, x: g.x + rnd(-.5, .5), z: g.z + rnd(-.5, .5), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2) };
+    if (ETYPES[ty].boss && this.wave >= this.maxWave) { e.final = true; e.hp *= 1.6; } // final boss — beefed up
+    this.enemies.set(id, e);
+    if (ETYPES[ty].boss) { this._banner(e.final ? '⚠ 최종 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5); }
   }
   /* enemy AI: follow flow field; attack blocking structures / core / nearby players */
   _enemySim(dt) {
