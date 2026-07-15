@@ -114,6 +114,7 @@ class ErosionGame extends HTMLElement {
     clearInterval(this._helloIv); clearTimeout(this._banT); clearInterval(this._wdIv); clearTimeout(this._waitHintT);
     if (this.net) { try { this.net.end(true); } catch (e) {} this.net = null; }
     window.removeEventListener('resize', this._onRz);
+    document.removeEventListener('visibilitychange', this._onVis);
     window.removeEventListener('keydown', this._kd); window.removeEventListener('keyup', this._ku);
     if (this.renderer) this.renderer.dispose();
     this.innerHTML = '';
@@ -135,6 +136,8 @@ class ErosionGame extends HTMLElement {
       return;
     }
     this._bindInput();
+    this._onVis = () => { this._bgPaused = document.hidden; };
+    document.addEventListener('visibilitychange', this._onVis);
     if (this.mode === 'solo') {
       let resumed = false;
       if (A('resume') === '1') { try { const s = JSON.parse(localStorage.getItem('eg_save') || 'null'); if (s && s.v === 1) { this._loadRun(s); resumed = true; } } catch (e) {} }
@@ -148,7 +151,7 @@ class ErosionGame extends HTMLElement {
   }
   /* ---------- state ---------- */
   _reset() {
-    const mk = (x, z) => ({ x, z, a: 0, hp: 100, maxhp: 100, speed: 6, dmg: 12, frate: 3, shots: 1, pierce: 0, regen: 0, dashCd: 3.5, sklLv: 1, sklT: 0, scrapMul: 1, fireT: 0, dashT: 0, dashing: 0, down: false, downT: 0, revP: 0, item: null, taken: {}, buys: {}, lastSeen: 0 });
+    const mk = (x, z) => ({ x, z, a: 0, hp: 100, maxhp: 100, speed: 6, dmg: 9, frate: 2.5, shots: 1, pierce: 0, regen: 0, dashCd: 3.5, sklLv: 1, sklT: 0, scrapMul: 1, fireT: 0, dashT: 0, dashing: 0, down: false, downT: 0, revP: 0, item: null, taken: {}, buys: {}, lastSeen: 0 });
     this.me = mk(-2.5, 5); this.ally = mk(2.5, 5);
     this.allyOn = this.mode === 'solo';
     this.occ = new Uint8Array(N * N); this.shp = new Float32Array(N * N);
@@ -527,7 +530,7 @@ class ErosionGame extends HTMLElement {
     this.sndBtn = smBtn('소리 ON');
     this.sndBtn.onclick = () => { this.mute = !this.mute; this.sndBtn.textContent = this.mute ? '소리 OFF' : '소리 ON'; };
     const xb = smBtn('나가기 ✕'); xb.style.borderColor = PAL.red7; xb.onclick = () => this._exitConfirm();
-    this.mm = H('canvas', 'position:absolute;right:10px;top:48px;width:104px;height:104px;border:1px solid ' + PAL.line + ';background:rgba(5,6,9,.85)', hud);
+    this.mm = H('canvas', 'position:absolute;right:10px;top:48px;width:104px;height:104px;border:1px solid rgba(58,64,82,.7);border-radius:50%;background:transparent', hud);
     this.mm.width = 104; this.mm.height = 104;
     // bottom-center XP
     const bc = H('div', 'position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;' + panel + 'padding:6px 12px', hud);
@@ -788,6 +791,7 @@ class ErosionGame extends HTMLElement {
     this._syncStruct(); this._unstuck(this.me);
   }
   _startOnline() {
+    this._lastStateAt = performance.now(); this._hostLost = false; this._peerPaused = false;
     this.phase = 'count'; this.countT = 3; this.allyOn = true; this.allyG.visible = true;
     this.pbar.ally.lab.textContent = '동료 · ' + (this.isHost ? '유닛-B' : '유닛-A');
     this.ov.style.display = 'none';
@@ -796,6 +800,10 @@ class ErosionGame extends HTMLElement {
     switch (m.t) {
       case 'hello': if (this.isHost) {
         if (this.phase === 'wait') { this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: this.scrap }); this._startOnline(); }
+        else if (this.tm - this.ally.lastSeen > 4) { // teammate slot is stale — allow rejoin mid-game
+          this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: this.scrap });
+          this._banner('동료 재접속!', 2600);
+        }
         else this._send({ t: 'busy' });
       } break;
       case 'welcome': if (!this.isHost && this.phase === 'wait') {
@@ -804,7 +812,7 @@ class ErosionGame extends HTMLElement {
         this._structUnpack(m.st); this._startOnline();
       } break;
       case 'busy': if (!this.isHost) { this._overlay(`<div style="font:700 20px ${FONT}">방이 가득 찼습니다</div><div style="margin-top:14px"><button id="egCancel" style="${this._obtn(false)}">돌아가기</button></div>`); this.ovIn.querySelector('#egCancel').onclick = () => this._exit(); } break;
-      case 'p': { const a = this.ally; a.lastSeen = this.tm; a.tx = m.x; a.tz = m.z; a.ta = m.a; a.hp = m.hp; a.maxhp = m.mh; a.down = m.dn; a.lv = m.lv;
+      case 'p': { const a = this.ally; a.lastSeen = this.tm; a.tx = m.x; a.tz = m.z; a.ta = m.a; a.hp = m.hp; a.maxhp = m.mh; a.down = m.dn; a.lv = m.lv; this._peerPaused = !!m.bg;
         (m.sh || []).forEach(s => this._spawnBullet(s[0], s[1], s[2], s[3], { ghost: true, ally: true }));
         break; }
       case 'hit': if (this.isHost) { const e = this.enemies.get(m.id); if (e) this._dmgEnemy(e, m.d); } break;
@@ -829,6 +837,8 @@ class ErosionGame extends HTMLElement {
   }
   _applyState(m) {
     this.tm = m.tm; if (m.xp !== undefined) this._setXp(m.xp);
+    this._lastStateAt = performance.now(); this._hostLost = false;
+    if (!this.isHost) this._peerPaused = !!m.bg;
     this.scrap = m.sc;
     this.coreHp = m.core;
     if (this._lastCore !== undefined && m.core < this._lastCore) this._coreHitFx();
@@ -1016,6 +1026,7 @@ class ErosionGame extends HTMLElement {
   }
   _startAssault() {
     this.wave++; this.phase = 'assault';
+    this.dmgWaveMul = 1 + (this.wave - 1) * .05; // late waves hit harder, not just tankier
     this._banner('WAVE ' + this.wave + ' — 습격!'); this._beep(180, .3, 'sawtooth', .07);
     const w = this.wave, q = [];
     const count = Math.round((14 + w * 6) * (DIFF_CNT[this.diffKey] || 1));
@@ -1070,7 +1081,7 @@ class ErosionGame extends HTMLElement {
         continue;
       }
       // melee player if adjacent
-      if (np && npd < 1.3) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this.diffMul); } continue; }
+      if (np && npd < 1.3) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this.diffMul * (this.dmgWaveMul || 1)); } continue; }
       const gx = w2g(e.x), gz = w2g(e.z), here = ti(gx, gz);
       // breakers & bosses smash adjacent structures even when a path exists
       if ((e.ty === 1 || et.boss) && e.cool <= 0) {
@@ -1089,7 +1100,7 @@ class ErosionGame extends HTMLElement {
         const j = ti(X, Z); if (this.flowD[j] < bd) { bd = this.flowD[j]; bi = j; }
       }
       if (bi < 0) { // at core
-        if (this.occ[here] === 3 || bd <= 1.5) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this.diffMul, e); } }
+        if (this.occ[here] === 3 || bd <= 1.5) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this.diffMul * (this.dmgWaveMul || 1), e); } }
         continue;
       }
       const o = this.occ[bi];
@@ -1098,7 +1109,7 @@ class ErosionGame extends HTMLElement {
         if (e.cool <= 0) this._atkStruct(e, et, bi);
         continue;
       }
-      if (o === 3) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this.diffMul * 2, e); } continue; }
+      if (o === 3) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this.diffMul * 2 * (this.dmgWaveMul || 1), e); } continue; }
       const dx = bx - e.x, dz = bz - e.z, d = Math.hypot(dx, dz) || 1;
       e.x += dx / d * sp * dt; e.z += dz / d * sp * dt;
       e.x = clamp(e.x, 1 - HALF, HALF - 1); e.z = clamp(e.z, 1 - HALF, HALF - 1);
@@ -1107,7 +1118,7 @@ class ErosionGame extends HTMLElement {
   _atkStruct(e, et, j) {
     e.cool = .8;
     const x = g2w(j % N), z = g2w((j / N) | 0);
-    this.shp[j] -= et.sdmg * this.diffMul;
+    this.shp[j] -= et.sdmg * this.diffMul * (this.dmgWaveMul || 1);
     this._burst(x, z, PAL.redHex, 4, 4); this._beep(190, .05, 'square', .02);
     if (this.shp[j] <= 0) { this._fx(x, z, false, PAL.red7Hex); this._remove(j); }
   }
@@ -1234,9 +1245,13 @@ class ErosionGame extends HTMLElement {
       this._overlay(`<div style="font:700 11px ${FONT};letter-spacing:.18em;color:${PAL.red}">EROSION PROTOCOL</div><div style="font:700 68px ${FONT};color:${PAL.cyan};text-shadow:0 0 24px rgba(37,216,255,.5)">${Math.ceil(this.countT)}</div><div style="font:400 13px ${FONT};line-height:1.7;color:${PAL.dim}">웨이브마다 무작위 균열 하나가 열린다.<br>붉게 빛나는 균열을 벽과 포탑으로 막고, 중앙의 정화 코어를 ${this.maxWave}웨이브 동안 지켜라.</div>`);
       if (this.countT <= 0) { this.phase = 'none'; this.ov.style.display = 'none'; if (this.isHostish()) this._startBuild(); }
     }
-    // solo: the augment sheet freezes the whole simulation (wave timer, enemies, bullets)
-    const paused = this.mode === 'solo' && this.upEl.style.display !== 'none' && !this.over;
-    const playing = !paused && (this.phase === 'build' || this.phase === 'assault');
+    // pause sources: solo augment sheet, tab in background (mine OR peer's), host silent
+    const inPhase = this.phase === 'build' || this.phase === 'assault';
+    if (!this.isHostish() && inPhase && this._lastStateAt) this._hostLost = performance.now() - this._lastStateAt > 5000;
+    const sheetPause = this.mode === 'solo' && this.upEl.style.display !== 'none';
+    const paused = !this.over && (sheetPause || this._bgPaused || this._peerPaused || this._hostLost);
+    const playing = inPhase && !paused;
+    if (inPhase && !this.over && this.mode !== 'solo') this._netTick(dt); // keep net alive even while paused
     if (playing && !this.over) {
       this.tm += dt; this.slowT = Math.max(0, this.slowT - dt);
       this._movePlayer(dt); this._buildSim(dt);
@@ -1259,7 +1274,6 @@ class ErosionGame extends HTMLElement {
       this._bulletSim(dt); this._reviveSim(dt);
       const p = this.me; if (!p.down) p.hp = Math.min(p.maxhp, p.hp + p.regen * dt);
       p.dashT = Math.max(0, p.dashT - dt); p.dashing = Math.max(0, p.dashing - dt); p.sklT = Math.max(0, p.sklT - dt);
-      if (this.mode !== 'solo') this._netTick(dt);
       if (this.mode !== 'solo' && this.allyOn) { const a = this.ally; if (a.tx !== undefined) { a.x += (a.tx - a.x) * Math.min(1, dt * 12); a.z += (a.tz - a.z) * Math.min(1, dt * 12); a.a = a.ta || 0; } }
     }
     this._render(dt);
@@ -1306,8 +1320,8 @@ class ErosionGame extends HTMLElement {
     for (const b of this.ebullets) {
       b.x += b.dx * dt; b.z += b.dz * dt; b.life -= dt;
       if (host) {
-        if (!this.me.down && dist2(b.x, b.z, this.me.x, this.me.z) < .49) { this._hurt(this.me, 9 * this.diffMul); b.life = 0; }
-        else if (this.allyOn && !this.ally.down && dist2(b.x, b.z, this.ally.x, this.ally.z) < .49) { this._dealToPlayer(this.ally, 9 * this.diffMul); b.life = 0; }
+        if (!this.me.down && dist2(b.x, b.z, this.me.x, this.me.z) < .49) { this._hurt(this.me, 9 * this.diffMul * (this.dmgWaveMul || 1)); b.life = 0; }
+        else if (this.allyOn && !this.ally.down && dist2(b.x, b.z, this.ally.x, this.ally.z) < .49) { this._dealToPlayer(this.ally, 9 * this.diffMul * (this.dmgWaveMul || 1)); b.life = 0; }
       } else if (!this.me.down && dist2(b.x, b.z, this.me.x, this.me.z) < .49) { b.life = 0; }
     }
     this.ebullets = this.ebullets.filter(b => b.life > 0);
@@ -1317,7 +1331,7 @@ class ErosionGame extends HTMLElement {
     if (this.sendPoseT <= 0) {
       this.sendPoseT = .09;
       const p = this.me;
-      const o = { t: 'p', x: +p.x.toFixed(2), z: +p.z.toFixed(2), a: +p.a.toFixed(2), hp: Math.round(p.hp), mh: p.maxhp, dn: p.down, lv: this.lv };
+      const o = { t: 'p', x: +p.x.toFixed(2), z: +p.z.toFixed(2), a: +p.a.toFixed(2), hp: Math.round(p.hp), mh: p.maxhp, dn: p.down, lv: this.lv, bg: this._bgPaused ? 1 : 0 };
       if (this.shotQ.length) { o.sh = this.shotQ; this.shotQ = []; }
       this._send(o);
     }
@@ -1325,7 +1339,7 @@ class ErosionGame extends HTMLElement {
       this.sendStateT -= dt;
       if (this.sendStateT <= 0) {
         this.sendStateT = .13; this.sendStT -= .13;
-        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate,
+        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, bg: this._bgPaused ? 1 : 0,
           en: [...this.enemies.values()].map(e => [e.id, e.ty, Math.round(e.x * 10), Math.round(e.z * 10), Math.round(e.hp)]),
           itm: this.fitems.map(f => [f.id, f.k, Math.round(f.x * 10), Math.round(f.z * 10)]) };
         if (this.sendStT <= 0) { this.sendStT = 1.4; o.st = this._structPack(); }
@@ -1344,12 +1358,14 @@ class ErosionGame extends HTMLElement {
     // build-mode overlay: refresh placeable tiles 4x/s
     const bovOn = this.buildMode && this.buildSel !== 3 && !this.over;
     this.buildOv.visible = bovOn;
-    if (bovOn && now - (this._bovT || 0) > .25) {
+    if (bovOn && now - (this._bovT || 0) > .12) {
       this._bovT = now;
       const ctx = this._bovCtx;
       ctx.clearRect(0, 0, N, N);
       ctx.fillStyle = 'rgba(70,235,120,.28)';
-      for (let gz = 0; gz < N; gz++) for (let gx = 0; gx < N; gx++) if (this._canPlace(ti(gx, gz))) ctx.fillRect(gx, gz, 1, 1);
+      // static blockers only (occ) — unit-proximity denial is shown by the ghost cursor,
+      // so the green wash never disagrees with where you can actually click
+      for (let gz = 0; gz < N; gz++) for (let gx = 0; gx < N; gx++) if (!this.occ[ti(gx, gz)]) ctx.fillRect(gx, gz, 1, 1);
       this._bovTex.needsUpdate = true;
     }
     // structures
@@ -1488,6 +1504,11 @@ class ErosionGame extends HTMLElement {
     this.coreF.style.background = chp < .3 ? PAL.red : `linear-gradient(90deg,${PAL.cyan},#7ee8ff)`;
     this.coreLab.textContent = '코어 ' + Math.max(0, Math.round(this.coreHp)) + '/' + this.coreMax;
     this.hintEl.style.display = this.wave === 0 && this.phase === 'build' ? 'block' : 'none';
+    // sticky pause notice (peer backgrounded / host silent)
+    if ((this.phase === 'build' || this.phase === 'assault') && !this.over) {
+      if (this._hostLost) this._banner('⏸ 호스트 연결 대기 중… 재연결되면 자동 재개', 600);
+      else if (this._peerPaused) this._banner('⏸ 일시정지 — 상대가 잠시 자리를 비웠습니다', 600);
+    }
     // pending upgrades: chip during assault, auto-open when the build phase arrives
     const sheetOpen = this.upEl.style.display !== 'none';
     this.upChip.style.display = this.pendUp > 0 && !sheetOpen ? 'block' : 'none';
@@ -1539,7 +1560,9 @@ class ErosionGame extends HTMLElement {
     if (this.buildMode) { this.wallChip.textContent = `벽 · ${this._cost(1)}`; this.turChip.textContent = `포탑 · ${this._cost(2)}`; }
     // minimap
     const ctx = this.mm.getContext('2d'), S = 104 / N;
-    ctx.fillStyle = 'rgba(8,9,13,.95)'; ctx.fillRect(0, 0, 104, 104);
+    ctx.clearRect(0, 0, 104, 104);
+    ctx.save(); ctx.beginPath(); ctx.arc(52, 52, 52, 0, Math.PI * 2); ctx.clip(); // circular, translucent
+    ctx.fillStyle = 'rgba(8,9,13,.45)'; ctx.fillRect(0, 0, 104, 104);
     for (let z = 0; z < N; z++)for (let x = 0; x < N; x++) {
       const o = this.occ[ti(x, z)];
       if (!o) continue;
@@ -1563,6 +1586,7 @@ class ErosionGame extends HTMLElement {
     const dot = (x, z, c, r) => { ctx.fillStyle = c; ctx.fillRect((w2g(x) + .5) * S - r, (w2g(z) + .5) * S - r, r * 2, r * 2); };
     dot(this.me.x, this.me.z, PAL.cyan, 2.5);
     if (this.allyOn) dot(this.ally.x, this.ally.z, PAL.amber, 2.5);
+    ctx.restore();
   }
 }
 customElements.define('erosion-game', ErosionGame);
