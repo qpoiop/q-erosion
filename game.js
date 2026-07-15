@@ -63,6 +63,11 @@ const UPG = [
     { d: '최대 HP +40, 즉시 회복', f: p => { p.maxhp += 40; p.hp = Math.min(p.maxhp, p.hp + 40); } },
     { d: '최대 HP +55, 즉시 회복', f: p => { p.maxhp += 55; p.hp = Math.min(p.maxhp, p.hp + 55); } },
     { d: '최대 HP +80, 완전 회복', f: p => { p.maxhp += 80; p.hp = p.maxhp; } }] },
+  { k: 'dash', n: '대시 강화', t: [
+    { d: '대시 쿨다운 −15%', f: p => p.dashCd *= .85 },
+    { d: '대시 쿨다운 −18%', f: p => p.dashCd *= .82 },
+    { d: '대시 쿨다운 −22%', f: p => p.dashCd *= .78 },
+    { d: '쿨 −25% · 무적 시간 +50%', f: p => { p.dashCd *= .75; p.dashDur = .27; } }] },
   { k: 'scrap', n: '회수 장치', t: [
     { d: '처치 자원 +30%', f: p => p.scrapMul = (p.scrapMul || 1) * 1.3 },
     { d: '처치 자원 +35%', f: p => p.scrapMul = (p.scrapMul || 1) * 1.35 },
@@ -449,8 +454,19 @@ class ErosionGame extends HTMLElement {
     const hud = this.hud = H('div', 'position:absolute;inset:0;pointer-events:none');
     const pe = 'pointer-events:auto;';
     const panel = 'background:' + PAL.panel + ';border:1px solid ' + PAL.line + ';backdrop-filter:blur(6px);';
-    // top-left players
-    const tl = H('div', 'position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:5px;width:160px;background:rgba(12,14,20,.55);border:1px solid rgba(58,64,82,.55);backdrop-filter:blur(4px);padding:8px', hud);
+    // top-left: wave/timer + core + players + scrap — one panel, keeps center clear
+    const tl = H('div', 'position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:5px;width:170px;background:rgba(12,14,20,.55);border:1px solid rgba(58,64,82,.55);backdrop-filter:blur(4px);padding:8px', hud);
+    const tcRow = H('div', 'display:flex;align-items:baseline;gap:7px', tl);
+    this.wvEl = H('div', 'font-size:13px;font-weight:700;letter-spacing:.06em', tcRow);
+    this.phEl = H('div', 'font-size:10px;font-weight:700;letter-spacing:.06em;color:' + PAL.dim, tcRow);
+    const cbRow = H('div', 'display:flex;align-items:center;gap:6px', tl);
+    const cb = H('div', 'flex:1;height:5px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', cbRow);
+    this.coreF = H('div', 'height:100%;width:100%;background:linear-gradient(90deg,' + PAL.cyan + ',#7ee8ff);box-shadow:0 0 10px ' + PAL.cyan, cb);
+    this.coreLab = H('div', 'font-size:9px;font-weight:700;letter-spacing:.04em;color:' + PAL.dim + ';white-space:nowrap', cbRow);
+    this.goBtn = H('button', pe + 'font:700 11px ' + FONT + ';border:1px solid ' + PAL.red + ';background:rgba(255,59,42,.15);color:' + PAL.red + ';padding:4px 0;width:100%;cursor:pointer;letter-spacing:.06em;display:none', tl);
+    this.goBtn.textContent = '습격 즉시 개시 ▶';
+    this.goBtn.onclick = () => { if (this.isHostish() && this.phase === 'build') this.phT = Math.min(this.phT, 1); };
+    H('div', 'border-top:1px solid ' + PAL.line, tl);
     this.pbar = {}; ['me', 'ally'].forEach(k => {
       const row = H('div', 'display:flex;flex-direction:column;gap:3px', tl);
       const lab = H('div', 'font-size:10px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;color:' + PAL.dim, row);
@@ -464,26 +480,13 @@ class ErosionGame extends HTMLElement {
     H('div', 'width:10px;height:10px;background:' + PAL.amber + ';box-shadow:0 0 10px ' + PAL.amber, sc);
     this.scEl = H('div', 'font:700 19px ' + FONT + ';color:' + PAL.amber + ';text-shadow:0 0 10px rgba(255,176,32,.45)', sc);
     H('div', 'font-size:10px;color:' + PAL.dim + ';letter-spacing:.08em', sc).textContent = '보유 자원';
-    // top-center: wave + core hp — compact strip so the play field stays visible
-    const tc = H('div', 'position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:3px;background:rgba(12,14,20,.5);border:1px solid rgba(58,64,82,.55);backdrop-filter:blur(4px);padding:5px 12px', hud);
-    const tcRow = H('div', 'display:flex;align-items:baseline;gap:8px', tc);
-    this.wvEl = H('div', 'font-size:13px;font-weight:700;letter-spacing:.08em', tcRow);
-    this.phEl = H('div', 'font-size:10px;font-weight:700;letter-spacing:.1em;color:' + PAL.dim, tcRow);
-    const cbRow = H('div', 'display:flex;align-items:center;gap:6px', tc);
-    const cb = H('div', 'width:150px;height:5px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', cbRow);
-    this.coreF = H('div', 'height:100%;width:100%;background:linear-gradient(90deg,' + PAL.cyan + ',#7ee8ff);box-shadow:0 0 10px ' + PAL.cyan, cb);
-    this.coreLab = H('div', 'font-size:9px;font-weight:700;letter-spacing:.06em;color:' + PAL.dim, cbRow);
-    // start-assault button (build phase, host/solo)
-    this.goBtn = H('button', pe + 'font:700 11px ' + FONT + ';border:1px solid ' + PAL.red + ';background:rgba(255,59,42,.15);color:' + PAL.red + ';padding:4px 10px;cursor:pointer;letter-spacing:.08em;margin-top:2px;display:none', tc);
-    this.goBtn.textContent = '습격 즉시 개시 ▶';
-    this.goBtn.onclick = () => { if (this.isHostish() && this.phase === 'build') this.phT = Math.min(this.phT, 1); };
     // top-right
     const tr = H('div', 'position:absolute;top:10px;right:10px;display:flex;flex-direction:column;align-items:flex-end;gap:6px', hud);
     const trb = H('div', 'display:flex;gap:5px', tr);
     const smBtn = txt => { const b = H('button', pe + 'font:700 11px ' + FONT + ';border:1px solid ' + PAL.line + ';background:' + PAL.panel + ';color:' + PAL.text + ';padding:6px 9px;cursor:pointer;letter-spacing:.05em', trb); b.textContent = txt; return b; };
     this.sndBtn = smBtn('소리 ON');
     this.sndBtn.onclick = () => { this.mute = !this.mute; this.sndBtn.textContent = this.mute ? '소리 OFF' : '소리 ON'; };
-    const xb = smBtn('나가기 ✕'); xb.style.borderColor = PAL.red7; xb.onclick = () => this._exit();
+    const xb = smBtn('나가기 ✕'); xb.style.borderColor = PAL.red7; xb.onclick = () => this._exitConfirm();
     this.mm = H('canvas', 'position:absolute;right:10px;top:48px;width:104px;height:104px;border:1px solid ' + PAL.line + ';background:rgba(5,6,9,.85)', hud);
     this.mm.width = 104; this.mm.height = 104;
     // bottom-center XP
@@ -503,27 +506,31 @@ class ErosionGame extends HTMLElement {
     // owned card lines (tier-colored) + awakened synergy badges
     this.ownedEl = H('div', 'position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-width:64vw', hud);
     this.synEl = H('div', 'position:absolute;bottom:64px;left:50%;transform:translateX(-50%);display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:60vw', hud);
-    // action buttons (right)
-    const br = H('div', 'position:absolute;bottom:18px;right:14px;display:flex;gap:10px;align-items:flex-end', hud);
-    const mkBtn = (label) => { const b = H('button', pe + 'width:68px;height:68px;border:1px solid ' + PAL.line + ';background:' + PAL.panel + ';color:' + PAL.text + ';font:700 12px ' + FONT + ';cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;padding:7px;gap:2px;text-align:left;backdrop-filter:blur(6px)', br); b.textContent = label; return b; };
-    this.itemBtn = mkBtn('아이템'); this.sklBtn = mkBtn('충격파'); this.dashBtn = mkBtn('대시');
+    // square action buttons — uniform centered label layout
+    const sqBtn = (parent, label, accent) => {
+      const b = H('button', pe + 'width:68px;height:68px;border:1px solid ' + (accent || PAL.line) + ';background:' + PAL.panel + ';color:' + (accent || PAL.text) + ';font:700 12px ' + FONT + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;gap:2px;text-align:center;backdrop-filter:blur(6px);line-height:1.3', parent);
+      b.textContent = label; return b;
+    };
     const press = (b, fn) => { b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fn(); }); };
-    press(this.dashBtn, () => this._dash(this.me)); press(this.itemBtn, () => this._useItem()); press(this.sklBtn, () => this._useSkill());
-    // build bar (left)
+    // skill buttons (right)
+    const br = H('div', 'position:absolute;bottom:18px;right:14px;display:flex;gap:10px;align-items:flex-end', hud);
+    this.sklBtn = sqBtn(br, '충격파'); this.dashBtn = sqBtn(br, '대시');
+    press(this.dashBtn, () => this._dash(this.me)); press(this.sklBtn, () => this._useSkill());
+    // build bar (left): 건설 · 연구 · 아이템
     const bl = H('div', 'position:absolute;bottom:18px;left:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-start', hud);
     this.chipRow = H('div', 'display:none;flex-direction:column;gap:6px', bl);
     this.chips = [];
     const mkChip = (label, sel) => { const b = H('button', pe + 'min-width:104px;border:1px solid ' + PAL.line + ';background:' + PAL.panel + ';color:' + PAL.text + ';font:700 12px ' + FONT + ';cursor:pointer;padding:9px 10px;text-align:left;backdrop-filter:blur(6px)', this.chipRow); b.textContent = label; press(b, () => { this.buildSel = sel; this._buildBarSync(); }); this.chips.push(b); return b; };
     this.wallChip = mkChip('벽', 1); this.turChip = mkChip('포탑', 2); this.sellChip = mkChip('판매 (70%)', 3);
     const blRow = H('div', 'display:flex;gap:8px', bl);
-    this.buildBtn = H('button', pe + 'width:68px;height:68px;border:1px solid ' + PAL.cyan + ';background:' + PAL.panel + ';color:' + PAL.cyan + ';font:700 12px ' + FONT + ';cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;padding:7px;text-align:left;backdrop-filter:blur(6px)', blRow);
-    this.buildBtn.textContent = '건설';
+    this.buildBtn = sqBtn(blRow, '건설', PAL.cyan);
     press(this.buildBtn, () => { this.buildMode = !this.buildMode; this._buildBarSync(); });
-    this.shopBtn = H('button', pe + 'width:68px;height:68px;border:1px solid ' + PAL.amber + ';background:' + PAL.panel + ';color:' + PAL.amber + ';font:700 12px ' + FONT + ';cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;padding:7px;text-align:left;backdrop-filter:blur(6px)', blRow);
-    this.shopBtn.textContent = '연구';
+    this.shopBtn = sqBtn(blRow, '연구', PAL.amber);
     press(this.shopBtn, () => this._toggleShop());
+    this.itemBtn = sqBtn(blRow, '아이템');
+    press(this.itemBtn, () => this._useItem());
     // banner / revive
-    this.ban = H('div', 'position:absolute;top:96px;left:50%;transform:translateX(-50%);background:rgba(12,14,20,.6);border:1px solid rgba(58,64,82,.55);backdrop-filter:blur(4px);color:' + PAL.text + ';font:700 12px ' + FONT + ';padding:6px 13px;letter-spacing:.07em;display:none;white-space:nowrap;border-left:3px solid ' + PAL.red, hud);
+    this.ban = H('div', 'position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(12,14,20,.6);border:1px solid rgba(58,64,82,.55);backdrop-filter:blur(4px);color:' + PAL.text + ';font:700 12px ' + FONT + ';padding:6px 13px;letter-spacing:.07em;display:none;white-space:nowrap;border-left:3px solid ' + PAL.red, hud);
     this.revEl = H('div', 'position:absolute;left:50%;top:58%;transform:translateX(-50%);display:none;' + panel + 'padding:7px 14px;font:700 12px ' + FONT, hud);
     // level-up sheet
     this.upEl = H('div', 'position:absolute;left:50%;bottom:96px;transform:translateX(-50%);display:none;flex-direction:column;gap:6px;align-items:center;' + pe, hud);
@@ -548,6 +555,17 @@ class ErosionGame extends HTMLElement {
   _hudReset() { if (this.upEl) { this.upEl.style.display = 'none'; this.shopEl.style.display = 'none'; this.ov.style.display = 'none'; this.buildMode = false; this._buildBarSync(); } }
   _banner(t, ms) { this.ban.textContent = t; this.ban.style.display = 'block'; clearTimeout(this._banT); this._banT = setTimeout(() => this.ban.style.display = 'none', ms || 2600); }
   _exit() { this.dispatchEvent(new CustomEvent('erosion-exit', { bubbles: true, composed: true })); }
+  _exitConfirm() { // exit button & browser-back both land here
+    if (this.phase === 'over' || this.phase === 'wait') { this._exit(); return; } // no game in progress — leave directly
+    if (this._exitCfEl) return;
+    const d = this._exitCfEl = this.H('div', 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,6,10,.55);pointer-events:auto', this.hud);
+    const box = this.H('div', `background:${PAL.panel};border:1px solid ${PAL.line};border-top:3px solid ${PAL.red};padding:20px 26px;display:flex;flex-direction:column;gap:10px;align-items:center;backdrop-filter:blur(6px)`, d);
+    box.innerHTML = `<div style="font:700 15px ${FONT}">게임을 나갈까요?</div><div style="font:400 12px ${FONT};color:${PAL.dim}">진행 상황은 저장되지 않습니다.</div>`;
+    const row = this.H('div', 'display:flex;gap:8px;margin-top:4px', box);
+    const mk = (t, primary) => { const b = this.H('button', `font:700 13px ${FONT};padding:9px 22px;cursor:pointer;border:1px solid ${primary ? PAL.red : PAL.line};background:${primary ? PAL.red : 'transparent'};color:${primary ? '#fff' : PAL.text}`, row); b.textContent = t; return b; };
+    mk('계속하기', false).onclick = () => { d.remove(); this._exitCfEl = null; };
+    mk('나가기', true).onclick = () => { d.remove(); this._exitCfEl = null; this._exit(); };
+  }
   _overlay(html) { this.ov.style.display = 'flex'; this.ovIn.innerHTML = html; }
   /* ---------- shop ---------- */
   _buyCount(id) { return this.me.buys[id] || 0; }
@@ -863,7 +881,7 @@ class ErosionGame extends HTMLElement {
   }
   _dash(p) {
     if (p.down || p.dashT > 0 || this.phase !== 'assault' && this.phase !== 'build') return;
-    p.dashT = p.dashCd; p.dashing = .18; this._beep(300, .07, 'triangle', .04);
+    p.dashT = p.dashCd; p.dashing = p.dashDur || .18; this._beep(300, .07, 'triangle', .04);
   }
   _useSkill() {
     const p = this.me;
@@ -1396,9 +1414,12 @@ class ErosionGame extends HTMLElement {
     this.sklBtn.textContent = p.sklT > 0 ? '충격파 ' + Math.ceil(p.sklT) : '충격파 Lv' + p.sklLv;
     this.sklBtn.style.opacity = p.sklT > 0 ? .45 : 1;
     this.sklBtn.style.borderColor = p.sklT > 0 ? PAL.line : PAL.cyan; this.sklBtn.style.color = p.sklT > 0 ? PAL.text : PAL.cyan;
-    this.itemBtn.textContent = p.item ? ITEMS[p.item].n : '아이템 —';
-    this.itemBtn.style.background = p.item ? PAL.red : PAL.panel; this.itemBtn.style.color = p.item ? '#fff' : PAL.text;
+    if (p.item) this.itemBtn.textContent = ITEMS[p.item].n; else this.itemBtn.innerHTML = '아이템<br>없음';
+    this.itemBtn.style.background = p.item ? PAL.red : PAL.panel; this.itemBtn.style.color = p.item ? '#fff' : PAL.dim;
     this.itemBtn.style.boxShadow = p.item ? '0 0 14px rgba(255,59,42,.5)' : 'none';
+    this.itemBtn.style.opacity = p.item ? 1 : .45;
+    this.itemBtn.style.cursor = p.item ? 'pointer' : 'default';
+    this.itemBtn.disabled = !p.item;
     if (this.buildMode) { this.wallChip.textContent = `벽 · ${this._cost(1)}`; this.turChip.textContent = `포탑 · ${this._cost(2)}`; }
     // minimap
     const ctx = this.mm.getContext('2d'), S = 104 / N;
