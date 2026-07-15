@@ -366,7 +366,7 @@ class ErosionGame extends HTMLElement {
       const lamp = new T.PointLight(PAL.redHex, 1.2, 8); lamp.position.y = 2; g.add(lamp);
     }
     body.castShadow = true; g.add(body); g.body = body;
-    if (e.final) g.scale.setScalar(1.28); // final boss towers over the mid-boss
+    if (e.final) g.scale.setScalar(2); // final boss towers over the mid-boss
     this.scene.add(g); return g;
   }
   _sMesh(k, i) { // structure mesh
@@ -908,7 +908,7 @@ class ErosionGame extends HTMLElement {
     const id = this.eid++;
     const hpMul = (1 + (this.wave - 1) * .18) * this.diffMul;
     const e = { id, ty, x: g.x + rnd(-.5, .5), z: g.z + rnd(-.5, .5), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2) };
-    if (ETYPES[ty].boss && this.wave >= this.maxWave) { e.final = true; e.hp *= 1.6; } // final boss — beefed up
+    if (ETYPES[ty].boss && this.wave >= this.maxWave) { e.final = true; e.hp *= 10; } // final boss — beefed up
     this.enemies.set(id, e);
     if (ETYPES[ty].boss) { this._banner(e.final ? '⚠ 최종 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5); }
   }
