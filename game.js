@@ -827,7 +827,7 @@ class ErosionGame extends HTMLElement {
         this.diffMul = m.diff; this.maxWave = m.waves; this.buildTime = m.bt; this.scrap = m.sc;
         this._structUnpack(m.st); this._startOnline();
       } break;
-      case 'busy': if (!this.isHost) { this._overlay(`<div style="font:700 20px ${FONT}">방이 가득 찼습니다</div><div style="margin-top:14px"><button id="egCancel" style="${this._obtn(false)}">돌아가기</button></div>`); this.ovIn.querySelector('#egCancel').onclick = () => this._exit(); } break;
+      case 'busy': if (!this.isHost && this.phase === 'wait') { this._overlay(`<div style="font:700 20px ${FONT}">방이 가득 찼습니다</div><div style="margin-top:14px"><button id="egCancel" style="${this._obtn(false)}">돌아가기</button></div>`); this.ovIn.querySelector('#egCancel').onclick = () => this._exit(); } break;
       case 'p': { const a = this.ally; a.lastSeen = this.tm; a.tx = m.x; a.tz = m.z; a.ta = m.a; a.hp = m.hp; a.maxhp = m.mh; a.down = m.dn; a.lv = m.lv; this._peerPaused = !!m.bg; if (m.sm) a.scrapMul = m.sm;
         (m.sh || []).forEach(s => this._spawnBullet(s[0], s[1], s[2], s[3], { ghost: true, ally: true }));
         break; }
@@ -852,7 +852,7 @@ class ErosionGame extends HTMLElement {
     }
   }
   _applyState(m) {
-    this.tm = m.tm; if (m.xp !== undefined) this._setXp(m.xp);
+    this.tm = m.tm; if (m.xp !== undefined) this._setXpTotal(m.xp);
     this._lastStateAt = performance.now(); this._hostLost = false;
     if (!this.isHost) this._peerPaused = !!m.bg;
     this.scrap = m.asc !== undefined ? m.asc : m.sc;
@@ -908,6 +908,22 @@ class ErosionGame extends HTMLElement {
   _killFx(e) { this._fx(e.x, e.z, !!ETYPES[e.ty]?.boss, PAL.redHex); const m = this.eMeshes.get(e.id); if (m) { if (m.bossBar) this.scene.remove(m.bossBar); this.scene.remove(m); this.eMeshes.delete(e.id); } }
   isHostish() { return this.mode === 'solo' || this.isHost; }
   _grantXp(v) { this._setXp(this.xp + v); }
+  _setXpTotal(total) { // joiner path: host sends cumulative XP — rebuild lv/remainder
+    let lv = 1, rem = total;
+    while (rem >= XP_NEED(lv)) { rem -= XP_NEED(lv); lv++; }
+    const gained = lv - this.lv;
+    this.xp = rem;
+    if (gained <= 0) { this.lv = Math.max(this.lv, lv); return; }
+    this.lv = lv; this.pendUp += gained;
+    this._beep(600, .12, 'square', .06); this._beep(900, .18, 'square', .05);
+    if (this.scene) {
+      this._fx(this.me.x, this.me.z, this.lv % 5 === 0 || gained > 1, PAL.cyanHex);
+      if (this.allyOn) this._fx(this.ally.x, this.ally.z, false, PAL.cyanHex);
+      if (this.lvEl.animate) this.lvEl.animate([{ transform: 'scale(1.55)', color: '#7ee8ff' }, { transform: 'scale(1)' }], { duration: 380 });
+      if (this.lv % 5 === 0) { this._banner(`⬆ 레벨 ${this.lv} 돌파!`, 2600); this._beep(880, .18, 'square', .06); }
+    }
+    if (this.pendUp > 0 && this.upEl.style.display === 'none' && !this.over && this.phase !== 'assault') this._showUpgrades();
+  }
   _setXp(v) {
     this.xp = v;
     const lv0 = this.lv;
