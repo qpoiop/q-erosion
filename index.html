@@ -140,7 +140,7 @@
 
   const rules = [
     { n: '01', t: '건설로 길을 막아라', d: '준비 단계에 벽·포탑을 배치. 적은 벽을 부수며 최단 경로로 코어를 노립니다.' },
-    { n: '02', t: '자원 = 전략', d: '처치·웨이브 보상 자원은 둘이 공유. 건설과 캐릭터·스킬·구조물 연구에 분배하세요.' },
+    { n: '02', t: '자원 = 전략', d: '골드는 각자의 지갑 — 처치한 사람이 자기 회수 배율로 획득, 웨이브 보너스는 각자 지급. 구조물 연구 효과는 팀 전체 적용.' },
     { n: '03', t: '증강 & 시너지', d: '레벨업마다 강화 카드 3택1 — 기본→레전드 4등급 테크. 두 계통 조합 시 시너지 각성, 충격파·대시·아이템까지 빌드의 일부.' },
     { n: '04', t: '코어 사수 + 구조', d: '정화 코어가 부서지면 패배. 쓰러진 동료는 곁에서 2.5초 유지로 부활.' },
   ];
@@ -221,7 +221,24 @@
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        // update layer: new build installed behind the scenes → offer a refresh
+        const toast = () => {
+          if (document.getElementById('sw-toast')) return;
+          const t = document.createElement('div');
+          t.id = 'sw-toast';
+          t.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:99999;display:flex;gap:10px;align-items:center;background:rgba(12,14,20,.95);border:1px solid #25d8ff;padding:11px 16px;font:700 13px "Noto Sans KR",sans-serif;color:#e8eaf0;box-shadow:0 0 20px rgba(37,216,255,.35)';
+          t.innerHTML = '새 버전이 준비되었습니다 <button id="sw-re" style="font:700 12px \'Noto Sans KR\',sans-serif;background:#25d8ff;color:#0b0c10;border:none;padding:7px 14px;cursor:pointer">업데이트</button><button id="sw-x" style="font:700 12px \'Noto Sans KR\',sans-serif;background:transparent;color:#9aa3b5;border:1px solid #3a4052;padding:7px 10px;cursor:pointer">나중에</button>';
+          document.body.appendChild(t);
+          t.querySelector('#sw-re').onclick = () => location.reload();
+          t.querySelector('#sw-x').onclick = () => t.remove();
+        };
+        if (reg.waiting && navigator.serviceWorker.controller) toast();
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          if (nw) nw.addEventListener('statechange', () => { if (nw.state === 'installed' && navigator.serviceWorker.controller) toast(); });
+        });
+      }).catch(() => {});
     });
   }
 })();
