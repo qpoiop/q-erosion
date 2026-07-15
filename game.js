@@ -11,11 +11,12 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const dist2 = (ax, az, bx, bz) => { const dx = ax - bx, dz = az - bz; return dx * dx + dz * dz; };
 const PAL = { bg: 0x0b0c10, line: '#3a4052', panel: 'rgba(12,14,20,.82)', text: '#e8eaf0', dim: '#9aa3b5', cyan: '#25d8ff', cyanHex: 0x25d8ff, amber: '#ffb020', amberHex: 0xffb020, red: '#ff3b2a', redHex: 0xff3b2a, red7: '#c22212', red7Hex: 0xc22212 };
 const FONT = "'Chakra Petch','Noto Sans KR',sans-serif";
+/* swarm balance: many weaker mobs rather than few strong ones */
 const ETYPES = [
-  { hp: 34, sp: 3.9, dmg: 10, sdmg: 22, xp: 8, sc: 2, r: .55 },   // tri rusher
-  { hp: 130, sp: 1.9, dmg: 24, sdmg: 55, xp: 20, sc: 6, r: .75 }, // cube breaker
-  { hp: 55, sp: 2.5, dmg: 0, sdmg: 18, xp: 15, sc: 4, r: .6, rng: true }, // hex gunner
-  { hp: 700, sp: 1.5, dmg: 45, sdmg: 130, xp: 80, sc: 30, r: 1.1, boss: true }, // boss
+  { hp: 30, sp: 3.9, dmg: 6, sdmg: 15, xp: 8, sc: 2, r: .55 },   // tri rusher
+  { hp: 115, sp: 1.9, dmg: 15, sdmg: 40, xp: 20, sc: 6, r: .75 }, // cube breaker
+  { hp: 48, sp: 2.5, dmg: 0, sdmg: 12, xp: 15, sc: 4, r: .6, rng: true }, // hex gunner
+  { hp: 700, sp: 1.5, dmg: 28, sdmg: 95, xp: 80, sc: 30, r: 1.1, boss: true }, // boss
 ];
 /* card rarity tiers — each line levels 기본→레어→에픽→레전드; a tier only
    appears after the previous tier of the same line was taken */
@@ -139,7 +140,7 @@ class ErosionGame extends HTMLElement {
     this.enemies = new Map(); this.eid = 1; this.bullets = []; this.ebullets = []; this.fitems = [];
     this.tm = 0; this.xp = 0; this.lv = 1; this.kills = 0; this.pendUp = 0; this.slowT = 0;
     this.scrap = 50; this.g = { wallMul: 1, turMul: 1, costMul: 1 };
-    this.coreHp = this.coreMax = 800;
+    this.coreHp = this.coreMax = 1000;
     this.wave = 0; this.phT = 0; this.spawnQ = []; this.spawnT = 0;
     this.shotQ = []; this.over = null;
     this.buildMode = false; this.buildSel = 1; // 1 wall 2 turret 3 sell
@@ -879,7 +880,7 @@ class ErosionGame extends HTMLElement {
     this.wave++; this.phase = 'assault';
     this._banner('WAVE ' + this.wave + ' — 습격!'); this._beep(180, .3, 'sawtooth', .07);
     const w = this.wave, q = [];
-    const count = 10 + w * 5;
+    const count = 14 + w * 6;
     // guaranteed mix: ranged gunners from wave 2, breakers from wave 3, rest melee rushers
     const nG = w >= 2 ? Math.max(3, Math.round(count * .22)) : 0;
     const nB = w >= 3 ? Math.round(count * .25) : 0;
@@ -891,11 +892,11 @@ class ErosionGame extends HTMLElement {
   _spawnLogic(dt) {
     if (!this.spawnQ.length) return;
     this.spawnT -= dt; if (this.spawnT > 0) return;
-    this.spawnT = Math.max(.28, .8 - this.wave * .04);
+    this.spawnT = Math.max(.24, .7 - this.wave * .035);
     const ty = this.spawnQ.shift();
     const g = this.gates[Math.floor(Math.random() * 4)];
     const id = this.eid++;
-    const hpMul = (1 + (this.wave - 1) * .22) * this.diffMul;
+    const hpMul = (1 + (this.wave - 1) * .18) * this.diffMul;
     this.enemies.set(id, { id, ty, x: g.x + rnd(-.5, .5), z: g.z + rnd(-.5, .5), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2) });
   }
   /* enemy AI: follow flow field; attack blocking structures / core / nearby players */
@@ -1143,8 +1144,8 @@ class ErosionGame extends HTMLElement {
     for (const b of this.ebullets) {
       b.x += b.dx * dt; b.z += b.dz * dt; b.life -= dt;
       if (host) {
-        if (!this.me.down && dist2(b.x, b.z, this.me.x, this.me.z) < .49) { this._hurt(this.me, 13 * this.diffMul); b.life = 0; }
-        else if (this.allyOn && !this.ally.down && dist2(b.x, b.z, this.ally.x, this.ally.z) < .49) { this._dealToPlayer(this.ally, 13 * this.diffMul); b.life = 0; }
+        if (!this.me.down && dist2(b.x, b.z, this.me.x, this.me.z) < .49) { this._hurt(this.me, 9 * this.diffMul); b.life = 0; }
+        else if (this.allyOn && !this.ally.down && dist2(b.x, b.z, this.ally.x, this.ally.z) < .49) { this._dealToPlayer(this.ally, 9 * this.diffMul); b.life = 0; }
       } else if (!this.me.down && dist2(b.x, b.z, this.me.x, this.me.z) < .49) { b.life = 0; }
     }
     this.ebullets = this.ebullets.filter(b => b.life > 0);
