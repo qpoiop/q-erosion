@@ -16,8 +16,9 @@ export class Room {
     }
     if (req.headers.get('Upgrade') !== 'websocket') return new Response('expected websocket', { status: 426 });
     const role = new URL(req.url).searchParams.get('role') === 'h' ? 'h' : 'g';
+    // reconnect takeover: a new socket for a role evicts the stale one
+    for (const old of this.state.getWebSockets(role)) { try { old.close(4000, 'replaced by reconnect'); } catch {} }
     if (this.state.getWebSockets().length >= 2) return new Response('room full', { status: 409 });
-    if (this.state.getWebSockets(role).length >= 1) return new Response('role taken', { status: 409 });
     const pair = new WebSocketPair();
     const client = pair[0], server = pair[1];
     this.state.acceptWebSocket(server, [role]); // hibernation API
