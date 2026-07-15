@@ -812,10 +812,10 @@ class ErosionGame extends HTMLElement {
         this._structUnpack(m.st); this._startOnline();
       } break;
       case 'busy': if (!this.isHost) { this._overlay(`<div style="font:700 20px ${FONT}">방이 가득 찼습니다</div><div style="margin-top:14px"><button id="egCancel" style="${this._obtn(false)}">돌아가기</button></div>`); this.ovIn.querySelector('#egCancel').onclick = () => this._exit(); } break;
-      case 'p': { const a = this.ally; a.lastSeen = this.tm; a.tx = m.x; a.tz = m.z; a.ta = m.a; a.hp = m.hp; a.maxhp = m.mh; a.down = m.dn; a.lv = m.lv; this._peerPaused = !!m.bg;
+      case 'p': { const a = this.ally; a.lastSeen = this.tm; a.tx = m.x; a.tz = m.z; a.ta = m.a; a.hp = m.hp; a.maxhp = m.mh; a.down = m.dn; a.lv = m.lv; this._peerPaused = !!m.bg; if (m.sm) a.scrapMul = m.sm;
         (m.sh || []).forEach(s => this._spawnBullet(s[0], s[1], s[2], s[3], { ghost: true, ally: true }));
         break; }
-      case 'hit': if (this.isHost) { const e = this.enemies.get(m.id); if (e) this._dmgEnemy(e, m.d); } break;
+      case 'hit': if (this.isHost) { const e = this.enemies.get(m.id); if (e) this._dmgEnemy(e, m.d, { ally: true }); } break;
       case 'bld': if (this.isHost) { if (this._canPlace(m.i)) { const c = this._cost(m.k); if (this.scrap >= c) { this.scrap -= c; this._place(m.i, m.k); this._send({ t: 'blt', i: m.i, k: m.k, sc: this.scrap }); } } } break;
       case 'blt': if (!this.isHost) { this.scrap = m.sc; this._place(m.i, m.k, true); this._fx(g2w(m.i % N), g2w((m.i / N) | 0), false, PAL.cyanHex); } break;
       case 'sel': if (this.isHost) { const k = this.occ[m.i]; if (k === 1 || k === 2) { this.scrap += Math.round(this._cost(k) * .7); this._remove(m.i); this._send({ t: 'slt', i: m.i, sc: this.scrap }); } } break;
@@ -876,12 +876,13 @@ class ErosionGame extends HTMLElement {
     for (const e of this.enemies.values()) { const d = dist2(p.x, p.z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
     if (best) { p.fireT = 1 / p.frate; this._fire(p, best.x, best.z, mine); }
   }
-  _dmgEnemy(e, d) {
+  _dmgEnemy(e, d, src) { // src: killing bullet/context — scrap multiplier belongs to the KILLER
     e.hp -= d; e.flash = .12;
     if (e.hp <= 0 && !e.deadDone) {
       e.deadDone = true; this.kills++; this._killFx(e); this.enemies.delete(e.id);
       this._grantXp(ETYPES[e.ty].xp);
-      this.scrap += ETYPES[e.ty].sc * (this.me.scrapMul || 1);
+      const mul = src && src.tur ? 1 : src && src.ally ? (this.ally.scrapMul || 1) : (this.me.scrapMul || 1);
+      this.scrap += ETYPES[e.ty].sc * mul;
       if (Math.random() < .04 && this.fitems.length < 2) this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: e.x, z: e.z });
     }
   }
@@ -1310,7 +1311,7 @@ class ErosionGame extends HTMLElement {
       for (const e of this.enemies.values()) {
         if (dist2(b.x, b.z, e.x, e.z) < (ETYPES[e.ty].r + .2) ** 2) {
           this._fx(b.x, b.z, false, b.tur || !b.ally ? PAL.cyanHex : PAL.amberHex);
-          if (!b.ghost) { if (host) this._dmgEnemy(e, b.dmg); else { e.flash = .12; this._send({ t: 'hit', id: e.id, d: +b.dmg.toFixed(1) }); } }
+          if (!b.ghost) { if (host) this._dmgEnemy(e, b.dmg, b); else { e.flash = .12; this._send({ t: 'hit', id: e.id, d: +b.dmg.toFixed(1) }); } }
           if (b.pierce > 0) b.pierce--; else b.life = 0;
           break;
         }
@@ -1331,7 +1332,7 @@ class ErosionGame extends HTMLElement {
     if (this.sendPoseT <= 0) {
       this.sendPoseT = .09;
       const p = this.me;
-      const o = { t: 'p', x: +p.x.toFixed(2), z: +p.z.toFixed(2), a: +p.a.toFixed(2), hp: Math.round(p.hp), mh: p.maxhp, dn: p.down, lv: this.lv, bg: this._bgPaused ? 1 : 0 };
+      const o = { t: 'p', x: +p.x.toFixed(2), z: +p.z.toFixed(2), a: +p.a.toFixed(2), hp: Math.round(p.hp), mh: p.maxhp, dn: p.down, lv: this.lv, bg: this._bgPaused ? 1 : 0, sm: +(p.scrapMul || 1).toFixed(2) };
       if (this.shotQ.length) { o.sh = this.shotQ; this.shotQ = []; }
       this._send(o);
     }
