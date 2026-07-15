@@ -113,7 +113,9 @@ class ErosionGame extends HTMLElement {
     cancelAnimationFrame(this._raf);
     clearInterval(this._helloIv); clearTimeout(this._banT); clearInterval(this._wdIv); clearTimeout(this._waitHintT);
     if (this.net) { try { this.net.end(true); } catch (e) {} this.net = null; }
-    window.removeEventListener('resize', this._onRz);
+    window.removeEventListener('resize', this._onRzBurst);
+    window.removeEventListener('orientationchange', this._onRzBurst);
+    if (window.visualViewport) window.visualViewport.removeEventListener('resize', this._onRzBurst);
     document.removeEventListener('visibilitychange', this._onVis);
     window.removeEventListener('keydown', this._kd); window.removeEventListener('keyup', this._ku);
     if (this.renderer) this.renderer.dispose();
@@ -352,7 +354,12 @@ class ErosionGame extends HTMLElement {
       this.bloom = new T.UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .45, .5, .85);
       this.composer.addPass(this.bloom);
     }
-    window.addEventListener('resize', this._onRz); this._onRz();
+    // iOS fires resize/orientationchange before layout settles — re-run sizing a few times
+    this._onRzBurst = () => { this._onRz(); setTimeout(this._onRz, 120); setTimeout(this._onRz, 350); setTimeout(this._onRz, 700); };
+    window.addEventListener('resize', this._onRzBurst);
+    window.addEventListener('orientationchange', this._onRzBurst);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', this._onRzBurst);
+    this._onRz();
   }
   _mkPlayer(isMe) {
     const T = THREE, g = new T.Group();
