@@ -65,7 +65,7 @@ class ErosionGame extends HTMLElement {
     this.room = (A('room') || '').toUpperCase();
     this.diffMul = DIFF[A('diff')] ?? 1;
     this.maxWave = parseInt(A('waves')) || 8;
-    this.buildTime = parseInt(A('buildtime')) || 25;
+    this.buildTime = parseInt(A('buildtime')) || 40;
     this._buildDOM(); this._initAudio(); this._reset();
     try { this._initThree(); } catch (e) {
       console.error('[erosion] WebGL init failed:', e);
@@ -378,7 +378,7 @@ class ErosionGame extends HTMLElement {
     const pe = 'pointer-events:auto;';
     const panel = 'background:' + PAL.panel + ';border:1px solid ' + PAL.line + ';backdrop-filter:blur(6px);';
     // top-left players
-    const tl = H('div', 'position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:6px;width:190px;' + panel + 'padding:10px', hud);
+    const tl = H('div', 'position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:5px;width:160px;background:rgba(12,14,20,.55);border:1px solid rgba(58,64,82,.55);backdrop-filter:blur(4px);padding:8px', hud);
     this.pbar = {}; ['me', 'ally'].forEach(k => {
       const row = H('div', 'display:flex;flex-direction:column;gap:3px', tl);
       const lab = H('div', 'font-size:10px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;color:' + PAL.dim, row);
@@ -392,15 +392,17 @@ class ErosionGame extends HTMLElement {
     H('div', 'width:9px;height:9px;background:' + PAL.amber + ';box-shadow:0 0 8px ' + PAL.amber, sc);
     this.scEl = H('div', 'font:700 15px ' + FONT + ';color:' + PAL.amber, sc);
     H('div', 'font-size:10px;color:' + PAL.dim + ';letter-spacing:.1em', sc).textContent = '자원';
-    // top-center: wave + core hp
-    const tc = H('div', 'position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;' + panel + 'padding:8px 18px;min-width:210px', hud);
-    this.wvEl = H('div', 'font-size:20px;font-weight:700;letter-spacing:.1em', tc);
-    this.phEl = H('div', 'font-size:11px;font-weight:700;letter-spacing:.14em;color:' + PAL.dim, tc);
-    const cb = H('div', 'width:210px;height:9px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5);margin-top:2px', tc);
+    // top-center: wave + core hp — compact strip so the play field stays visible
+    const tc = H('div', 'position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:3px;background:rgba(12,14,20,.5);border:1px solid rgba(58,64,82,.55);backdrop-filter:blur(4px);padding:5px 12px', hud);
+    const tcRow = H('div', 'display:flex;align-items:baseline;gap:8px', tc);
+    this.wvEl = H('div', 'font-size:13px;font-weight:700;letter-spacing:.08em', tcRow);
+    this.phEl = H('div', 'font-size:10px;font-weight:700;letter-spacing:.1em;color:' + PAL.dim, tcRow);
+    const cbRow = H('div', 'display:flex;align-items:center;gap:6px', tc);
+    const cb = H('div', 'width:150px;height:5px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', cbRow);
     this.coreF = H('div', 'height:100%;width:100%;background:linear-gradient(90deg,' + PAL.cyan + ',#7ee8ff);box-shadow:0 0 10px ' + PAL.cyan, cb);
-    this.coreLab = H('div', 'font-size:10px;font-weight:700;letter-spacing:.12em;color:' + PAL.dim, tc);
+    this.coreLab = H('div', 'font-size:9px;font-weight:700;letter-spacing:.06em;color:' + PAL.dim, cbRow);
     // start-assault button (build phase, host/solo)
-    this.goBtn = H('button', pe + 'font:700 12px ' + FONT + ';border:1px solid ' + PAL.red + ';background:rgba(255,59,42,.15);color:' + PAL.red + ';padding:6px 12px;cursor:pointer;letter-spacing:.08em;margin-top:4px;display:none', tc);
+    this.goBtn = H('button', pe + 'font:700 11px ' + FONT + ';border:1px solid ' + PAL.red + ';background:rgba(255,59,42,.15);color:' + PAL.red + ';padding:4px 10px;cursor:pointer;letter-spacing:.08em;margin-top:2px;display:none', tc);
     this.goBtn.textContent = '습격 즉시 개시 ▶';
     this.goBtn.onclick = () => { if (this.isHostish() && this.phase === 'build') this.phT = Math.min(this.phT, 1); };
     // top-right
@@ -437,7 +439,7 @@ class ErosionGame extends HTMLElement {
     this.shopBtn.textContent = '연구';
     press(this.shopBtn, () => this._toggleShop());
     // banner / revive
-    this.ban = H('div', 'position:absolute;top:86px;left:50%;transform:translateX(-50%);' + panel + 'color:' + PAL.text + ';font:700 13px ' + FONT + ';padding:8px 16px;letter-spacing:.08em;display:none;white-space:nowrap;border-left:3px solid ' + PAL.red, hud);
+    this.ban = H('div', 'position:absolute;top:96px;left:50%;transform:translateX(-50%);background:rgba(12,14,20,.6);border:1px solid rgba(58,64,82,.55);backdrop-filter:blur(4px);color:' + PAL.text + ';font:700 12px ' + FONT + ';padding:6px 13px;letter-spacing:.07em;display:none;white-space:nowrap;border-left:3px solid ' + PAL.red, hud);
     this.revEl = H('div', 'position:absolute;left:50%;top:58%;transform:translateX(-50%);display:none;' + panel + 'padding:7px 14px;font:700 12px ' + FONT, hud);
     // level-up sheet
     this.upEl = H('div', 'position:absolute;left:50%;bottom:96px;transform:translateX(-50%);display:none;flex-direction:column;gap:6px;align-items:center;' + pe, hud);
@@ -813,7 +815,7 @@ class ErosionGame extends HTMLElement {
     this.wave++; this.phase = 'assault';
     this._banner('WAVE ' + this.wave + ' — 습격!'); this._beep(180, .3, 'sawtooth', .07);
     const w = this.wave, q = [];
-    const count = 7 + w * 4;
+    const count = 10 + w * 5;
     for (let i = 0; i < count; i++) {
       let ty = 0;
       const r = Math.random();
@@ -826,7 +828,7 @@ class ErosionGame extends HTMLElement {
   _spawnLogic(dt) {
     if (!this.spawnQ.length) return;
     this.spawnT -= dt; if (this.spawnT > 0) return;
-    this.spawnT = Math.max(.35, 1.1 - this.wave * .05);
+    this.spawnT = Math.max(.28, .8 - this.wave * .04);
     const ty = this.spawnQ.shift();
     const g = this.gates[Math.floor(Math.random() * 4)];
     const id = this.eid++;
@@ -1180,15 +1182,15 @@ class ErosionGame extends HTMLElement {
   }
   _hudTick(dt) {
     this._hudT = (this._hudT || 0) - dt; if (this._hudT > 0) return; this._hudT = .12;
-    this.wvEl.textContent = this.phase === 'build' ? `WAVE ${this.wave + 1} 준비` : `WAVE ${Math.max(1, this.wave)} / ${this.maxWave}`;
-    if (this.phase === 'build') { this.phEl.textContent = `습격까지 ${Math.max(0, Math.ceil(this.phT))}초 — 건설·연구 단계`; this.phEl.style.color = PAL.cyan; }
-    else if (this.phase === 'assault') { this.phEl.textContent = `습격 진행 중 — 잔여 ${this.enemies.size + (this.isHostish() ? this.spawnQ.length : (this._qn || 0))}`; this.phEl.style.color = PAL.red; }
+    this.wvEl.textContent = this.phase === 'build' ? `WAVE ${this.wave + 1} 준비` : `WAVE ${Math.max(1, this.wave)}/${this.maxWave}`;
+    if (this.phase === 'build') { this.phEl.textContent = `습격까지 ${Math.max(0, Math.ceil(this.phT))}초`; this.phEl.style.color = PAL.cyan; }
+    else if (this.phase === 'assault') { this.phEl.textContent = `잔여 ${this.enemies.size + (this.isHostish() ? this.spawnQ.length : (this._qn || 0))}`; this.phEl.style.color = PAL.red; }
     else this.phEl.textContent = '';
     this.goBtn.style.display = this.isHostish() && this.phase === 'build' ? 'block' : 'none';
     const chp = this.coreHp / this.coreMax;
     this.coreF.style.width = Math.max(0, chp * 100) + '%';
     this.coreF.style.background = chp < .3 ? PAL.red : `linear-gradient(90deg,${PAL.cyan},#7ee8ff)`;
-    this.coreLab.textContent = '정화 코어 ' + Math.max(0, Math.round(this.coreHp)) + ' / ' + this.coreMax;
+    this.coreLab.textContent = '코어 ' + Math.max(0, Math.round(this.coreHp)) + '/' + this.coreMax;
     this.scEl.textContent = '◈ ' + Math.floor(this.scrap);
     const setBar = (k, p, col) => { this.pbar[k].f.style.width = Math.max(0, p.hp / p.maxhp * 100) + '%'; const c2 = p.down ? PAL.red : col; this.pbar[k].f.style.background = c2; this.pbar[k].f.style.boxShadow = '0 0 8px ' + c2; };
     setBar('me', this.me, PAL.cyan);
