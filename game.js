@@ -846,8 +846,16 @@ class ErosionGame extends HTMLElement {
   _grantXp(v) { this._setXp(this.xp + v); }
   _setXp(v) {
     this.xp = v;
+    const lv0 = this.lv;
     let need = 25 + this.lv * 18;
     while (this.xp >= need) { this.xp -= need; this.lv++; need = 25 + this.lv * 18; this.pendUp++; if (this.mode === 'solo') this._botUpgrade(); this._beep(600, .12, 'square', .06); this._beep(900, .18, 'square', .05); }
+    if (this.lv > lv0 && this.scene) { // level-up flair on the units + HUD
+      const milestone = this.lv % 5 === 0 || this.lv - lv0 > 1;
+      this._fx(this.me.x, this.me.z, milestone, PAL.cyanHex);
+      if (this.allyOn) this._fx(this.ally.x, this.ally.z, false, PAL.cyanHex);
+      if (this.lvEl.animate) this.lvEl.animate([{ transform: 'scale(1.55)', color: '#7ee8ff' }, { transform: 'scale(1)' }], { duration: 380 });
+      if (this.lv % 5 === 0) { this._banner(`⬆ 레벨 ${this.lv} 돌파!`, 2600); this._beep(880, .18, 'square', .06); this._beep(1180, .22, 'square', .05); }
+    }
     // solo pauses while the sheet is open, so it can open any time. multiplayer:
     // build phase opens immediately, assault holds as a chip (see _hudTick).
     if (this.pendUp > 0 && this.upEl.style.display === 'none' && !this.over && (this.mode === 'solo' || this.phase !== 'assault')) this._showUpgrades();
