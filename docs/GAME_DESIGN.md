@@ -82,3 +82,14 @@
 - PWA: 앱 셸 network-first(배포 즉시 반영) · 버전 고정 CDN cache-first · 오프라인 솔로 가능
 - 배포: `development` 작업 → `production` PR 병합 → GitHub Actions → Cloudflare Pages (`q-erosion.pages.dev`)
 - WebGL 불가 시 안내 오버레이 + 로비 복귀. 참가 무응답 12초 힌트. 방 정원 2인(초과 busy)
+
+
+## 침투 작전 (맵 2)
+
+- 트리거: 최종 웨이브 클리어 → phase `escape`, escGate 랜덤 1개(금색 펄스). 유닛이 균열 반경 3 내 진입 → `infpick`
+- 택1(`_infKeep`): 플레이어를 기본 스탯으로 재구성 후 선택 카테고리만 리플레이 — 증강(taken 리플레이+시너지 재계산), 연구(per 상점 리플레이), 구조물(st 상점 리플레이), 자금(지갑 유지). 코어 증강은 맵 2에서 no-op
+- 맵 2: x=9/22 열이 암석(occ 5)인 세로 회랑, flow 타깃 = 하단 시작선(코어 없음, `_dmgCoreBy` no-op). 미니맵/코어 UI 숨김
+- 물량: `(14+60+(maxWave−10)×3) × 난이도 × 2`, 35%/70% 지점에 보스 티어1·2 삽입. 스폰은 상단, wsp 2
+- 피날레: 전멸 → 암전 점멸(0.3s×6) → 침식의 근원: `700 × 웨이브 배율 × 14 × 10` HP, giant(×2 스케일), smash 2
+- 처치 → `_finalClear` 연출 → 승리 오버레이(최종 클리어) + 엔딩 크레딧 롤. bestWave = maxWave+1
+- 멀티 메시지: inen(조이너 진입) / inpk(픽 시트 열기) / inch(선택 전달) / ingo(맵 전환) / infin(피날레 연출)

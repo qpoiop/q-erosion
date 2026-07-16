@@ -39,9 +39,20 @@ export function install(P) {
   };
   P._spawnOne = function () {
     const ty = this.spawnQ.shift();
-    const g = this.gates[this.activeGates[Math.floor(Math.random() * this.activeGates.length)]]; // wave streams through the active gate(s)
     const id = this.eid++;
-    const hpMul = (1 + (this.wave - 1) * .18) * this._dMul();
+    const hpMul = (1 + (Math.min(this.wave, this.maxWave) - 1) * .18) * this._dMul();
+    if (this.inf) { // infiltration: enemies pour in from the TOP of the corridor
+      const e = { id, ty, x: g2w(11 + Math.floor(Math.random() * 10)), z: g2w(1) + rnd(-1, 1), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), wsp: 2 };
+      if (ETYPES[ty].boss) {
+        this.infBossN = (this.infBossN || 0) + 1; // bosses 1 then 2, in order
+        e.btier = Math.min(2, this.infBossN);
+        if (e.btier === 2) { e.hp *= 4; e.wsp *= 1.15; }
+        this._banner(e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5);
+      }
+      e.mhp = e.hp; this.enemies.set(id, e);
+      return;
+    }
+    const g = this.gates[this.activeGates[Math.floor(Math.random() * this.activeGates.length)]]; // wave streams through the active gate(s)
     // spawn OUTSIDE the gate, spread across its widened front, walk in
     const nx = g.gx === 0 ? -1 : g.gx === N - 1 ? 1 : 0, nz = g.gz === 0 ? -1 : g.gz === N - 1 ? 1 : 0;
     const off = rnd(1.8, 4), lat = rnd(-4.6, 4.6);
@@ -166,6 +177,7 @@ export function install(P) {
     if (this.shp[j] <= 0) { this._fx(x, z, false, PAL.red7Hex); this._remove(j); }
   };
   P._dmgCoreBy = function (v, e) {
+    if (this.inf) return; // map 2 has no core — the flow target is just the players' start line
     this.coreHp -= v; this.shake = Math.max(this.shake || 0, .3);
     this._burst(this.coreMesh.position.x + rnd(-1, 1), this.coreMesh.position.z + rnd(-1, 1), PAL.cyanHex, 5, 4);
     this._coreHitFx();
@@ -223,6 +235,106 @@ export function install(P) {
       if (this.me.down && this.me.downT <= 0) this._gameOver(false, '구조 실패');
     }
   };
+  P._startEscape = function () { // wave 15 cleared: a rift to the ENEMY core opens instead of instant victory
+    this.phase = 'escape'; this.phT = 999;
+    this.escGate = Math.floor(Math.random() * 4);
+    this.activeGates = [this.escGate]; this.activeGate = this.escGate;
+    this._banner(`⚑ 적의 코어로 통하는 균열이 열렸다 — ${GATE_DIR[this.escGate]}쪽 균열로 진입하라!`, 6000);
+    this._beep(880, .3, 'square', .07); this._beep(1320, .4, 'square', .06);
+    if (this.mode === 'solo') { try { localStorage.removeItem('eg_save'); } catch (e) {} } // one-way trip
+  };
+  P._escapeSim = function () { // host + local: entering the open rift starts the infiltration pick
+    const g = this.gates[this.escGate]; if (!g) return;
+    const near = (p) => dist2(p.x, p.z, g.x, g.z) < 9;
+    if (near(this.me)) { if (this.isHostish()) this._startInfPick(); else this._send({ t: 'inen' }); }
+    else if (this.isHostish() && this.allyOn && near(this.ally)) this._startInfPick();
+  };
+  P._startInfPick = function () {
+    if (this.phase === 'infpick') return;
+    this.phase = 'infpick'; this._infMe = null; this._infAlly = this.mode === 'solo' ? '증강' : null;
+    if (this.isHostish() && this.mode !== 'solo') this._send({ t: 'inpk' });
+    this._showInfPick();
+  };
+  P._infKeep = function (choice) { // keep ONE thing; everything else resets (침투는 몸이 가벼워야 한다)
+    const p = this.me;
+    const kept = { taken: { ...p.taken }, buys: { ...p.buys }, scrap: this.scrap };
+    const base = { hp: 100, maxhp: 100, speed: 6, dmg: 9, frate: 2.5, shots: 1, pierce: 0, regen: 0, dashCd: 3.5, dashDur: undefined, sklLv: 1, scrapMul: 1, armor: 1, dropMul: 1, sklDmgMul: 1, sklRMul: 1, sklCdMul: 1, swSlowF: 0, swStunC: 0, wallMul: 1, turMul: 1, turHpMul: 1, costMul: 1, wallLv: 0, turLv: 0 };
+    Object.assign(p, base, { taken: {}, buys: {}, syn: {}, synGrade: {}, items: p.items, down: false, downT: 0 });
+    this.scrap = 60; this.lv = 1; this.xp = 0; this.pendUp = 0;
+    this._noCore = true; // core augments are meaningless on map 2 — replay must not touch coreHp
+    if (choice === '증강') {
+      for (const u of UPG) { const t = kept.taken[u.k] || 0; for (let i = 0; i < t; i++) u.t[i].f(p, this); if (t) p.taken[u.k] = t; }
+      this._checkSyn(p, false);
+      this.lv = 1 + Object.values(p.taken).reduce((a, b) => a + b, 0);
+    } else if (choice === '연구') {
+      for (const u of SHOP) { if (u.st || u.id === 'crep') continue; const n = kept.buys[u.id] || 0; for (let i = 0; i < n; i++) u.f(p, this); if (n) p.buys[u.id] = n; }
+    } else if (choice === '구조물') {
+      for (const u of SHOP) { if (!u.st) continue; const n = kept.buys[u.id] || 0; for (let i = 0; i < n; i++) u.f(p, this); if (n) p.buys[u.id] = n; }
+    } else if (choice === '자금') this.scrap = kept.scrap;
+    p.hp = p.maxhp;
+    this._infMe = choice;
+    if (this.mode !== 'solo') this._send({ t: 'inch', c: choice });
+    this._tryStartInf();
+  };
+  P._tryStartInf = function () {
+    if (!this.isHostish()) return;
+    if (this._infMe && this._infAlly) this._startInfiltration();
+    else this._banner('동료의 선택을 기다리는 중…', 2600);
+  };
+  P._startInfiltration = function () {
+    if (this.inf) return;
+    if (this.isHostish() && this.mode !== 'solo') this._send({ t: 'ingo' });
+    this._overlay(`<div style="font:700 11px ${FONT};letter-spacing:.18em;color:${PAL.red}">INFILTRATION</div><div style="font:700 30px ${FONT};margin:8px 0">적의 코어로 침투 중…</div><div style="font:400 12px ${FONT};color:${PAL.dim}">돌아올 수 없다. 전부 쓰러뜨려라.</div>`);
+    setTimeout(() => { if (this._dead) return; this._buildInfMap(); }, 1600);
+  };
+  P._buildInfMap = function () { // map 2: vertical corridor, no core, no minimap
+    this.inf = true; this.infBossN = 0; this.infFinal = false;
+    this.enemies.clear(); this.bullets = []; this.ebullets = []; this.fitems = [];
+    this.occ = new Uint8Array(N * N); this.shp = new Float32Array(N * N); this.bld = new Float32Array(N * N);
+    this.own = new Uint8Array(N * N); this.building = new Set();
+    for (let z = 0; z < N; z++) { this.occ[ti(9, z)] = 5; this.occ[ti(22, z)] = 5; this.bld[ti(9, z)] = 1; this.bld[ti(22, z)] = 1; } // corridor walls
+    this.coreTiles = []; for (let x = 11; x <= 20; x++) this.coreTiles.push(ti(x, 30)); // flow target = players' start line
+    this._flow(); this._syncStruct();
+    if (this.coreMesh) this.coreMesh.visible = false;
+    if (this.coreBar) this.coreBar.visible = false;
+    this.gateMs && this.gateMs.forEach(g => { g.rift.material.opacity = 0; g.lamp.intensity = 0; });
+    if (this.mm) this.mm.style.display = 'none';
+    this.me.x = g2w(14); this.me.z = g2w(29);
+    this.ally.x = g2w(17); this.ally.z = g2w(29);
+    this.ov.style.display = 'none';
+    this.phase = 'inf'; this.wave = this.maxWave;
+    if (this.isHostish()) { // 2x the wave-15 horde + bosses 1 and 2 in order
+      let cntMul = DIFF_CNT[this.diffKey] || 1;
+      if (this.diffKey === 'nightmare') cntMul = 2.5;
+      const count = Math.round((14 + 60 + Math.max(0, this.maxWave - 10) * 3) * cntMul * 2);
+      const q = [];
+      const nG = Math.max(3, Math.round(count * .22)), nB = Math.round(count * .25);
+      for (let i = 0; i < count; i++) q.push(i < nG ? 2 : i < nG + nB ? 1 : 0);
+      for (let i = q.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [q[i], q[j]] = [q[j], q[i]]; }
+      q.splice(Math.floor(q.length * .35), 0, 3); q.splice(Math.floor(q.length * .7), 0, 3);
+      this.spawnQ = q; this.spawnT = 1.2;
+    }
+    this._banner('⚔ 침투 개시 — 적의 소굴이다. 위에서 몰려온다!', 4200); this._beep(180, .4, 'sawtooth', .08);
+  };
+  P._startFinale = function () { // horde cleared: blackout blinks, then the SOURCE appears
+    if (this.infFinal) return; this.infFinal = true;
+    if (this.isHostish() && this.mode !== 'solo') this._send({ t: 'infin' });
+    const bl = this.H('div', 'position:absolute;inset:0;background:#000;z-index:45;opacity:0;pointer-events:none', this.hud);
+    let n = 0; const iv = setInterval(() => { bl.style.opacity = bl.style.opacity === '1' ? '0' : '1'; if (++n >= 6) { clearInterval(iv); bl.remove(); if (!this._dead && this.isHostish()) this._spawnSource(); } }, 300);
+    this._beep(60, 1.2, 'sawtooth', .1);
+  };
+  P._spawnSource = function () {
+    const hpMul = (1 + (this.maxWave - 1) * .18) * this._dMul();
+    const id = this.eid++;
+    const e = { id, ty: 3, x: g2w(15) + 1, z: g2w(4), hp: ETYPES[3].hp * hpMul * 14 * 10, cool: 0, shootT: 1, wsp: 1.6, btier: 3, final: true, smash: 2, giant: true }; // 10x the wave-15 final boss, twice the size
+    e.mhp = e.hp; this.enemies.set(id, e);
+    this._banner('⚠⚠ 침식의 근원 — 모든 것의 시작이 모습을 드러냈다', 5200);
+    this._beep(50, .8, 'sawtooth', .12); this._beep(70, 1, 'sawtooth', .1); this.shake = 1.2;
+  };
+  P._finalClear = function () {
+    for (let i = 0; i < 16; i++) setTimeout(() => { if (!this._dead && this.scene) { this._fx(rnd(-10, 10), rnd(-20, 10), i % 3 === 0, i % 2 ? PAL.cyanHex : 0xffffff); this.shake = Math.max(this.shake || 0, .4); } }, i * 130);
+    setTimeout(() => { if (!this._dead) this._gameOver(true, '침식의 근원 정화 — 프로토콜의 끝'); }, 1200);
+  };
   P._gameOver = function (win, why, fromNet) {
     if (this.over) return; this.over = { win, why };
     this.phase = 'over';
@@ -232,7 +344,7 @@ export function install(P) {
         const st = JSON.parse(localStorage.getItem('eg_stats') || '{}');
         st.plays = (st.plays || 0) + 1;
         if (win) st.wins = (st.wins || 0) + 1;
-        st.bestWave = Math.max(st.bestWave || 0, win ? this.maxWave : this.wave);
+        st.bestWave = Math.max(st.bestWave || 0, win ? this.maxWave + (this.inf ? 1 : 0) : this.wave);
         localStorage.setItem('eg_stats', JSON.stringify(st));
       } catch (e) {}
     }
@@ -242,7 +354,7 @@ export function install(P) {
     const canRestart = this.isHostish();
     this._overlay(`
       <div style="font:700 11px ${FONT};letter-spacing:.18em;color:${win ? PAL.cyan : PAL.red}">${win ? 'PROTOCOL COMPLETE' : 'PROTOCOL FAILED'}</div>
-      <div style="font:700 34px ${FONT};margin:4px 0 10px;text-shadow:0 0 20px ${win ? 'rgba(37,216,255,.4)' : 'rgba(255,59,42,.4)'}">${win ? '방어 성공' : '방어선 붕괴'}</div>
+      <div style="font:700 34px ${FONT};margin:4px 0 10px;text-shadow:0 0 20px ${win ? 'rgba(37,216,255,.4)' : 'rgba(255,59,42,.4)'}">${win ? (this.inf ? '최종 클리어 — 침식 정화' : '방어 성공') : '방어선 붕괴'}</div>
       <div style="font:400 13px ${FONT};line-height:1.7;border-top:1px solid ${PAL.line};padding-top:10px;color:${PAL.dim}">
         사유 — ${why}<br>웨이브 ${this.wave}/${this.maxWave} · 경과 ${mm}:${ss} · 처치 ${this.kills} · 레벨 ${this.lv}
       </div>
@@ -250,6 +362,12 @@ export function install(P) {
         ${canRestart ? `<button id="egRe" style="${this._obtn(true)}">재도전</button>` : ''}
         <button id="egOut" style="${this._obtn(false)}">로비로</button>
       </div>${canRestart ? '' : `<div style="font:400 11px ${FONT};margin-top:8px;color:${PAL.dim}">방장이 재도전을 시작할 수 있습니다</div>`}`);
+    if (win && this.inf) { // ending credits
+      const cr = this.H('div', `margin-top:14px;max-height:150px;overflow:hidden;border-top:1px solid ${PAL.line};position:relative`, this.ovIn);
+      const roll = this.H('div', `font:400 11px ${FONT};color:${PAL.dim};line-height:2;text-align:center;animation:egCredits 26s linear infinite`, cr);
+      roll.innerHTML = `<b style="color:${PAL.cyan}">EROSION PROTOCOL</b><br>침식의 근원이 정화되었다.<br><br>— 3D MODELS (sketchfab, CC-BY) —<br>캐릭터 Toy Robot · rkmorello<br>근접 drone robot · noortjeschuur<br>원거리 Robo_V2 · _SeF_ / Robot_04 · taktelon<br>보스 Robot · l0wpoly / Utility Robot · nickheitzman<br>최종 보스 Futuristic army robot · iasarmientoj<br>타워 Combat Turret · SnoyCat / Scy-fi turret · kudinadarya<br>코어 Crystal · rudolfs<br>벽 Cube Metalic · _sqtime_ / Yellow Metal Cube · JakobHenerey20231<br><br>— TECH —<br>three.js · Cloudflare Pages · Durable Objects<br><br>플레이해 주셔서 감사합니다`;
+      const cs = document.createElement('style'); cs.textContent = '@keyframes egCredits { from { transform: translateY(150px); } to { transform: translateY(-100%); } }'; this.ovIn.appendChild(cs);
+    }
     this.ovIn.querySelector('#egOut').onclick = () => this._exit();
     const re = this.ovIn.querySelector('#egRe');
     if (re) re.onclick = () => {

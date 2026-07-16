@@ -26,6 +26,7 @@ export function install(P) {
     e.hp -= d; e.flash = .12;
     if (e.hp <= 0 && !e.deadDone) {
       e.deadDone = true; this.kills++; this._killFx(e); this.enemies.delete(e.id);
+      if (e.giant && this.inf) { this._finalClear(); } // the SOURCE falls — final clear
       this._grantXp(ETYPES[e.ty].xp);
       // every kill pays BOTH units — each at their own 회수 배율 (killer no longer hogs the gold)
       const base = ETYPES[e.ty].sc * (DIFF_SCR[this.diffKey] || 1);
@@ -70,6 +71,7 @@ export function install(P) {
     if (this.pendUp > 0 && this.upEl.style.display === 'none' && !this.over && (this.mode === 'solo' || this.phase !== 'assault')) this._showUpgrades();
   };
   P._coreAug = function (add, heal) { // core augment — host-authoritative; joiners forward the request
+    if (this._noCore || this.inf) return; // map 2 has no core
     if (this.isHostish()) { this.coreMax += add; this.coreHp = Math.min(this.coreMax, this.coreHp + heal); this._coreBanT = this.tm; }
     else this._send({ t: 'caug', a: add, h: heal });
   };

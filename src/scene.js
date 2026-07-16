@@ -181,6 +181,7 @@ export function install(P) {
         // no PointLight: boss spawn/death would change the light count → full-scene shader recompile stall
       }
       if (e.final && !(this.mdl && this.mdl.boss3)) g.scale.setScalar(2); // boss3 GLB is already colossal; only the fallback needs inflating
+      if (e.giant) g.scale.multiplyScalar(2); // 침식의 근원 — twice the final boss
       this.scene.add(g); return g;
     }
     const g = new T.Group();
@@ -378,6 +379,15 @@ export function install(P) {
     this._setBar(this.coreBar, chp, this._hpColor(chp));
     // gates pulse
     this.gateMs.forEach((g, i) => {
+      if (this.inf) return; // no gates on map 2
+      if (this.phase === 'escape') { // the way OUT glows gold
+        const esc = i === this.escGate;
+        g.rift.material.color.setHex(esc ? PAL.amberHex : 0x6a7180);
+        g.rift.material.opacity = esc ? .6 + Math.sin(now * 5) * .3 : .1;
+        g.lamp.color.setHex(esc ? PAL.amberHex : 0x6a7180);
+        g.lamp.intensity = esc ? 2.2 + Math.sin(now * 6) * .8 : .1;
+        return;
+      }
       const active = (this.activeGates || [this.activeGate]).includes(i);
       // inactive rifts turn gray so the live gate is unmistakable
       g.rift.material.color.setHex(active ? PAL.redHex : 0x6a7180);
