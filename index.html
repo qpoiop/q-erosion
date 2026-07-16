@@ -79,6 +79,7 @@
           <b style="color:#e8eaf0">벽으로 길을 막고, 포탑으로 요격하고</b>, 중앙의 정화 코어를 사수하라.<br>
           자원으로 캐릭터·스킬·구조물을 연구하고, 쓰러진 동료는 곁에서 일으켜 세워라.
         </p>
+        <p style="margin:12px auto 0;font-size:11.5px;color:#5a6377;font-family:'Noto Sans KR',sans-serif;letter-spacing:.05em">📱 모바일은 <b style="color:#9aa3b5">가로 모드</b> 플레이를 권장합니다</p>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:14px;padding:30px 0 8px;justify-content:center">
         <div style="flex:1 1 260px;max-width:330px;background:rgba(13,15,21,.85);border:1px solid #3a4052;border-top:3px solid #ff3b2a;padding:20px;display:flex;flex-direction:column;gap:10px;backdrop-filter:blur(6px)">
@@ -110,14 +111,22 @@
         <button class="diff-btn" data-diff="easy" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#9aa3b5;border:1px solid #3a4052;padding:7px 16px;cursor:pointer;letter-spacing:.04em">쉬움</button>
         <button class="diff-btn" data-diff="normal" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#9aa3b5;border:1px solid #3a4052;padding:7px 16px;cursor:pointer;letter-spacing:.04em">보통</button>
         <button class="diff-btn" data-diff="hard" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#9aa3b5;border:1px solid #3a4052;padding:7px 16px;cursor:pointer;letter-spacing:.04em">어려움</button>
-        <button class="diff-btn" data-diff="nightmare" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#c96bff;border:1px solid #5a3a72;padding:7px 16px;cursor:pointer;letter-spacing:.04em">악몽</button>
+        <button class="diff-btn" data-diff="nightmare" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#c96bff;border:1px solid #5a3a72;padding:7px 16px;cursor:pointer;letter-spacing:.04em">☠ 악몽</button>
       </div>
+      <div id="nm-warn" style="display:none;margin-top:10px;text-align:center;font:700 11.5px 'Noto Sans KR',sans-serif;color:#ff5e6b;letter-spacing:.06em;line-height:1.7;animation:nmWarn 1.2s ease-in-out infinite">
+        ⚠ 균열이 동시에 여러 개 열립니다 — 불가능에 가까운 난이도.<br><span style="color:#c96bff">멀티 협동 플레이를 권장합니다.</span>
+      </div>
+      <style>
+        @keyframes nmWarn{0%,100%{opacity:1}50%{opacity:.55}}
+        @keyframes nmGlow{0%,100%{box-shadow:0 0 6px rgba(201,107,255,.45),inset 0 0 8px rgba(201,107,255,.12)}50%{box-shadow:0 0 18px rgba(201,107,255,.9),inset 0 0 14px rgba(201,107,255,.3)}}
+      </style>
       <div id="rules" style="display:flex;flex-wrap:wrap;gap:1px;background:#3a4052;border:1px solid #3a4052;margin:26px 0 0"></div>
       <div style="padding:16px 0 34px;font-size:11px;line-height:1.7;color:#5a6377;font-family:'Noto Sans KR',sans-serif;text-align:center">
         온라인 협동은 무료 공개 WebSocket 릴레이로 연결됩니다 — 서버 설치·비용 없음.<br>
         3D 모델(sketchfab.com): 캐릭터 "Toy Robot" by rkmorello · 근접 "drone robot" by noortjeschuur · 원거리 "Robo_V2" by _SeF_, "Robot_04" by taktelon<br>
-        보스 "Robot" by l0wpoly, "Utility Robot" by nickheitzman · 타워 "Combat Turret" by SnoyCat, "Scy-fi turret" by kudinadarya (전부 CC-BY, 캐릭터/l0wpoly 제외 명시)<br>
-        모바일: 화면 드래그 이동(가상 스틱) · 자동 조준 · 대시/아이템 버튼 &nbsp;|&nbsp; PC: WASD 이동 · Space 대시 · E 아이템
+        보스 "Robot" by l0wpoly, "Utility Robot" by nickheitzman, "Futuristic army robot" by iasarmientoj · 타워 "Combat Turret" by SnoyCat, "Scy-fi turret" by kudinadarya<br>
+        코어 "Crystal" by rudolfs · 벽 "Cube Metalic" by _sqtime_, "Yellow Metal Cube" by JakobHenerey20231 (전부 CC-BY, 캐릭터/l0wpoly 제외 명시)<br>
+        모바일: 화면 드래그 이동(가상 스틱) · 자동 조준 · 대시/아이템 버튼 — <span style="color:#9aa3b5;font-weight:700">가로 모드 플레이 권장</span> &nbsp;|&nbsp; PC: WASD 이동 · Space 대시 · E 아이템
       </div>
     </div>
   </div>
@@ -126,7 +135,7 @@
 <script>
 (() => {
   // props (design data-props): difficulty enum easy|normal|hard (default normal),
-  // waves int 4..15 (default 8), buildTime int 15..60 (default 25).
+  // waves int 4..20 (default 15), buildTime int 15..60 (default 25).
   // Overridable via URL query: ?diff=hard&waves=10&buildtime=30
   const q = new URLSearchParams(location.search);
   const clampInt = (v, def, min, max) => {
@@ -135,7 +144,7 @@
   };
   const props = {
     difficulty: ['easy', 'normal', 'hard'].includes(q.get('diff')) ? q.get('diff') : 'normal',
-    waves: clampInt(q.get('waves'), 10, 4, 15),
+    waves: clampInt(q.get('waves'), 15, 4, 20),
     buildTime: clampInt(q.get('buildtime'), 40, 15, 60),
   };
 
@@ -147,6 +156,13 @@
     b.style.color = on ? DIFF_COLOR[b.dataset.diff] : '#9aa3b5';
     b.style.borderColor = on ? DIFF_COLOR[b.dataset.diff] : '#3a4052';
     b.style.background = on ? 'rgba(255,255,255,.05)' : 'transparent';
+    if (b.dataset.diff === 'nightmare') { // nightmare gets a pulsing violet glow when armed
+      b.style.animation = on ? 'nmGlow 1.4s ease-in-out infinite' : '';
+      b.style.background = on ? 'rgba(201,107,255,.12)' : 'transparent';
+      b.style.textShadow = on ? '0 0 8px rgba(201,107,255,.8)' : '';
+    }
+    const warn = document.getElementById('nm-warn');
+    if (warn) warn.style.display = props.difficulty === 'nightmare' ? 'block' : 'none';
   });
   diffBtns.forEach(b => b.addEventListener('click', () => { props.difficulty = b.dataset.diff; syncDiff(); }));
   syncDiff();

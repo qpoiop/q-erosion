@@ -130,11 +130,12 @@ const MODELS = {
   ranged2:{ url: 'assets/enemy_ranged_b.glb', size: 1.7, yaw: 0, merge: true },
   boss1:  { url: 'assets/boss_mid.glb',       size: 4.6, yaw: 0, merge: true },
   boss2:  { url: 'assets/boss_final.glb',     size: 4.2, yaw: 0, merge: true },
+  boss3:  { url: 'assets/boss_last.glb',      size: 5.8, yaw: 0, merge: true }, // wave-15 final boss
   tower0: { url: 'assets/tower_t1.glb',       size: 1.9, yaw: 0, merge: true }, // research band 0-3
   tower1: { url: 'assets/tower_t2.glb',       size: 2.2, yaw: 0, merge: true }, // band 4-9; band 10+ = same model, scaled up
   wall0:  { url: 'assets/wall_t1.glb',        size: 1.84, yaw: 0, merge: true }, // wall research 0-3 (tile is 2 units)
   wall1:  { url: 'assets/wall_t2.glb',        size: 1.84, yaw: 0, merge: true }, // wall research 4+
-  core:   { url: 'assets/core.glb',           size: 6.5, yaw: 0, merge: true }, // energy-orb core — bbox is mostly its transparent halo, so oversize it
+  core:   { url: 'assets/core.glb',           size: 4.2, yaw: 0, merge: true }, // crystal core (sits on the 4.8-wide pedestal)
 };
 const SHIP_MODEL_YAW = (() => { const q = new URLSearchParams(location.search).get('shipyaw'); return q !== null ? +q * Math.PI / 180 : 0; })();
 const XP_NEED = lv => 45 + lv * 30 + Math.max(0, lv - 5) * 12; // Lv1-5: original pace; Lv6+: +12/level extra so late cards space out gently

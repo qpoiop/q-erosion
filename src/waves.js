@@ -17,7 +17,9 @@ export function install(P) {
     this.dmgWaveMul = 1 + (this.wave - 1) * .05; // late waves hit harder, not just tankier
     this._banner('WAVE ' + this.wave + ' — 습격!'); this._beep(180, .3, 'sawtooth', .07);
     const w = this.wave, q = [];
-    const count = Math.round((14 + w * 6) * (DIFF_CNT[this.diffKey] || 1));
+    let cntMul = DIFF_CNT[this.diffKey] || 1;
+    if (this.diffKey === 'nightmare') cntMul = 1.25 + (2.5 - 1.25) * this._nmRamp(); // waves 1-3 ≈ hard, full 2.5x by wave 6
+    const count = Math.round((14 + Math.min(w, 10) * 6 + Math.max(0, w - 10) * 3) * cntMul); // waves 11+ grow slower — 15 waves shouldn't become a swarm wall
     // guaranteed mix: ranged gunners from wave 2, breakers from wave 3, rest melee rushers
     const nG = w >= 2 ? Math.max(3, Math.round(count * .22)) : 0;
     const nB = w >= 3 ? Math.round(count * .25) : 0;
@@ -29,7 +31,9 @@ export function install(P) {
   P._spawnLogic = function (dt) {
     if (!this.spawnQ.length) return;
     this.spawnT -= dt; if (this.spawnT > 0) return;
-    this.spawnT = Math.max(.24, (.7 - this.wave * .035) * (DIFF_SPT[this.diffKey] || 1));
+    let sptMul = DIFF_SPT[this.diffKey] || 1;
+    if (this.diffKey === 'nightmare') sptMul = .88 + (.5 - .88) * this._nmRamp();
+    this.spawnT = Math.max(.24, (.7 - this.wave * .035) * sptMul);
     const burst = Math.min(3, 1 + ((this.wave / 3) | 0)); // w1-2: 1, w3-5: 2, w6+: 3 at once
     for (let bn = 0; bn < burst && this.spawnQ.length; bn++) this._spawnOne();
   };
@@ -37,22 +41,26 @@ export function install(P) {
     const ty = this.spawnQ.shift();
     const g = this.gates[this.activeGates[Math.floor(Math.random() * this.activeGates.length)]]; // wave streams through the active gate(s)
     const id = this.eid++;
-    const hpMul = (1 + (this.wave - 1) * .18) * this.diffMul;
+    const hpMul = (1 + (this.wave - 1) * .18) * this._dMul();
     // spawn OUTSIDE the gate, spread across its widened front, walk in
     const nx = g.gx === 0 ? -1 : g.gx === N - 1 ? 1 : 0, nz = g.gz === 0 ? -1 : g.gz === N - 1 ? 1 : 0;
     const off = rnd(1.8, 4), lat = rnd(-4.6, 4.6);
     const e = { id, ty, x: g.x + nx * off + lat * (nz ? 1 : 0), z: g.z + nz * off + lat * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x + lat * (nz ? 1 : 0), gz: g.z + lat * (nx ? 1 : 0), wsp: 1 + (this.wave - 1) * .035 };
-    if (ETYPES[ty].boss && this.wave >= this.maxWave) { e.final = true; e.hp *= 10; } // final boss — beefed up
+    if (ETYPES[ty].boss) { // boss tiers: w5 mid, w10 heavy, final wave = colossal structure-wrecker
+      e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1;
+      if (e.btier === 2) e.hp *= 4;
+      else if (e.btier === 3) { e.final = true; e.hp *= 14; e.smash = 2; }
+    }
     e.mhp = e.hp;
     this.enemies.set(id, e);
-    if (ETYPES[ty].boss) { this._banner(e.final ? '⚠ 최종 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5); }
+    if (ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5); }
   };
   P._enemySim = function (dt) {
     const slow = this.slowT > 0 ? .5 : 1;
     const players = [this.me]; if (this.allyOn) players.push(this.ally);
     for (const e of this.enemies.values()) {
       const et = ETYPES[e.ty];
-      let sp = et.sp * slow * this.diffMul * (e.wsp || 1);
+      let sp = et.sp * slow * this._dMul() * (e.wsp || 1);
       e.cool -= dt;
       // spawned outside: walk in through the gate before anything else
       if (e.entering) {
@@ -73,7 +81,7 @@ export function install(P) {
         continue;
       }
       // melee player if adjacent
-      if (np && npd < 5) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this.diffMul * (this.dmgWaveMul || 1)); } continue; }
+      if (np && npd < 5) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this._dMul() * (this.dmgWaveMul || 1)); } continue; }
       // melee mobs hunt a nearby player; structures in the way get smashed
       if (!et.rng && !et.boss && np && npd < 49) {
         const dx = np.x - e.x, dz = np.z - e.z, d = Math.hypot(dx, dz) || 1;
@@ -84,13 +92,16 @@ export function install(P) {
         continue;
       }
       const gx = w2g(e.x), gz = w2g(e.z), here = ti(gx, gz);
-      // breakers & bosses smash adjacent structures even when a path exists
-      if ((e.ty === 1 || et.boss) && e.cool <= 0) {
+      // breakers & bosses smash any adjacent structure; every enemy type retaliates against adjacent TURRETS.
+      // reach scales with body radius — big bosses used to fail the old fixed 1.9u check and ignored structures
+      if (e.cool <= 0) {
+        const smasher = e.ty === 1 || et.boss;
+        const rr = 1.5 + (et.r || .55) * (e.final ? 1.6 : 1), rr2 = rr * rr;
         let hit = -1;
-        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
           const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
           const j = ti(X, Z), o2 = this.occ[j];
-          if ((o2 === 1 || o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < 3.6) { hit = j; break; }
+          if ((smasher ? (o2 === 1 || o2 === 2) : o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < rr2) { hit = j; break; }
         }
         if (hit >= 0) { this._atkStruct(e, et, hit); continue; }
       }
@@ -101,7 +112,7 @@ export function install(P) {
         const j = ti(X, Z); if (this.flowD[j] < bd) { bd = this.flowD[j]; bi = j; }
       }
       if (bi < 0) { // at core
-        if (this.occ[here] === 3 || bd <= 1.5) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this.diffMul * (this.dmgWaveMul || 1), e); } }
+        if (this.occ[here] === 3 || bd <= 1.5) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this._dMul() * (this.dmgWaveMul || 1), e); } }
         continue;
       }
       const o = this.occ[bi];
@@ -110,7 +121,7 @@ export function install(P) {
         if (e.cool <= 0) this._atkStruct(e, et, bi);
         continue;
       }
-      if (o === 3) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this.diffMul * 2 * (this.dmgWaveMul || 1), e); } continue; }
+      if (o === 3) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this._dMul() * 2 * (this.dmgWaveMul || 1), e); } continue; }
       const dx = bx - e.x, dz = bz - e.z, d = Math.hypot(dx, dz) || 1;
       e.x += dx / d * sp * dt; e.z += dz / d * sp * dt;
       e.x = clamp(e.x, 1 - HALF, HALF - 1); e.z = clamp(e.z, 1 - HALF, HALF - 1);
@@ -119,7 +130,7 @@ export function install(P) {
   P._atkStruct = function (e, et, j) {
     e.cool = .8;
     const x = g2w(j % N), z = g2w((j / N) | 0);
-    this.shp[j] -= et.sdmg * this.diffMul * (this.dmgWaveMul || 1);
+    this.shp[j] -= et.sdmg * this._dMul() * (this.dmgWaveMul || 1) * (e.smash || 1); // final boss wrecks structures at 2x
     this._burst(x, z, PAL.redHex, 4, 4); this._beep(190, .05, 'square', .02);
     if (this.shp[j] <= 0) { this._fx(x, z, false, PAL.red7Hex); this._remove(j); }
   };

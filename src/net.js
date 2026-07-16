@@ -136,7 +136,7 @@ export function install(P) {
     if (this.phase !== 'over' && this.phase !== 'count' && m.ph) { if (m.ph !== this.phase) { this.phase = m.ph; if (m.ph === 'assault') this._banner('WAVE ' + this.wave + ' — 습격!'); else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); } } this.phT = m.pt; }
     const seen = new Set();
     (m.en || []).forEach(a => { const [id, ty, x, z, hp] = a; seen.add(id); let e = this.enemies.get(id);
-      if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss && this.wave >= this.maxWave) e.final = true; this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.final ? '⚠ 최종 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
+      if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss) { e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1; if (e.btier === 3) e.final = true; } this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
       e.tx = x / 10; e.tz = z / 10; e.hp = hp; if (!e.mhp || hp > e.mhp) e.mhp = hp; });
     for (const [id, e] of this.enemies) if (!seen.has(id)) { this._killFx(e); this.enemies.delete(id); }
     if (m.st) this._structUnpack(m.st);

@@ -167,7 +167,7 @@ export function install(P) {
   };
   P._eMesh = function (e) {
     const T = THREE;
-    const key = e.ty === 3 ? (e.final ? 'boss2' : 'boss1') : e.ty === 2 ? (e.id % 2 ? 'ranged' : (this.mdl && this.mdl.ranged2 ? 'ranged2' : 'ranged')) : 'melee';
+    const key = e.ty === 3 ? (e.btier === 3 ? (this.mdl && this.mdl.boss3 ? 'boss3' : 'boss2') : e.btier === 2 ? 'boss2' : 'boss1') : e.ty === 2 ? (e.id % 2 ? 'ranged' : (this.mdl && this.mdl.ranged2 ? 'ranged2' : 'ranged')) : 'melee';
     const tpl = this.mdl && this.mdl[key];
     if (tpl) {
       const g = new T.Group();
@@ -179,7 +179,7 @@ export function install(P) {
         aura.rotation.x = -Math.PI / 2; aura.position.y = .07; g.add(aura); g.aura = aura;
         // no PointLight: boss spawn/death would change the light count → full-scene shader recompile stall
       }
-      if (e.final) g.scale.setScalar(2);
+      if (e.final && !(this.mdl && this.mdl.boss3)) g.scale.setScalar(2); // boss3 GLB is already colossal; only the fallback needs inflating
       this.scene.add(g); return g;
     }
     const g = new T.Group();
@@ -419,7 +419,7 @@ export function install(P) {
       else m.rotation.y += dt * (e.ty === 2 ? 1.5 : .6);
       m.position.set(e.x, 0, e.z);
       if (ETYPES[e.ty] && ETYPES[e.ty].boss) { // boss: big red HP bar overhead + pulsing aura
-        if (!m.bossBar) { m.bossBar = this._mkBar(e.x, e.z, 3.6); m.bossBar.position.y = e.final ? 6.2 : 3.4; }
+        if (!m.bossBar) { m.bossBar = this._mkBar(e.x, e.z, e.btier === 3 ? 4.6 : 3.6); const bh = new T.Box3().setFromObject(m).max.y; m.bossBar.position.y = Math.max(3.4, bh + 1); } // above the actual model, whatever its height
         m.bossBar.position.x = e.x; m.bossBar.position.z = e.z;
         this._setBar(m.bossBar, clamp(e.hp / (e.mhp || e.hp || 1), 0, 1), PAL.redHex);
         if (m.aura) { m.aura.scale.setScalar(1 + Math.sin(now * 3.2) * .12); m.aura.material.opacity = .4 + Math.sin(now * 3.2) * .2; }
