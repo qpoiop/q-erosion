@@ -3,7 +3,7 @@ import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, R
 
 export function install(P) {
   P._spawnBullet = function (x, z, dx, dz, o) {
-    this.bullets.push({ x, z, dx, dz, life: .9, dmg: o.dmg || 0, pierce: o.pierce || 0, ghost: o.ghost, ally: o.ally, tur: o.tur });
+    this.bullets.push({ x, z, dx, dz, life: .9, dmg: o.dmg || 0, pierce: o.pierce || 0, ghost: o.ghost, ally: o.ally, tur: o.tur, band: o.band || 0 });
   };
   P._fire = function (p, tx, tz, mine) {
     const base = Math.atan2(tz - p.z, tx - p.x);
@@ -143,7 +143,7 @@ export function install(P) {
       if (cd > 0) continue;
       const x = g2w(i % N), z = g2w((i / N) | 0);
       let best = null, bd = 90; for (const e of this.enemies.values()) { const d = dist2(x, z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
-      if (best) { this._turCd[i] = .3; const a = Math.atan2(best.z - z, best.x - x); this._spawnBullet(x, z, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * this.g.turMul, tur: true }); }
+      if (best) { this._turCd[i] = .3; const a = Math.atan2(best.z - z, best.x - x); this._spawnBullet(x, z, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * this.g.turMul, tur: true, band: this._turBand() }); }
     }
   };
   P._pickupSim = function () {
@@ -184,7 +184,7 @@ export function install(P) {
       if (Math.abs(b.x) > HALF || Math.abs(b.z) > HALF) { b.life = 0; continue; }
       for (const e of this.enemies.values()) {
         if (dist2(b.x, b.z, e.x, e.z) < (ETYPES[e.ty].r + .2) ** 2) {
-          this._fx(b.x, b.z, false, b.tur || !b.ally ? PAL.cyanHex : PAL.amberHex);
+          this._fx(b.x, b.z, false, b.tur ? (b.band === 2 ? 0xd98aff : b.band === 1 ? PAL.amberHex : PAL.cyanHex) : !b.ally ? PAL.cyanHex : PAL.amberHex);
           if (!b.ghost) { if (host) this._dmgEnemy(e, b.dmg, b); else { e.flash = .12; this._send({ t: 'hit', id: e.id, d: +b.dmg.toFixed(1) }); } }
           if (b.pierce > 0) b.pierce--; else b.life = 0;
           break;
