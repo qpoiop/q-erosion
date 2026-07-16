@@ -303,6 +303,13 @@ export function install(P) {
   P._render = function (dt) {
     const T = THREE, now = performance.now() / 1000;
     this._fno = ((this._fno | 0) + 1) & 0xffff;
+    if (this._fpsEl === undefined) { // ?fps=1 — on-device frame meter for diagnosing role-specific jank reports
+      this._fpsEl = null;
+      if (new URLSearchParams(location.search).get('fps') === '1') {
+        this._fpsEl = this.H('div', 'position:absolute;left:50%;top:4px;transform:translateX(-50%);font:700 10px monospace;color:#7dff8a;background:rgba(0,0,0,.5);padding:2px 8px;z-index:60;pointer-events:none', this.hud);
+      }
+    }
+    if (this._fpsEl && (this._fno & 15) === 0) this._fpsEl.textContent = `${(1000 / Math.max(1, this._ftAvg || 16)).toFixed(0)}fps · ${(this._ftAvg || 16).toFixed(0)}ms${this._lowPerf ? ' · LOW' : ''}`;
     { // perf governor: sustained jank → shed the expensive passes (weak phones died at wave 11+)
       const ms = Math.min(100, dt * 1000);
       this._ftAvg = (this._ftAvg || 16) * .92 + ms * .08;
