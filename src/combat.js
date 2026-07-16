@@ -27,11 +27,10 @@ export function install(P) {
     if (e.hp <= 0 && !e.deadDone) {
       e.deadDone = true; this.kills++; this._killFx(e); this.enemies.delete(e.id);
       this._grantXp(ETYPES[e.ty].xp);
+      // every kill pays BOTH units — each at their own 회수 배율 (killer no longer hogs the gold)
       const base = ETYPES[e.ty].sc * (DIFF_SCR[this.diffKey] || 1);
-      if (this.mode === 'solo') this.scrap += base * (src && src.ally ? (this.ally.scrapMul || 1) : src && src.tur ? 1 : (this.me.scrapMul || 1));
-      else if (src && src.tur) { this.scrap += base / 2; this.allyScrap += base / 2; } // turret kills split
-      else if (src && src.ally) this.allyScrap += base * (this.ally.scrapMul || 1);
-      else this.scrap += base * (this.me.scrapMul || 1);
+      this.scrap += base * (this.me.scrapMul || 1);
+      if (this.mode !== 'solo') this.allyScrap += base * (this.ally.scrapMul || 1);
       const dropMul = src && src.ally ? (this.ally.dropMul || 1) : src && src.tur ? 1 : (this.me.dropMul || 1); // killer's loot-detection augment
       if (Math.random() < .04 * dropMul && this.fitems.length < 3) this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: e.x, z: e.z });
     }

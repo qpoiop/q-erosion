@@ -48,8 +48,8 @@ export function install(P) {
     const e = { id, ty, x: g.x + nx * off + lat * (nz ? 1 : 0), z: g.z + nz * off + lat * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x + lat * (nz ? 1 : 0), gz: g.z + lat * (nx ? 1 : 0), wsp: 1 + (this.wave - 1) * .035 };
     if (ETYPES[ty].boss) { // boss tiers: w5 mid, w10 heavy, final wave = colossal structure-wrecker
       e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1;
-      if (e.btier === 2) e.hp *= 4;
-      else if (e.btier === 3) { e.final = true; e.hp *= 14; e.smash = 2; }
+      if (e.btier === 2) { e.hp *= 4; e.wsp *= 1.15; }
+      else if (e.btier === 3) { e.final = true; e.hp *= 14; e.smash = 2; e.wsp *= 1.4; } // colossal but NOT slow
     }
     e.mhp = e.hp;
     this.enemies.set(id, e);
