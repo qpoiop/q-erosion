@@ -22,7 +22,7 @@ export function install(P) {
     const rng = p.range || 9;
     let best = null, bd = rng * rng; // firing range is a real stat now — 조준 광학 research extends it
     for (const e of this.enemies.values()) { const d = dist2(p.x, p.z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
-    if (best) { p.fireT = 1 / p.frate; this._fire(p, best.x, best.z, mine); }
+    if (best) { p.fireT = 1 / Math.min(6.5, p.frate); this._fire(p, best.x, best.z, mine); } // hard fire-rate ceiling
   };
   P._dmgEnemy = function (e, d, src) { // src: killing bullet/context — scrap multiplier belongs to the KILLER
     e.hp -= d; e.flash = .12;
@@ -216,10 +216,13 @@ export function install(P) {
       b.x += b.dx * dt; b.z += b.dz * dt; b.life -= dt;
       if (Math.abs(b.x) > HALF || Math.abs(b.z) > HALF) { b.life = 0; continue; }
       for (const e of this.enemies.values()) {
+        if (b.hitIds && b.hitIds.has(e.id)) continue; // a piercing bullet hits each enemy ONCE — overlap re-hits were shredding bosses
         if (dist2(b.x, b.z, e.x, e.z) < (ETYPES[e.ty].r + .2) ** 2) {
+          (b.hitIds = b.hitIds || new Set()).add(e.id);
           this._fx(b.x, b.z, false, b.tur ? (b.band === 2 ? 0xd98aff : b.band === 1 ? PAL.amberHex : PAL.cyanHex) : !b.ally ? PAL.cyanHex : PAL.amberHex);
-          if (!b.ghost) { if (host) this._dmgEnemy(e, b.dmg, b); else { e.flash = .12; this._send({ t: 'hit', id: e.id, d: +b.dmg.toFixed(1) }); } }
-          if (b.pierce > 0) b.pierce--; else b.life = 0;
+          const bd2 = ETYPES[e.ty].boss ? b.dmg * .7 : b.dmg; // bosses shrug off 30% of bullet damage
+          if (!b.ghost) { if (host) this._dmgEnemy(e, bd2, b); else { e.flash = .12; (this._hitQ = this._hitQ || []).push([e.id, +bd2.toFixed(1)]); } }
+          if (b.pierce > 0) { b.pierce--; b.dmg *= .7; } else b.life = 0; // pierce decays 30% per hop — no more free lawnmower lanes
           break;
         }
       }

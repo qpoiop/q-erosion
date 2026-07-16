@@ -139,6 +139,7 @@ export function install(P) {
       case 'busy': if (!this.isHost && this.phase === 'wait') { this._overlay(`<div style="font:700 20px ${FONT}">방이 가득 찼습니다</div><div style="margin-top:14px"><button id="egCancel" style="${this._obtn(false)}">돌아가기</button></div>`); this.ovIn.querySelector('#egCancel').onclick = () => this._exit(); } break;
       case 'p': { this._peerSeenAt = performance.now(); const a = this.ally; a.lastSeen = this.tm; a.tx = m.x; a.tz = m.z; a.ta = m.a; a.hp = m.hp; a.maxhp = m.mh; a.down = m.dn; a.lv = m.lv; this._peerPaused = !!m.bg; if (m.sm) a.scrapMul = m.sm; if (m.au !== undefined) a.au = m.au;
         (m.sh || []).forEach(s => this._spawnBullet(s[0], s[1], s[2], s[3], { ghost: true, ally: true, life: s[4] || .55 }));
+        if (this.isHost && m.hq) for (const [hid, hd] of m.hq) { const he = this.enemies.get(hid); if (he) this._dmgEnemy(he, Math.min(hd, 500), { ally: true }); }
         break; }
       case 'hit': if (this.isHost) { const e = this.enemies.get(m.id); if (e) this._dmgEnemy(e, m.d, { ally: true }); } break;
       case 'bld': if (this.isHost) { if (this._canPlace(m.i) && this._structCount(1, m.k) < (m.k === 1 ? CAP_WALL : CAP_TUR)) { const c = this._cost(m.k, this.ally); if (this.allyScrap >= c) { this.allyScrap -= c; this.allyStat.b++; this._place(m.i, m.k, false, 1); this._send({ t: 'blt', i: m.i, k: m.k, o: 1, sc: Math.round(this.allyScrap) }); } } } break;
@@ -186,14 +187,19 @@ export function install(P) {
       else if (m.ph === 'escape') { this._banner(`⚑ 적의 코어로 통하는 균열이 열렸다 — ${GATE_DIR[m.eg ?? this.escGate ?? 0]}쪽 균열로 진입하라!`, 6000); }
       else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); }
     } this.phT = m.pt; }
+    if (m.ebq) for (const [ex, ez, edx, edz] of m.ebq) this.ebullets.push({ x: ex, z: ez, dx: edx, dz: edz, life: 3, ghost: !this.isHost }); // batched gunner shots
     const seen = new Set();
-    (m.en || []).forEach(a => { const [id, ty, x, z, hp, fl] = a; seen.add(id); let e = this.enemies.get(id);
+    const flat = m.en || []; // flat stride-6 array — one allocation instead of one array per enemy
+    for (let fi = 0; fi < flat.length; fi += 6) {
+      const id = flat[fi], ty = flat[fi + 1], x = flat[fi + 2], z = flat[fi + 3], hp = flat[fi + 4], fl = flat[fi + 5];
+      seen.add(id); let e = this.enemies.get(id);
       if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss) { // tier travels in the packet flags — the old inference mislabeled the SOURCE as a tier-2 boss on laggy joiners
           if (fl & 2) { e.btier = 3; e.final = true; e.giant = true; }
           else if (this.inf) e.btier = (fl & 1) ? 2 : 1;
           else { e.btier = this.wave >= this.maxWave ? 3 : (fl & 1) || this.wave >= 10 ? 2 : 1; if (e.btier === 3) e.final = true; }
         } this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
-      e.tx = x / 10; e.tz = z / 10; e.hp = hp; if (!e.mhp || hp > e.mhp) e.mhp = hp; });
+      e.tx = x / 10; e.tz = z / 10; e.hp = hp; if (!e.mhp || hp > e.mhp) e.mhp = hp;
+    }
     for (const [id, e] of this.enemies) if (!seen.has(id)) { this._killFx(e); this.enemies.delete(id); }
     if (m.st) this._structUnpack(m.st);
     {
@@ -209,14 +215,17 @@ export function install(P) {
       const p = this.me;
       const o = { t: 'p', x: +p.x.toFixed(2), z: +p.z.toFixed(2), a: +p.a.toFixed(2), hp: Math.round(p.hp), mh: p.maxhp, dn: p.down, lv: this.lv, bg: this._bgPaused ? 1 : 0, sm: +(p.scrapMul || 1).toFixed(2), au: Object.values(p.taken || {}).reduce((a, b) => a + b, 0) };
       if (this.shotQ.length) { o.sh = this.shotQ; this.shotQ = []; }
+      if (this._hitQ && this._hitQ.length) { o.hq = this._hitQ; this._hitQ = []; }
       this._send(o);
     }
     if (this.isHost) {
       this.sendStateT -= dt;
       if (this.sendStateT <= 0) {
-        this.sendStateT = .13; this.sendStT -= .13;
-        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, eg: this.escGate, cm: this.coreMax, ss: [this.stat.k, Math.round(this.stat.g), this.stat.b, this.stat.r], as: [this.allyStat.k, Math.round(this.allyStat.g)], hr: [this.me.wallMul, this.me.turMul, this.me.turHpMul, this.me.costMul, this.me.wallLv || 0, this.me.turLv || 0], bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
-          en: [...this.enemies.values()].map(e => [e.id, e.ty, Math.round(e.x * 10), Math.round(e.z * 10), Math.round(e.hp), (e.giant ? 2 : 0) | (e.btier === 2 ? 1 : 0)]),
+        this.sendStateT = this._stIv || .13; this.sendStT -= this._stIv || .13;
+        this._stIv = this.enemies.size > 120 ? .26 : this.enemies.size > 60 ? .2 : .13; // adaptive: hordes don't need 7.7Hz
+      const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, eg: this.escGate, cm: this.coreMax, ss: [this.stat.k, Math.round(this.stat.g), this.stat.b, this.stat.r], as: [this.allyStat.k, Math.round(this.allyStat.g)], hr: [this.me.wallMul, this.me.turMul, this.me.turHpMul, this.me.costMul, this.me.wallLv || 0, this.me.turLv || 0], bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
+          en: (() => { const a = new Array(this.enemies.size * 6); let i2 = 0; for (const e of this.enemies.values()) { a[i2++] = e.id; a[i2++] = e.ty; a[i2++] = Math.round(e.x * 10); a[i2++] = Math.round(e.z * 10); a[i2++] = Math.round(e.hp); a[i2++] = (e.giant ? 2 : 0) | (e.btier === 2 ? 1 : 0); } return a; })(), // flat stride-6 — one array, cheap parse
+          ebq: this._ebQ && this._ebQ.length ? (() => { const q = this._ebQ; this._ebQ = []; return q; })() : undefined,
           itm: this.fitems.map(f => [f.id, f.k, Math.round(f.x * 10), Math.round(f.z * 10)]) };
         if (this.sendStT <= 0) { this.sendStT = 1.4; o.st = this._structPack(); }
         this._send(o);

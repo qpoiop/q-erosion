@@ -109,7 +109,7 @@ export function install(P) {
         else if (d < 4.5) { e.x -= (np.x - e.x) / d * sp * dt; e.z -= (np.z - e.z) / d * sp * dt; }
         e.shootT -= dt;
         if (e.shootT <= 0) { e.shootT = 2.8; const a = Math.atan2(np.z - e.z, np.x - e.x); const dx = Math.cos(a) * 8.5, dz = Math.sin(a) * 8.5;
-          this.ebullets.push({ x: e.x, z: e.z, dx, dz, life: 3 }); if (this.mode !== 'solo') this._send({ t: 'eb', x: +e.x.toFixed(1), z: +e.z.toFixed(1), dx: +dx.toFixed(1), dz: +dz.toFixed(1) }); }
+          this.ebullets.push({ x: e.x, z: e.z, dx, dz, life: 3 }); if (this.mode !== 'solo') (this._ebQ = this._ebQ || []).push([+e.x.toFixed(1), +e.z.toFixed(1), +dx.toFixed(1), +dz.toFixed(1)]); }
         continue;
       }
       // melee player if adjacent

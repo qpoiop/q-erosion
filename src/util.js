@@ -148,7 +148,7 @@ const SYN = [
 const ITEMS = { bomb: { n: '융단 폭격', i: '💣', d: '전 구역의 적에게 90 피해' }, turret: { n: '즉석 포탑', i: '🗼', d: '현재 위치에 포탑 즉시 건설' }, kit: { n: '응급 키트', i: '➕', d: '내 체력 완전 회복' }, slow: { n: '지연 필드', i: '⏳', d: '5초간 모든 적 감속' } };
 const ITEM_KEYS = Object.keys(ITEMS);
 const INV_MAX = 5; // item inventory slots
-const PV = 2; // net protocol version — bump on breaking message changes; peers warn on mismatch
+const PV = 3; // net protocol version — bump on breaking message changes; peers warn on mismatch
 const DIFF = { easy: .75, normal: 1, hard: 1.35, nightmare: 1.49 };   // damage: nightmare = hard +10%
 const DIFF_CNT = { easy: .8, normal: 1, hard: 1.25, nightmare: 2.5 }; // wave size: nightmare ≈ 2x hard
 const DIFF_SPT = { easy: 1.15, normal: 1, hard: .88, nightmare: .5 }; // spawn interval (2x mobs need 2x flow)
