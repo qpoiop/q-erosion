@@ -94,7 +94,7 @@ export function install(P) {
       if (fresh && s.first) s.first(p, this);
       while (applied < target) { s.f(p, this); applied++; }
       p.syn[s.id] = applied;
-      if (grade > oldGrade) { p.synGrade[s.id] = grade; if (s.grade) s.grade(p, this, grade); }
+      if (grade > oldGrade) { p.synGrade[s.id] = grade; if (s.grade) for (let lv = oldGrade + 1; lv <= grade; lv++) s.grade(p, this, lv); }
       if (mine && fresh) { this._banner(`✦ 시너지 각성 — ${s.n}! ${s.d}`, 3800); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
       else if (mine && grade > oldGrade && grade >= 2) { this._banner(`✦ 시너지 진화 — ${s.n} [${RAR[grade - 1].n}]`, 3200); this._beep(990, .12, 'square', .05); }
       else if (mine) this._beep(880, .08, 'square', .04);

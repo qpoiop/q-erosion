@@ -110,15 +110,27 @@ const SHOP = [
 /* synergies: awaken when both lines are taken, then DEEPEN — f re-applies for every
    tier gained across the two lines (see _checkSyn), so leveling either line keeps paying */
 const SYN = [
-  { id: 'storm', need: ['frate', 'shots'], n: '폭풍 사격', d: '두 계통 티어당 연사 +4%', f: p => p.frate *= 1.04 },
-  { id: 'ap', need: ['dmg', 'pierce'], n: '철갑 관통', d: '티어당 피해 +3.5% (각성 시 관통 +1)', first: p => p.pierce++, f: p => p.dmg *= 1.035 },
-  { id: 'rush', need: ['speed', 'regen'], n: '전투 기동', d: '티어당 대시 쿨다운 −4%', f: p => p.dashCd *= .96 },
-  { id: 'fort', need: ['maxhp', 'regen'], n: '재생 장갑', d: '티어당 초당 수복 +0.35', f: p => p.regen += .35 },
-  { id: 'greed', need: ['scrap', 'dmg'], n: '약탈 프로토콜', d: '티어당 처치 자원 +4%', f: p => p.scrapMul = (p.scrapMul || 1) * 1.04 },
-  { id: 'bulwark', need: ['armor', 'maxhp'], n: '불괴 장갑', d: '티어당 받는 피해 −2%', f: p => p.armor = (p.armor || 1) * .98 },
-  { id: 'sanctum', need: ['core', 'regen'], n: '성역 프로토콜', d: '티어당 코어 최대 +25 · 즉시 +25', f: (p, g) => g && g._coreAug(25, 25) },
-  { id: 'hunter', need: ['drop', 'scrap'], n: '전리품 사냥꾼', d: '티어당 드랍 +5% · 자원 +2%', f: p => { p.dropMul = (p.dropMul || 1) * 1.05; p.scrapMul = (p.scrapMul || 1) * 1.02; } },
-  { id: 'aegis', need: ['armor', 'core'], n: '수호자 서약', d: '티어당 받는 피해 −1.5% · 코어 +12', f: (p, g) => { p.armor = (p.armor || 1) * .985; if (g) g._coreAug(12, 12); } },
+  /* f: re-applies per combined tier of the two lines (tier-sum, max 8).
+     grade: called once per GRADE level reached (2=레어, 3=에픽, 4=레전드; grade = min of the two line tiers) —
+     modest one-time bumps so grades matter without overshadowing the per-tier growth. */
+  { id: 'storm', need: ['frate', 'shots'], n: '폭풍 사격', d: '티어당 연사 +4% · 등급 보너스', f: p => p.frate *= 1.04,
+    grade: (p, g, gr) => { if (gr >= 2) p.frate *= gr === 4 ? 1.05 : gr === 3 ? 1.04 : 1.03; } },
+  { id: 'ap', need: ['dmg', 'pierce'], n: '철갑 관통', d: '티어당 피해 +3.5% (각성 시 관통 +1) · 등급 보너스', first: p => p.pierce++, f: p => p.dmg *= 1.035,
+    grade: (p, g, gr) => { if (gr >= 2) p.dmg *= gr === 4 ? 1.05 : gr === 3 ? 1.04 : 1.03; if (gr === 4) p.pierce++; } },
+  { id: 'rush', need: ['speed', 'regen'], n: '전투 기동', d: '티어당 대시 쿨다운 −4% · 등급 보너스', f: p => p.dashCd *= .96,
+    grade: (p, g, gr) => { if (gr >= 2) p.dashCd *= gr === 4 ? .95 : gr === 3 ? .96 : .97; } },
+  { id: 'fort', need: ['maxhp', 'regen'], n: '재생 장갑', d: '티어당 초당 수복 +0.35 · 등급 보너스', f: p => p.regen += .35,
+    grade: (p, g, gr) => { if (gr >= 2) p.regen += gr === 4 ? .8 : gr === 3 ? .5 : .3; } },
+  { id: 'greed', need: ['scrap', 'dmg'], n: '약탈 프로토콜', d: '티어당 처치 자원 +4% · 등급 보너스', f: p => p.scrapMul = (p.scrapMul || 1) * 1.04,
+    grade: (p, g, gr) => { if (gr >= 2) p.scrapMul = (p.scrapMul || 1) * (gr === 4 ? 1.06 : gr === 3 ? 1.05 : 1.04); } },
+  { id: 'bulwark', need: ['armor', 'maxhp'], n: '불괴 장갑', d: '티어당 받는 피해 −2% · 등급 보너스', f: p => p.armor = (p.armor || 1) * .98,
+    grade: (p, g, gr) => { if (gr >= 2) p.armor = (p.armor || 1) * (gr === 4 ? .98 : gr === 3 ? .985 : .99); } },
+  { id: 'sanctum', need: ['core', 'regen'], n: '성역 프로토콜', d: '티어당 코어 최대 +25 · 즉시 +25 · 등급 보너스', f: (p, g) => g && g._coreAug(25, 25),
+    grade: (p, g, gr) => { if (gr >= 2 && g) g._coreAug(gr === 4 ? 80 : gr === 3 ? 50 : 30, gr === 4 ? 80 : gr === 3 ? 50 : 30); } },
+  { id: 'hunter', need: ['drop', 'scrap'], n: '전리품 사냥꾼', d: '티어당 드랍 +5% · 자원 +2% · 등급 보너스', f: p => { p.dropMul = (p.dropMul || 1) * 1.05; p.scrapMul = (p.scrapMul || 1) * 1.02; },
+    grade: (p, g, gr) => { if (gr >= 2) p.dropMul = (p.dropMul || 1) * (gr === 4 ? 1.1 : gr === 3 ? 1.07 : 1.05); } },
+  { id: 'aegis', need: ['armor', 'core'], n: '수호자 서약', d: '티어당 받는 피해 −1.5% · 코어 +12 · 등급 보너스', f: (p, g) => { p.armor = (p.armor || 1) * .985; if (g) g._coreAug(12, 12); },
+    grade: (p, g, gr) => { if (gr >= 2) { p.armor = (p.armor || 1) * (gr === 4 ? .985 : .99); if (g) g._coreAug(gr === 4 ? 30 : gr === 3 ? 20 : 15, 15); } } },
   { id: 'reson', need: ['skl', 'dmg'], n: '공명 폭발', d: '티어당 충격파 피해 +5% · 등급별 둔화/마비 부여', f: p => p.sklDmgMul = (p.sklDmgMul || 1) * 1.05,
     grade: (p, g, gr) => { // 기본: 30% 둔화 2.5s → 레어 35%/3s → 에픽 +마비 20% → 레전드 50% 둔화 3.5s·마비 35%
       p.swSlowF = gr >= 4 ? .5 : gr >= 2 ? .65 : .7;
@@ -126,7 +138,8 @@ const SYN = [
       p.swStunC = gr >= 4 ? .35 : gr >= 3 ? .2 : 0;
       p.swStunT = gr >= 4 ? 1.2 : 1;
     } },
-  { id: 'surge', need: ['skl', 'speed'], n: '연쇄 기동', d: '티어당 충격파 쿨 −3% · 범위 +2%', f: p => { p.sklCdMul = (p.sklCdMul || 1) * .97; p.sklRMul = (p.sklRMul || 1) * 1.02; } },
+  { id: 'surge', need: ['skl', 'speed'], n: '연쇄 기동', d: '티어당 충격파 쿨 −3% · 범위 +2% · 등급 보너스', f: p => { p.sklCdMul = (p.sklCdMul || 1) * .97; p.sklRMul = (p.sklRMul || 1) * 1.02; },
+    grade: (p, g, gr) => { if (gr >= 2) { p.sklCdMul = (p.sklCdMul || 1) * (gr === 4 ? .95 : gr === 3 ? .97 : .98); p.sklRMul = (p.sklRMul || 1) * (gr === 4 ? 1.03 : 1.02); } } },
 ];
 const ITEMS = { bomb: { n: '융단 폭격', i: '💣', d: '전 구역의 적에게 90 피해' }, turret: { n: '즉석 포탑', i: '🗼', d: '현재 위치에 포탑 즉시 건설' }, kit: { n: '응급 키트', i: '➕', d: '내 체력 완전 회복' }, slow: { n: '지연 필드', i: '⏳', d: '5초간 모든 적 감속' } };
 const ITEM_KEYS = Object.keys(ITEMS);
