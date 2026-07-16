@@ -175,7 +175,7 @@ export function install(P) {
         (this._turFlash = this._turFlash || {})[i] = 1; // muzzle recoil for the render pass
         // spawn at the MUZZLE, not the model's center — tall tier-2 towers were swallowing the beam
         const mx = x + Math.cos(a) * 1.2, mz = z + Math.sin(a) * 1.2, my = 1.15 + band * .45;
-        this._spawnBullet(mx, mz, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * (q.turMul || 1), tur: true, band, life: .5, own: q === this.ally ? 1 : 0, y: my });
+        this._spawnBullet(mx, mz, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * (q.turMul || 1), tur: true, band, life: .5, own: q === this.ally ? 1 : 0, y: my, ghost: !this.isHostish() });
       }
     }
   };

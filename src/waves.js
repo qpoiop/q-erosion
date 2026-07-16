@@ -132,7 +132,7 @@ export function install(P) {
         for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
           const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
           const j = ti(X, Z), o2 = this.occ[j];
-          if ((smasher ? (o2 === 1 || o2 === 2) : o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < rr2) { hit = j; break; }
+          if ((smasher || o2 === 2 || ((e.id & 3) !== 0 && Math.random() < .35)) && (o2 === 1 || o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < rr2) { hit = j; break; } // everyone gnaws blockades — walls can't cheese a whole horde
         }
         if (hit >= 0) { this._atkStruct(e, et, hit); continue; }
       }

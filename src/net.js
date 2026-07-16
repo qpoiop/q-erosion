@@ -26,6 +26,7 @@ export function install(P) {
       if (d) { d.textContent = '아직 응답이 없습니다 — 코드가 정확한지, 방장이 대기 화면을 열어두었는지 확인하세요.'; d.style.color = PAL.amber; }
     }, 12000);
     this._connectRelay();
+    this._mqtt2(); // parallel matchmaking channel
     this.sendPoseT = 0; this.sendStateT = 0; this.sendStT = 0;
   };
   P._onNetReady = function () { // shared post-connect handshake (relay & mqtt paths)
@@ -80,7 +81,22 @@ export function install(P) {
     };
     connect();
   };
-  P._send = function (o) { if (this.net && this.net.connected) { this._netUp = true; this.net.publish(this.pubT, JSON.stringify(o)); } }
+  P._send = function (o) {
+    const s = JSON.stringify(o);
+    if (this.net && this.net.connected) { this._netUp = true; this.net.publish(this.pubT, s); }
+    if (this.net2) { try { this.net2.publish(this.pubT, s); } catch (e) {} } // matchmaking runs on BOTH transports
+  }
+  P._mqtt2 = function () { // secondary MQTT channel for the wait phase — kills relay/MQTT split-brain during matchmaking
+    if (this.net2 || this._dead || typeof mqtt === 'undefined') return;
+    try {
+      const c = mqtt.connect('wss://broker.emqx.io:8084/mqtt', { clientId: 'eg2_' + Math.random().toString(16).slice(2, 10), clean: true, connectTimeout: 8000, reconnectPeriod: 0 });
+      c.on('connect', () => { c.subscribe(this.subT); });
+      c.on('message', (t, m) => { try { this._onMsg(JSON.parse(m.toString())); } catch (e) {} });
+      c.on('error', () => {});
+      this.net2 = c;
+    } catch (e) {}
+  };
+  P._dropMqtt2 = function () { if (this.net2) { const c = this.net2; this.net2 = null; setTimeout(() => { try { c.end(true); } catch (e) {} }, 1500); } }
   P._allyR = function () { const a = this.ally; return { wallMul: a.wallMul, turMul: a.turMul, turHpMul: a.turHpMul, costMul: a.costMul, wallLv: a.wallLv || 0, turLv: a.turLv || 0 }; }
   P._structPack = function () { const a = []; for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2 || this.occ[i] === 5) a.push([i, this.occ[i], Math.round(this.shp[i]), +this.bld[i].toFixed(2), this.own[i]]); return a; }
   P._structUnpack = function (a) {
@@ -98,6 +114,7 @@ export function install(P) {
   P._startOnline = function () {
     this._lastStateAt = performance.now(); this._peerSeenAt = performance.now(); this._hostLost = false; this._peerPaused = false;
     this.phase = 'count'; this.countT = 3; this.allyOn = true; this.allyG.visible = true;
+    setTimeout(() => this._dropMqtt2(), 2500); // matchmaking done — single transport from here
     this.pbar.ally.lab.textContent = '동료 · ' + (this.isHost ? '유닛-B' : '유닛-A');
     this.ov.style.display = 'none';
   };
@@ -105,16 +122,16 @@ export function install(P) {
     switch (m.t) {
       case 'hello': if (this.isHost) {
         if (m.v !== PV) this._banner('⚠ 상대 클라이언트가 구버전입니다 — 양쪽 모두 새로고침 권장', 5200);
-        if (this.phase === 'wait') { this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV }); this._startOnline(); }
+        if (this.phase === 'wait') { this._send({ t: 'welcome', diff: this.diffMul, dk: this.diffKey, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV }); this._startOnline(); }
         else if (performance.now() - (this._peerSeenAt || 0) > 3000) { // teammate silent 3s (wall-clock — tm freezes on pause) — allow rejoin mid-game
-          this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV });
+          this._send({ t: 'welcome', diff: this.diffMul, dk: this.diffKey, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV });
           this._banner('동료 재접속!', 2600);
         }
         else this._send({ t: 'busy' });
       } break;
       case 'welcome': if (!this.isHost && this.phase === 'wait') {
         clearInterval(this._helloIv);
-        this.diffMul = m.diff; this.maxWave = m.waves; this.buildTime = m.bt; this.scrap = m.sc;
+        this.diffMul = m.diff; if (m.dk) { this.diffKey = m.dk; this._setDiffTag && this._setDiffTag(); } this.maxWave = m.waves; this.buildTime = m.bt; this.scrap = m.sc;
         if (m.v !== PV) this._banner('⚠ 방장 클라이언트 버전이 다릅니다 — 양쪽 모두 새로고침 권장', 5200);
         if (m.ar) Object.assign(this.me, m.ar); if (m.abuys) this.me.buys = { ...m.abuys }; // rejoin: my research/buy counts live on the host
         this._structUnpack(m.st); this._startOnline();

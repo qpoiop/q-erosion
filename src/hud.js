@@ -16,11 +16,15 @@ export function install(P) {
     const tcRow = H('div', 'display:flex;align-items:baseline;gap:7px', tl);
     this.wvEl = H('div', 'font-size:13px;font-weight:700;letter-spacing:.06em', tcRow);
     this.phEl = H('div', 'font-size:10px;font-weight:700;letter-spacing:.06em;color:' + PAL.dim, tcRow);
-    this._mkDiffTag = (parent) => { // difficulty tag — always visible so you know what you signed up for
+    this._setDiffTag = () => { // difficulty tag — joiners learn the real difficulty from welcome(dk)
       const DN = { easy: ['쉬움', PAL.cyan], normal: ['보통', '#e8eaf0'], hard: ['어려움', PAL.red], nightmare: ['☠ 악몽', '#c96bff'] };
       const [dn, dc] = DN[this.diffKey] || DN.normal;
-      const d = H('div', `font:700 10px ${FONT};letter-spacing:.08em;color:${dc};border:1px solid ${dc}66;padding:6px 9px;background:rgba(12,14,20,.6)`, parent);
-      d.textContent = dn;
+      const d = this._diffTagEl;
+      d.textContent = dn; d.style.color = dc; d.style.borderColor = dc + '66';
+    };
+    this._mkDiffTag = (parent) => {
+      this._diffTagEl = H('div', `font:700 10px ${FONT};letter-spacing:.08em;padding:6px 9px;background:rgba(12,14,20,.6);border:1px solid transparent`, parent);
+      this._setDiffTag();
     };
     const cbRow = H('div', 'display:flex;align-items:center;gap:6px', tl);
     const cb = H('div', 'flex:1;height:5px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', cbRow);

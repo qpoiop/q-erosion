@@ -105,7 +105,7 @@ const SHOP = [
   { id: 'sskl', c: '스킬', n: '충격파 강화', d: '피해·반경 ↑, 쿨다운 ↓', cost: 40, per: true, max: 4, f: p => p.sklLv++ },
   { id: 'sdash', c: '스킬', n: '대시 모듈', d: '대시 쿨다운 −20%', cost: 30, per: true, max: 4, f: p => p.dashCd = Math.max(1.2, p.dashCd - 3.5 * .2) },
   // structure research is PER-PLAYER: it applies to structures the buyer built (st flag → owner-scoped HP rescale)
-  { id: 'gwall', c: '구조물', n: '벽 강화', d: '내가 지은 벽 내구 +40%', cost: 35, per: true, st: true, f: p => { p.wallMul *= 1.4; p.wallLv = (p.wallLv || 0) + 1; } },
+  { id: 'gwall', c: '구조물', n: '벽 강화', d: '내가 지은 벽 내구 +40%', cost: 35, per: true, st: true, max: 6, f: p => { p.wallMul = (p.wallMul || 1) + .4; p.wallLv = (p.wallLv || 0) + 1; } },
   { id: 'gtur', c: '구조물', n: '포탑 화력', d: '내 포탑 공격 +15% · 내구 +15%', cost: 40, per: true, st: true, max: 8, f: p => { p.turMul *= 1.15; p.turHpMul = (p.turHpMul || 1) * 1.15; p.turLv = (p.turLv || 0) + 1; } },
   { id: 'gcost', c: '구조물', n: '건설 자동화', d: '내 건설 비용 −15%', cost: 45, per: true, st: true, max: 3, f: p => p.costMul *= .85 },
   { id: 'crep', c: '구조물', n: '코어 수리', d: '코어 HP +150 즉시 회복', cost: 50, per: true, f: (p, g) => g && g._coreAug(0, 150) },
