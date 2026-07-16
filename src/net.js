@@ -27,15 +27,19 @@ export function install(P) {
     }
   };
   P._connectRelay = function () { // dedicated Cloudflare DO relay first; public MQTT as fallback
-    if (this._dead) return;
+    if (this._dead || this._relayTrying) return;
+    this._relayTrying = true;
     let settled = false;
     try {
       const ws = new WebSocket(RELAY + '/room/' + this.room + '?role=' + (this.isHost ? 'h' : 'g'));
-      const to = setTimeout(() => { if (!settled) { settled = true; try { ws.close(); } catch (e) {} this._connectMqtt(); } }, 5000);
+      const to = setTimeout(() => { settled = true; this._relayTrying = false; if (!(this.net && this.net.isRelay)) { try { ws.close(); } catch (e) {} this._connectMqtt(); } }, 5000);
       ws.onopen = () => {
-        if (settled) { try { ws.close(); } catch (e) {} return; }
-        settled = true; clearTimeout(to);
-        this.net = { ws, connected: true, publish: (t, m) => { try { ws.send(m); } catch (e) {} }, end: () => { try { ws.close(); } catch (e) {} } };
+        if (settled && this.net && this.net.isRelay) { try { ws.close(); } catch (e) {} return; }
+        settled = true; this._relayTrying = false; clearTimeout(to);
+        const prev = this.net;
+        this.net = { ws, connected: true, isRelay: true, publish: (t, m) => { try { ws.send(m); } catch (e) {} }, end: () => { try { ws.close(); } catch (e) {} } };
+        if (prev && !prev.isRelay) { try { prev.end(true); } catch (e) {} } // was on the MQTT fallback — relay recovered, drop it
+        clearInterval(this._relayRetryIv); this._relayRetryIv = null;
         this._netUp = true;
         ws.onmessage = ev => { try { this._onMsg(JSON.parse(ev.data)); } catch (e) {} };
         ws.onclose = () => {
@@ -44,11 +48,17 @@ export function install(P) {
         };
         this._onNetReady();
       };
-      ws.onerror = () => { if (!settled) { settled = true; clearTimeout(to); this._connectMqtt(); } };
-    } catch (e) { this._connectMqtt(); }
+      ws.onerror = () => { if (!settled) { settled = true; this._relayTrying = false; clearTimeout(to); this._connectMqtt(); } };
+    } catch (e) { this._relayTrying = false; this._connectMqtt(); }
   };
   P._connectMqtt = function () {
     if (this._dead) return;
+    // fallback split-brain guard: one peer on relay + one on MQTT never meet.
+    // keep probing the relay and switch back the moment it answers.
+    if (!this._relayRetryIv) this._relayRetryIv = setInterval(() => {
+      if (this._dead || (this.net && this.net.isRelay)) { clearInterval(this._relayRetryIv); this._relayRetryIv = null; return; }
+      this._connectRelay();
+    }, 4000);
     const urls = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
     let ui = 0;
     const connect = () => {
