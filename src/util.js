@@ -30,16 +30,17 @@ const RAR = [
 ];
 const ROMAN = ['I', 'II', 'III', 'IV'];
 const UPG = [
+  // 연사/위력 are ADDITIVE on the base stat (base 2.5 / 9) — multiplicative stacking turned bullets into a laser
   { k: 'frate', n: '연사 계통', t: [
-    { d: '발사 속도 +20%', f: p => p.frate *= 1.2 },
-    { d: '발사 속도 +25%', f: p => p.frate *= 1.25 },
-    { d: '발사 속도 +32%', f: p => p.frate *= 1.32 },
-    { d: '발사 속도 +45%', f: p => p.frate *= 1.45 }] },
+    { d: '발사 속도 +20%', f: p => p.frate += 2.5 * .2 },
+    { d: '발사 속도 +25%', f: p => p.frate += 2.5 * .25 },
+    { d: '발사 속도 +32%', f: p => p.frate += 2.5 * .32 },
+    { d: '발사 속도 +45%', f: p => p.frate += 2.5 * .45 }] },
   { k: 'dmg', n: '위력 증폭', t: [
-    { d: '탄환 피해 +22%', f: p => p.dmg *= 1.22 },
-    { d: '탄환 피해 +28%', f: p => p.dmg *= 1.28 },
-    { d: '탄환 피해 +36%', f: p => p.dmg *= 1.36 },
-    { d: '탄환 피해 +50%', f: p => p.dmg *= 1.5 }] },
+    { d: '탄환 피해 +22%', f: p => p.dmg += 9 * .22 },
+    { d: '탄환 피해 +28%', f: p => p.dmg += 9 * .28 },
+    { d: '탄환 피해 +36%', f: p => p.dmg += 9 * .36 },
+    { d: '탄환 피해 +50%', f: p => p.dmg += 9 * .5 }] },
   { k: 'shots', n: '확산 사격', t: [
     { d: '탄환 +1 (피해 −15%)', f: p => { p.shots++; p.dmg *= .85; } },
     { d: '탄환 +1 (피해 −12%)', f: p => { p.shots++; p.dmg *= .88; } },
@@ -51,10 +52,10 @@ const UPG = [
     { d: '관통 +2', f: p => p.pierce += 2 },
     { d: '관통 +3', f: p => p.pierce += 3 }] },
   { k: 'speed', n: '기동 개선', t: [
-    { d: '이동 속도 +10%', f: p => p.speed *= 1.1 },
-    { d: '이동 속도 +12%', f: p => p.speed *= 1.12 },
-    { d: '이동 속도 +15%', f: p => p.speed *= 1.15 },
-    { d: '이속 +20% · 대시 쿨 −10%', f: p => { p.speed *= 1.2; p.dashCd *= .9; } }] },
+    { d: '이동 속도 +10%', f: p => p.speed += 6 * .1 },
+    { d: '이동 속도 +12%', f: p => p.speed += 6 * .12 },
+    { d: '이동 속도 +15%', f: p => p.speed += 6 * .15 },
+    { d: '이속 +20% · 대시 쿨 −10%', f: p => { p.speed += 6 * .2; p.dashCd *= .9; } }] },
   { k: 'regen', n: '자가 수복', t: [
     { d: '초당 HP +1.2', f: p => p.regen += 1.2 },
     { d: '초당 HP +1.6', f: p => p.regen += 1.6 },
@@ -98,8 +99,8 @@ const UPG = [
 ];
 const SHOP = [
   { id: 'php', c: '캐릭터', n: '장갑 보강', d: '최대 HP +25', cost: 30, per: true, f: p => { p.maxhp += 25; p.hp += 25; } },
-  { id: 'pspd', c: '캐릭터', n: '구동계 개선', d: '이동 속도 +8%', cost: 30, per: true, f: p => p.speed *= 1.08 },
-  { id: 'pdmg', c: '캐릭터', n: '화력 증강', d: '공격력 +12%', cost: 35, per: true, f: p => p.dmg *= 1.12 },
+  { id: 'pspd', c: '캐릭터', n: '구동계 개선', d: '이동 속도 +8%', cost: 30, per: true, f: p => p.speed += 6 * .08 },
+  { id: 'pdmg', c: '캐릭터', n: '화력 증강', d: '공격력 +12%', cost: 35, per: true, f: p => p.dmg += 9 * .12 },
   { id: 'prng', c: '캐릭터', n: '조준 광학', d: '사거리 +12%', cost: 35, per: true, max: 5, f: p => p.range = (p.range || 9) * 1.12 },
   { id: 'sskl', c: '스킬', n: '충격파 강화', d: '피해·반경 ↑, 쿨다운 ↓', cost: 40, per: true, max: 4, f: p => p.sklLv++ },
   { id: 'sdash', c: '스킬', n: '대시 모듈', d: '대시 쿨다운 −20%', cost: 30, per: true, max: 4, f: p => p.dashCd *= .8 },

@@ -75,7 +75,7 @@ export function install(P) {
     this.buffEl = H('div', 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;flex-direction:column;gap:6px;z-index:25;' + pe + panel + 'padding:16px;min-width:min(88vw,420px);max-height:74vh;overflow:auto', hud);
     // square action buttons — uniform centered label layout
     const sqBtn = (parent, label, accent) => {
-      const b = H('button', pe + 'width:68px;height:68px;border:1px solid ' + (accent || PAL.line) + ';background:' + PAL.panel + ';color:' + (accent || PAL.text) + ';font:700 12px ' + FONT + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;gap:2px;text-align:center;backdrop-filter:blur(6px);line-height:1.3', parent);
+      const b = H('button', pe + 'width:68px;height:52px;border:1px solid ' + (accent || PAL.line) + ';background:' + PAL.panel + ';color:' + (accent || PAL.text) + ';font:700 12px ' + FONT + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;gap:2px;text-align:center;backdrop-filter:blur(6px);line-height:1.3', parent);
       b.textContent = label; return b;
     };
     const press = (b, fn) => { b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fn(); }); };
@@ -196,7 +196,8 @@ export function install(P) {
     this.lvEl.textContent = 'LV ' + this.lv;
     this.xpF.style.width = Math.min(100, this.xp / XP_NEED(this.lv) * 100) + '%';
     const p = this.me;
-    this.dashBtn.innerHTML = p.dashT > 0 ? '대시<br>' + p.dashT.toFixed(1) + 's' : '대시';
+    const dashLv = (p.buys.sdash || 0) + (p.taken.dash || 0);
+    this.dashBtn.innerHTML = p.dashT > 0 ? '대시<br>' + p.dashT.toFixed(1) + 's' : dashLv > 0 ? '대시<br>Lv' + dashLv : '대시';
     this.dashBtn.style.opacity = p.dashT > 0 ? .45 : 1;
     this.sklBtn.innerHTML = p.sklT > 0 ? '충격파<br>' + Math.ceil(p.sklT) + 's' : '충격파<br>Lv' + p.sklLv;
     this.sklBtn.style.opacity = p.sklT > 0 ? .45 : 1;
