@@ -99,8 +99,19 @@ const DIFF_CNT = { easy: .8, normal: 1, hard: 1.25 };  // wave size multiplier
 const DIFF_SPT = { easy: 1.15, normal: 1, hard: .88 }; // spawn interval multiplier
 const RELAY = 'wss://q-erosion-relay.qpoiop3.workers.dev'; // dedicated DO relay (public MQTT is the fallback)
 const GATE_DIR = ['북', '남', '서', '동']; // matches gates[] order
-const SHIP_MODEL = 'assets/scv.glb'; // set to null to revert to the primitive ships
-const SHIP_MODEL_YAW = (() => { const q = new URLSearchParams(location.search).get('shipyaw'); return q !== null ? +q * Math.PI / 180 : -Math.PI / 2; })(); // beam-aligned; ?shipyaw=deg to tune
+/* GLB model manifest — primitives remain the automatic fallback for anything
+   that fails to load. size = target footprint (units), yaw = forward correction,
+   merge = bake all submeshes into one static mesh per material (draw-call diet). */
+const MODELS = {
+  ship:   { url: 'assets/char.glb',   size: 2.3, yaw: 0, merge: true },
+  melee:  { url: 'assets/melee.glb',  size: 1.7, yaw: 0, merge: true },
+  ranged: { url: 'assets/ranged.glb', size: 1.7, yaw: 0, merge: true },
+  boss1:  { url: 'assets/boss1.glb',  size: 3.6, yaw: 0, merge: true },
+  boss2:  { url: 'assets/boss2.glb',  size: 4.2, yaw: 0, merge: true },
+  tower:  { url: 'assets/tower.glb',  size: 0,   yaw: 0, merge: false }, // subtrees extracted by name
+};
+const SHIP_MODEL_YAW = (() => { const q = new URLSearchParams(location.search).get('shipyaw'); return q !== null ? +q * Math.PI / 180 : 0; })();
+const TOWER_TIERS = ['MultifunctionalSmallTower', 'MultifunctionalSmallTower_Armored', 'MultifunctionalTower_Armored'];
 const XP_NEED = lv => 45 + lv * 30;  // steeper curve — augments should take real kills
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
@@ -199,6 +210,7 @@ class ErosionGame extends HTMLElement {
     }
   }
   _structHp(k) { return k === 1 ? WALL_HP * this.g.wallMul : TURRET_HP; }
+  _turBand() { const l = this.g.turLv || 0; return l >= 10 ? 2 : l >= 4 ? 1 : 0; }
   _place(i, k, silent) {
     this.occ[i] = k; this.shp[i] = this._structHp(k);
     this.bld[i] = 0; this.building.add(i);
@@ -327,7 +339,7 @@ class ErosionGame extends HTMLElement {
     this.allyArrG.add(this.allyArr); this.allyArrG.visible = false; this.scene.add(this.allyArrG);
     // players
     this.meG = this._mkPlayer(true); this.allyG = this._mkPlayer(false);
-    this._loadShipModel();
+    this._loadModels();
     this.scene.add(this.meG); this.scene.add(this.allyG);
     this.allyG.visible = this.allyOn;
     // ghost placement cursor
@@ -385,30 +397,90 @@ class ErosionGame extends HTMLElement {
     g.shipParts = [hull, nose, canopy, wl, wr, e1, e2]; // hidden when a GLB ship model is applied
     return g;
   }
-  /* optional GLB ship (SHIP_MODEL) — primitive ship stays as automatic fallback */
-  _loadShipModel() {
-    if (!SHIP_MODEL || !THREE.GLTFLoader) return;
+  /* generic GLB loader: normalize (center/ground/scale), optional static merge */
+  _mergeStatic(root) { // bake world-transformed geometry into one mesh per material
+    const T = THREE, byMat = new Map();
+    root.updateMatrixWorld(true);
+    root.traverse(o => {
+      if (!o.isMesh || !o.geometry) return;
+      let g = o.geometry.clone();
+      ['skinIndex', 'skinWeight'].forEach(a => g.deleteAttribute(a));
+      if (g.index) g = g.toNonIndexed();
+      if (!g.attributes.uv && g.attributes.position) g.setAttribute('uv', new T.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+      g.applyMatrix4(o.matrixWorld);
+      const k = o.material.uuid;
+      if (!byMat.has(k)) byMat.set(k, { mat: o.material, geos: [] });
+      byMat.get(k).geos.push(g);
+    });
+    const out = new T.Group();
+    for (const { mat, geos } of byMat.values()) {
+      const merged = T.BufferGeometryUtils.mergeBufferGeometries(geos, false);
+      if (merged) { const m = new T.Mesh(merged, mat); m.castShadow = true; out.add(m); }
+    }
+    return out;
+  }
+  _normalize(obj, size, yaw) {
     const T = THREE;
-    new T.GLTFLoader().load(SHIP_MODEL, gl => {
-      if (this._dead) return;
-      const src = gl.scene;
-      const box = new T.Box3().setFromObject(src);
-      const size = box.getSize(new T.Vector3()), ctr = box.getCenter(new T.Vector3());
-      const s = 2.5 / Math.max(size.x, size.z, .001);
-      src.position.set(-ctr.x, -box.min.y, -ctr.z);
-      const tpl = new T.Group(); tpl.add(src);
-      tpl.scale.setScalar(s);
-      tpl.rotation.y = SHIP_MODEL_YAW; // model-forward → +z (game nose convention)
-      [[this.meG, 0x0e3038], [this.allyG, 0x38280c]].forEach(([g, tint], idx) => {
-        const m = idx === 0 ? tpl : tpl.clone(true);
-        m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); o.material.color = new T.Color(0x9aa4b8); o.material.emissive = new T.Color(tint); if ('metalness' in o.material) { o.material.metalness = .55; o.material.roughness = .5; } } });
-        g.shipParts.forEach(pp => pp.visible = false);
-        g.add(m); g.model = m;
-      });
-    }, undefined, e => console.warn('[erosion] ship model load failed — primitive ship kept', e));
+    const box = new T.Box3().setFromObject(obj);
+    const sz = box.getSize(new T.Vector3()), ctr = box.getCenter(new T.Vector3());
+    const s = size / Math.max(sz.x, sz.z, .001);
+    obj.position.set(-ctr.x, -box.min.y, -ctr.z);
+    const tpl = new T.Group(); tpl.add(obj);
+    tpl.scale.setScalar(s); tpl.rotation.y = yaw;
+    return tpl;
+  }
+  _loadModels() {
+    if (!THREE.GLTFLoader) return;
+    const T = THREE; this.mdl = {};
+    const loader = new T.GLTFLoader();
+    for (const [key, cfg] of Object.entries(MODELS)) {
+      loader.load(cfg.url, gl => {
+        if (this._dead) return;
+        if (key === 'tower') { // extract tier subtrees by node name
+          gl.scene.updateMatrixWorld(true);
+          TOWER_TIERS.forEach((name, i) => {
+            const node = gl.scene.getObjectByName(name);
+            if (!node) return;
+            const solo = this._mergeStatic(node);
+            this.mdl['tower' + i] = this._normalize(solo, 1.9 + i * .25, 0);
+          });
+          this._syncStruct();
+          return;
+        }
+        let root = cfg.merge ? this._mergeStatic(gl.scene) : gl.scene;
+        this.mdl[key] = this._normalize(root, cfg.size, key === 'ship' ? SHIP_MODEL_YAW : cfg.yaw);
+        if (key === 'ship') this._applyShip();
+      }, undefined, e => console.warn('[erosion] model load failed (' + key + ') — primitive kept', e));
+    }
+  }
+  _applyShip() {
+    const T = THREE, tpl = this.mdl.ship;
+    if (!tpl || !this.meG) return;
+    [[this.meG, 0x0e3038], [this.allyG, 0x38280c]].forEach(([g, tint], idx) => {
+      const m = tpl.clone(true);
+      m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); o.material.emissive = new T.Color(tint); if ('metalness' in o.material) { o.material.metalness = .5; o.material.roughness = .55; } } });
+      g.shipParts.forEach(pp => pp.visible = false);
+      g.add(m); g.model = m;
+    });
   }
   _eMesh(e) {
-    const T = THREE, g = new T.Group();
+    const T = THREE;
+    const key = e.ty === 3 ? (e.final ? 'boss2' : 'boss1') : e.ty === 2 ? 'ranged' : 'melee';
+    const tpl = this.mdl && this.mdl[key];
+    if (tpl) {
+      const g = new T.Group();
+      const m = tpl.clone(true);
+      if (e.ty === 1) { m.scale.multiplyScalar(1.25); m.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new T.Color(0x3a0d08); } }); } // breaker: bigger, red-tinged
+      g.add(m); g.isModel = true;
+      if (e.ty === 3) {
+        const aura = new T.Mesh(new T.RingGeometry(1.5, 1.85, 40), new T.MeshBasicMaterial({ color: PAL.redHex, transparent: true, opacity: .5, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+        aura.rotation.x = -Math.PI / 2; aura.position.y = .07; g.add(aura); g.aura = aura;
+        const lamp = new T.PointLight(PAL.redHex, 1.2, 8); lamp.position.y = 2; g.add(lamp);
+      }
+      if (e.final) g.scale.setScalar(2);
+      this.scene.add(g); return g;
+    }
+    const g = new T.Group();
     let body;
     if (e.ty === 0) {
       body = new T.Mesh(new T.ConeGeometry(.5, .95, 4), this.mEnemy); body.position.y = .55;
@@ -443,6 +515,17 @@ class ErosionGame extends HTMLElement {
       const b2 = new T.Mesh(new T.BoxGeometry(TS * .5, h * .6, TS * .5), this.mObs); b2.position.set(.3 - (i % 3) * .3, h * .55, .25 - (i % 2) * .5); b2.rotation.y = .5 + (i % 5) * .3; b2.castShadow = true; g.add(b2);
       const rim = new T.Mesh(new T.BoxGeometry(TS * .86, .07, TS * .86), this.mGlowRed7); rim.position.y = .05; g.add(rim);
     } else {
+      const band = this._turBand();
+      const tpl = this.mdl && this.mdl['tower' + band];
+      if (tpl) {
+        const m = tpl.clone(true);
+        m.traverse(o => { if (o.isMesh) o.castShadow = true; });
+        g.add(m); g.band = band;
+        const gun2 = new T.Mesh(new T.BoxGeometry(.12, .12, .9), this.mGlowCyan);
+        const bh = new T.Box3().setFromObject(m).max.y;
+        gun2.position.set(0, Math.max(1.1, bh * .82), .5); g.add(gun2); g.gun = gun2;
+        this.scene.add(g); return g;
+      }
       const base = new T.Mesh(new T.BoxGeometry(.9, .5, .9), this.mWallS); base.position.y = .25; base.castShadow = true; g.add(base);
       const pod = new T.Mesh(new T.BoxGeometry(.55, .45, .8), this.mBody); pod.position.y = .75; pod.castShadow = true; g.add(pod); g.pod = pod;
       const gun = new T.Mesh(new T.BoxGeometry(.12, .12, .7), this.mGlowCyan); gun.position.set(0, .78, .5); pod.add ? g.add(gun) : 0; g.gun = gun;
@@ -672,6 +755,7 @@ class ErosionGame extends HTMLElement {
   }
   _refreshShp() { for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 && this.shp[i] > WALL_HP * this.g.wallMul) this.shp[i] = WALL_HP * this.g.wallMul; }
   _structUpgFx(id) { // structure research feedback: every matching structure pops + sparks
+    this._syncStruct();
     const kind = id === 'gwall' ? 1 : id === 'gtur' ? 2 : 0;
     if (!kind || !this.sMeshes) return;
     for (const [i, g] of this.sMeshes) if (g.kind === kind) { g.userData.pop = .3; this._burst(g.position.x, g.position.z, kind === 1 ? PAL.cyanHex : PAL.amberHex, 3, 3); }
@@ -1442,7 +1526,8 @@ class ErosionGame extends HTMLElement {
         const k = this.occ[i], has = this.sMeshes.has(i);
         if ((k === 1 || k === 2 || k === 5)) {
           let g = this.sMeshes.get(i);
-          if (!g || g.kind !== k) { if (g) { if (g.bar) this.scene.remove(g.bar); this.scene.remove(g); } g = this._sMesh(k, i); g.kind = k; this.sMeshes.set(i, g); g.position.set(g2w(i % N), 0, g2w((i / N) | 0)); }
+          const bandStale = k === 2 && g && g.band !== undefined && g.band !== this._turBand();
+          if (!g || g.kind !== k || bandStale) { if (g) { if (g.bar) this.scene.remove(g.bar); this.scene.remove(g); } g = this._sMesh(k, i); g.kind = k; this.sMeshes.set(i, g); g.position.set(g2w(i % N), 0, g2w((i / N) | 0)); }
         } else if (has) { const old = this.sMeshes.get(i); if (old.bar) this.scene.remove(old.bar); this.scene.remove(old); this.sMeshes.delete(i); }
       }
     }
@@ -1462,7 +1547,7 @@ class ErosionGame extends HTMLElement {
           let sy = 1;
           if (g.userData.pop > 0) { g.userData.pop -= dt; sy = 1 + .22 * Math.sin(Math.min(1, 1 - g.userData.pop / .28) * Math.PI); }
           // research tiers change the silhouette: turrets grow (2x2-scale at Lv10+), wall trims thicken
-          const base = g.kind === 2 ? ((this.g.turLv || 0) >= 10 ? 2 : 1 + (this.g.turLv || 0) * .07) : 1;
+          const base = g.kind === 2 ? (g.band !== undefined ? 1 + (this.g.turLv || 0) * .03 : ((this.g.turLv || 0) >= 10 ? 2 : 1 + (this.g.turLv || 0) * .07)) : 1;
           g.scale.set(base, base * sy, base);
           if (g.kind === 1 && g.trim) g.trim.scale.y = 1 + (this.g.wallLv || 0) * .8;
         }
@@ -1527,7 +1612,9 @@ class ErosionGame extends HTMLElement {
     // enemies
     for (const [id, e] of this.enemies) {
       let m = this.eMeshes.get(id); if (!m) { m = this._eMesh(e); this.eMeshes.set(id, m); }
-      m.position.set(e.x, 0, e.z); m.rotation.y += dt * (e.ty === 2 ? 1.5 : .6);
+      if (m.isModel) { const mdx = e.x - (m.px ?? e.x), mdz = e.z - (m.pz ?? e.z); if (mdx * mdx + mdz * mdz > 1e-6) m.rotation.y = -Math.atan2(mdz, mdx) + Math.PI / 2; m.px = e.x; m.pz = e.z; }
+      else m.rotation.y += dt * (e.ty === 2 ? 1.5 : .6);
+      m.position.set(e.x, 0, e.z);
       if (ETYPES[e.ty] && ETYPES[e.ty].boss) { // boss: big red HP bar overhead + pulsing aura
         if (!m.bossBar) { m.bossBar = this._mkBar(e.x, e.z, 3.6); m.bossBar.position.y = e.final ? 6.2 : 3.4; }
         m.bossBar.position.x = e.x; m.bossBar.position.z = e.z;
@@ -1535,7 +1622,8 @@ class ErosionGame extends HTMLElement {
         if (m.aura) { m.aura.scale.setScalar(1 + Math.sin(now * 3.2) * .12); m.aura.material.opacity = .4 + Math.sin(now * 3.2) * .2; }
       }
       if (e.ty === 0) m.position.y = Math.abs(Math.sin(now * 6 + id)) * .12;
-      if (e.flash > 0) { e.flash -= dt; m.body.material = this.mFlash; } else m.body.material = this.mEnemy;
+      if (m.body) { if (e.flash > 0) { e.flash -= dt; m.body.material = this.mFlash; } else m.body.material = this.mEnemy; }
+      else if (m.isModel && e.flash > 0) { e.flash -= dt; m.children[0].scale.setScalar(m.children[0].userData.s0 || (m.children[0].userData.s0 = m.children[0].scale.x)); m.children[0].scale.multiplyScalar(1.06); }
     }
     for (const [id, m] of this.eMeshes) if (!this.enemies.has(id)) { this.scene.remove(m); this.eMeshes.delete(id); }
     // bullets
