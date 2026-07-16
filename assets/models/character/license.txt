@@ -1,0 +1,11 @@
+Model Information:
+* title:	Toy Robot Animated - Lowpoly
+* source:	https://sketchfab.com/3d-models/toy-robot-animated-lowpoly-6bc8f39aac354dfbbd374bb9ba5b4c24
+* author:	rkmorello (https://sketchfab.com/rkmorello)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Toy Robot Animated - Lowpoly" (https://sketchfab.com/3d-models/toy-robot-animated-lowpoly-6bc8f39aac354dfbbd374bb9ba5b4c24) by rkmorello (https://sketchfab.com/rkmorello) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
