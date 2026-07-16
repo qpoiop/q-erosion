@@ -71,7 +71,7 @@ class ErosionGame extends HTMLElement {
       if (this.countT <= 0) { this.phase = 'none'; this.ov.style.display = 'none'; if (this.isHostish()) this._startBuild(); }
     }
     // pause sources: solo augment sheet, tab in background (mine OR peer's), host silent
-    const inPhase = this.phase === 'build' || this.phase === 'assault';
+    const inPhase = this.phase === 'build' || this.phase === 'assault' || this.phase === 'escape' || this.phase === 'inf';
     if (!this.isHostish() && inPhase && this._lastStateAt) this._hostLost = performance.now() - this._lastStateAt > 5000;
     if (this._peerPaused && performance.now() - (this._peerSeenAt || 0) > 4000) this._peerPaused = false; // partner gone silent — treat as disconnected, not paused
     const sheetPause = this.mode === 'solo' && this.upEl.style.display !== 'none';
@@ -83,12 +83,18 @@ class ErosionGame extends HTMLElement {
       this._movePlayer(dt); this._buildSim(dt);
       this._autoCombat(this.me, dt, true);
       if (this.mode === 'solo') this._botSim(dt);
+      if (this.phase === 'escape') this._escapeSim();
       if (this.isHostish()) {
         if (this.phase === 'build') { this.phT -= dt; if (this.phT <= 0) this._startAssault(); }
+        else if (this.phase === 'escape') { /* waiting for a unit to enter the rift */ }
+        else if (this.phase === 'inf') {
+          this._spawnLogic(dt); this._enemySim(dt);
+          if (!this.spawnQ.length && this.enemies.size === 0 && !this.infFinal) this._startFinale();
+        }
         else {
           this._spawnLogic(dt); this._enemySim(dt);
           if (!this.spawnQ.length && this.enemies.size === 0) {
-            if (this.wave >= this.maxWave) this._gameOver(true, `${this.maxWave}웨이브 방어 완수`);
+            if (this.wave >= this.maxWave) this._startEscape(); // the way to the enemy core opens
             else this._startBuild();
           }
         }

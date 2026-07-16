@@ -143,8 +143,9 @@ export function install(P) {
   P._overlay = function (html) { this.ov.style.display = 'flex'; this.ovIn.innerHTML = html; }
   P._hudTick = function (dt) {
     this._hudT = (this._hudT || 0) - dt; if (this._hudT > 0) return; this._hudT = .12;
-    this.wvEl.textContent = this.phase === 'build' ? `WAVE ${this.wave + 1} 준비` : `WAVE ${Math.max(1, this.wave)}/${this.maxWave}`;
-    if (this.phase === 'build') { this.phEl.textContent = `습격까지 ${Math.max(0, Math.ceil(this.phT))}초`; this.phEl.style.color = PAL.cyan; }
+    this.wvEl.textContent = this.inf ? '침투' : this.phase === 'escape' ? '탈출구 개방' : this.phase === 'build' ? `WAVE ${this.wave + 1} 준비` : `WAVE ${Math.max(1, this.wave)}/${this.maxWave}`;
+    if (this.inf || this.phase === 'escape') { this.phEl.textContent = this.inf ? `잔여 ${this.enemies.size + (this.isHostish() ? this.spawnQ.length : (this._qn || 0))}` : '균열로 진입하라'; this.phEl.style.color = this.inf ? PAL.red : PAL.amber; }
+    else if (this.phase === 'build') { this.phEl.textContent = `습격까지 ${Math.max(0, Math.ceil(this.phT))}초`; this.phEl.style.color = PAL.cyan; }
     else if (this.phase === 'assault') { this.phEl.textContent = `잔여 ${this.enemies.size + (this.isHostish() ? this.spawnQ.length : (this._qn || 0))}`; this.phEl.style.color = PAL.red; }
     else this.phEl.textContent = '';
     this.goBtn.style.display = this.isHostish() && this.phase === 'build' ? 'block' : 'none';

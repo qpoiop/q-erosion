@@ -114,6 +114,11 @@ export function install(P) {
       case 'byk': if (!this.isHost) { const u = SHOP.find(s => s.id === m.id); this.scrap = m.sc; if (u && u.per) { this.me.buys[u.id] = this._buyCount(u.id) + 1; u.f(this.me, this); if (u.st) { this._structUpgFx(u.id); this._syncStruct(); } this._beep(760, .1, 'square', .05); if (this.shopEl.style.display === 'flex') this._renderShop(); } } break;
       case 'skl': if (this.isHost) this._shockwave(m.x, m.z, Math.min(m.r || 4, 12), Math.min(m.dmg || 60, 500), false, m.deb && { f: Math.max(.4, m.deb.f || .7), t: Math.min(m.deb.t || 2.5, 5), c: Math.min(m.deb.c || 0, .5), ct: Math.min(m.deb.ct || 1, 2) }); else this._shockFx(m.x, m.z); break;
       case 'caug': if (this.isHost) this._coreAug(m.a, m.h); break;
+      case 'inen': if (this.isHost && this.phase === 'escape') this._startInfPick(); break; // joiner stepped into the rift
+      case 'inpk': if (!this.isHost && this.phase !== 'infpick') { this.phase = 'infpick'; this._infMe = null; this._showInfPick(); } break;
+      case 'inch': if (this.isHost) { this._infAlly = m.c; if (m.c !== '구조물') Object.assign(this.ally, { wallMul: 1, turMul: 1, turHpMul: 1, costMul: 1, wallLv: 0, turLv: 0 }); this._tryStartInf(); } break;
+      case 'ingo': if (!this.isHost) this._startInfiltration(); break;
+      case 'infin': if (!this.isHost) { this.infFinal = true; this._startFinale ? (() => {})() : 0; const bl = this.H('div', 'position:absolute;inset:0;background:#000;z-index:45;opacity:0;pointer-events:none', this.hud); let c2 = 0; const iv = setInterval(() => { bl.style.opacity = bl.style.opacity === '1' ? '0' : '1'; if (++c2 >= 6) { clearInterval(iv); bl.remove(); } }, 300); this._banner('⚠⚠ 침식의 근원 — 모든 것의 시작이 모습을 드러냈다', 5200); this.shake = 1.2; } break;
       case 'use': { if (this.isHost && this.ally.items) { const ix = this.ally.items.indexOf(m.k); if (ix >= 0) this.ally.items.splice(ix, 1); } this._applyItemFx(m.k, m.x, m.z, false); } break;
       case 'dmg': if (!this.isHost) this._hurt(this.me, m.v); break;
       case 'eb': this.ebullets.push({ x: m.x, z: m.z, dx: m.dx, dz: m.dz, life: 3, ghost: !this.isHost }); break;
@@ -137,10 +142,17 @@ export function install(P) {
     const gts = m.gts || (m.gt !== undefined ? [m.gt] : null);
     if (gts && gts.join() !== (this.activeGates || []).join()) { this.activeGates = gts; this.activeGate = gts[0]; if (this.phase === 'build') this._banner(`다음 균열: ${gts.map(i => GATE_DIR[i]).join('·')}쪽`, 2600); }
     const wasPhase = this.phase;
-    if (this.phase !== 'over' && this.phase !== 'count' && this.phase !== 'wait' && m.ph) { if (m.ph !== this.phase) { this.phase = m.ph; if (m.ph === 'assault') this._banner('WAVE ' + this.wave + ' — 습격!'); else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); } } this.phT = m.pt; }
+    if (m.eg !== undefined) this.escGate = m.eg;
+    if (this.phase !== 'over' && this.phase !== 'count' && this.phase !== 'wait' && this.phase !== 'infpick' && m.ph) { if (m.ph !== this.phase) {
+      if (m.ph === 'inf' && !this.inf) this._buildInfMap(); // host advanced without me (missed ingo) — catch up
+      this.phase = m.ph;
+      if (m.ph === 'assault') this._banner('WAVE ' + this.wave + ' — 습격!');
+      else if (m.ph === 'escape') { this._banner(`⚑ 적의 코어로 통하는 균열이 열렸다 — ${GATE_DIR[m.eg ?? this.escGate ?? 0]}쪽 균열로 진입하라!`, 6000); }
+      else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); }
+    } this.phT = m.pt; }
     const seen = new Set();
     (m.en || []).forEach(a => { const [id, ty, x, z, hp] = a; seen.add(id); let e = this.enemies.get(id);
-      if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss) { e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1; if (e.btier === 3) e.final = true; } this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
+      if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss) { if (this.inf) { e.btier = this.infFinal ? 3 : ((this._infGhostB = (this._infGhostB || 0) + 1) >= 2 ? 2 : 1); if (this.infFinal) { e.final = true; e.giant = true; } } else { e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1; if (e.btier === 3) e.final = true; } } this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
       e.tx = x / 10; e.tz = z / 10; e.hp = hp; if (!e.mhp || hp > e.mhp) e.mhp = hp; });
     for (const [id, e] of this.enemies) if (!seen.has(id)) { this._killFx(e); this.enemies.delete(id); }
     if (m.st) this._structUnpack(m.st);
@@ -159,7 +171,7 @@ export function install(P) {
       this.sendStateT -= dt;
       if (this.sendStateT <= 0) {
         this.sendStateT = .13; this.sendStT -= .13;
-        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, cm: this.coreMax, hr: [this.me.wallMul, this.me.turMul, this.me.turHpMul, this.me.costMul, this.me.wallLv || 0, this.me.turLv || 0], bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
+        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, eg: this.escGate, cm: this.coreMax, hr: [this.me.wallMul, this.me.turMul, this.me.turHpMul, this.me.costMul, this.me.wallLv || 0, this.me.turLv || 0], bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
           en: [...this.enemies.values()].map(e => [e.id, e.ty, Math.round(e.x * 10), Math.round(e.z * 10), Math.round(e.hp)]),
           itm: this.fitems.map(f => [f.id, f.k, Math.round(f.x * 10), Math.round(f.z * 10)]) };
         if (this.sendStT <= 0) { this.sendStT = 1.4; o.st = this._structPack(); }

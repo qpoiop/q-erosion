@@ -118,6 +118,26 @@ export function install(P) {
     for (const [i, g] of this.sMeshes) if (g.kind === kind) { g.userData.pop = .3; this._burst(g.position.x, g.position.z, kind === 1 ? PAL.cyanHex : PAL.amberHex, 3, 3); }
     this._beep(820, .12, 'square', .05);
   };
+  P._showInfPick = function () { // 침투는 몸이 가벼워야 한다 — keep exactly ONE thing
+    this._upDeadline = 0;
+    this.upTitle.textContent = '침투 준비 — 하나만 가져갈 수 있다';
+    this.upRow.innerHTML = '';
+    const opts = [
+      ['연구', '캐릭터·스킬 연구 유지', 'HP/이속/공격력/충격파/대시 연구 효과와 구매 이력'],
+      ['구조물', '구조물 연구 유지', '벽 내구·포탑 화력·건설 자동화 연구 (새 진지 구축에 유리)'],
+      ['증강', '증강 카드 · 시너지 유지', '획득한 카드 전 계통과 각성한 시너지·등급'],
+      ['자금', '보유 자원 유지', '현재 지갑 그대로 (나머지는 60으로 초기화)'],
+    ];
+    for (const [k, n, d] of opts) {
+      const c = document.createElement('button');
+      c.style.cssText = `width:190px;min-height:150px;border:1px solid ${PAL.line};border-top:4px solid ${PAL.amber};background:${PAL.panel};color:${PAL.text};padding:16px;cursor:pointer;text-align:left;font-family:${FONT};display:flex;flex-direction:column;gap:7px;backdrop-filter:blur(6px)`;
+      c.innerHTML = `<span style="font:700 10px ${FONT};letter-spacing:.14em;color:${PAL.amber}">KEEP ONE</span><span style="font:700 18px ${FONT}">${n}</span><span style="font:400 12.5px ${FONT};line-height:1.5;color:${PAL.dim}">${d}</span>`;
+      c.onclick = () => { this.upEl.style.display = 'none'; this._infKeep(k); this._beep(750, .1); };
+      this.upRow.appendChild(c);
+    }
+    this.upHint.textContent = '침투는 몸이 가벼워야 한다 — 선택하지 않은 능력·자원은 초기화됩니다';
+    this.upEl.style.display = 'flex';
+  };
   P._showUpgrades = function () {
     const p = this.me;
     const pool = UPG.map(u => ({ u, tier: p.taken[u.k] || 0 })).filter(c => c.tier < c.u.t.length);
