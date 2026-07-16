@@ -1,5 +1,5 @@
 // scene.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._groundTex = function () {
@@ -356,7 +356,7 @@ export function install(P) {
     this._setBar(this.coreBar, chp, this._hpColor(chp));
     // gates pulse
     this.gateMs.forEach((g, i) => {
-      const active = i === this.activeGate;
+      const active = (this.activeGates || [this.activeGate]).includes(i);
       // inactive rifts turn gray so the live gate is unmistakable
       g.rift.material.color.setHex(active ? PAL.redHex : 0x6a7180);
       g.rift.material.opacity = active ? .5 + Math.sin(now * 3 + i) * .2 + (this.phase === 'assault' ? .25 : 0) : .16;

@@ -1,5 +1,5 @@
 // combat.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._spawnBullet = function (x, z, dx, dz, o) {
@@ -107,9 +107,10 @@ export function install(P) {
       }
     }
   };
-  P._useItem = function () {
-    const p = this.me; if (!p.item || p.down || (this.phase !== 'assault' && this.phase !== 'build')) return;
-    const k = p.item; p.item = null;
+  P._useItem = function (idx) {
+    const p = this.me; if (p.down || (this.phase !== 'assault' && this.phase !== 'build')) return;
+    const k = p.items[idx ?? 0]; if (!k) return;
+    p.items.splice(idx ?? 0, 1);
     this._applyItemFx(k, p.x, p.z, true);
     if (this.mode !== 'solo') this._send({ t: 'use', k, x: +p.x.toFixed(1), z: +p.z.toFixed(1) });
   };
@@ -149,9 +150,9 @@ export function install(P) {
   P._pickupSim = function () {
     for (const f of [...this.fitems]) {
       const meN = dist2(f.x, f.z, this.me.x, this.me.z) < 1.7, alN = this.allyOn && dist2(f.x, f.z, this.ally.x, this.ally.z) < 1.7;
-      if (meN && !this.me.down && !this.me.item) { this.me.item = f.k; this.fitems = this.fitems.filter(q => q !== f); this._beep(700, .1); this._banner('아이템 획득 — ' + ITEMS[f.k].n + ' (E)', 2600); if (this.mode !== 'solo') this._send({ t: 'itm', who: 0, id: f.id, k: f.k }); }
-      else if (alN && !this.ally.down && this.mode !== 'solo') { this.fitems = this.fitems.filter(q => q !== f); this._send({ t: 'itm', who: 1, id: f.id, k: f.k }); }
-      else if (alN && this.mode === 'solo' && !this.ally.item) { this.ally.item = f.k; this.fitems = this.fitems.filter(q => q !== f); }
+      if (meN && !this.me.down && this.me.items.length < INV_MAX) { this.me.items.push(f.k); this.fitems = this.fitems.filter(q => q !== f); this._beep(700, .1); this._banner(`아이템 획득 — ${ITEMS[f.k].n} (${this.me.items.length}/${INV_MAX})`, 2600); if (this.mode !== 'solo') this._send({ t: 'itm', who: 0, id: f.id, k: f.k }); }
+      else if (alN && !this.ally.down && this.mode !== 'solo' && this.ally.items.length < INV_MAX) { this.ally.items.push(f.k); this.fitems = this.fitems.filter(q => q !== f); this._send({ t: 'itm', who: 1, id: f.id, k: f.k }); }
+      else if (alN && this.mode === 'solo' && this.ally.items.length < INV_MAX) { this.ally.items.push(f.k); this.fitems = this.fitems.filter(q => q !== f); }
     }
   };
   P._movePlayer = function (dt) {

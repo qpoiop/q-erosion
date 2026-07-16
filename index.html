@@ -110,6 +110,7 @@
         <button class="diff-btn" data-diff="easy" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#9aa3b5;border:1px solid #3a4052;padding:7px 16px;cursor:pointer;letter-spacing:.04em">쉬움</button>
         <button class="diff-btn" data-diff="normal" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#9aa3b5;border:1px solid #3a4052;padding:7px 16px;cursor:pointer;letter-spacing:.04em">보통</button>
         <button class="diff-btn" data-diff="hard" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#9aa3b5;border:1px solid #3a4052;padding:7px 16px;cursor:pointer;letter-spacing:.04em">어려움</button>
+        <button class="diff-btn" data-diff="nightmare" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#c96bff;border:1px solid #5a3a72;padding:7px 16px;cursor:pointer;letter-spacing:.04em">악몽</button>
       </div>
       <div id="rules" style="display:flex;flex-wrap:wrap;gap:1px;background:#3a4052;border:1px solid #3a4052;margin:26px 0 0"></div>
       <div style="padding:16px 0 34px;font-size:11px;line-height:1.7;color:#5a6377;font-family:'Noto Sans KR',sans-serif;text-align:center">
@@ -139,7 +140,7 @@
   };
 
   // difficulty selector (host/solo apply it; joiner inherits the host's)
-  const DIFF_COLOR = { easy: '#25d8ff', normal: '#e8eaf0', hard: '#ff3b2a' };
+  const DIFF_COLOR = { easy: '#25d8ff', normal: '#e8eaf0', hard: '#ff3b2a', nightmare: '#c96bff' };
   const diffBtns = [...document.querySelectorAll('.diff-btn')];
   const syncDiff = () => diffBtns.forEach(b => {
     const on = b.dataset.diff === props.difficulty;
