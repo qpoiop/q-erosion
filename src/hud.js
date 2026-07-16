@@ -339,7 +339,7 @@ export function install(P) {
     if (synKey !== this._synKey) {
       this._synKey = synKey;
       this.synEl.innerHTML = SYN.filter(s => this.me.syn && this.me.syn[s.id])
-        .map(s => `<div style="background:rgba(12,14,20,.6);border:1px solid ${PAL.amber};color:${PAL.amber};font:700 10px ${FONT};padding:3px 8px;letter-spacing:.05em" title="${s.d}">✦ ${s.n}</div>`).join('');
+        .map(s => { const gr = (this.me.synGrade || {})[s.id] || 1, r = RAR[gr - 1]; return `<div style="background:rgba(12,14,20,.6);border:1px solid ${r.c};color:${r.c};font:700 10px ${FONT};padding:3px 8px;letter-spacing:.05em" title="${s.d}">✦ ${s.n} ${ROMAN[gr - 1]}</div>`; }).join('');
     }
     if (this.shopEl.style.display === 'flex') { // live affordability while the sheet is open
       const bal = this.shopEl.querySelector('.shop-bal');

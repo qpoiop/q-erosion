@@ -77,7 +77,9 @@ export function install(P) {
     }
     for (const e of this.enemies.values()) {
       const et = ETYPES[e.ty];
-      let sp = et.sp * slow * this._dMul() * (e.wsp || 1);
+      if (e.stunT > 0) { e.stunT -= dt; continue; } // paralyzed — no move, no attack
+      if (e.slowT2 > 0) e.slowT2 -= dt;
+      let sp = et.sp * slow * this._dMul() * (e.wsp || 1) * (e.slowT2 > 0 ? (e.slowF || .7) : 1);
       e.cool -= dt;
       // spawned outside: walk in through the gate before anything else
       if (e.entering) {

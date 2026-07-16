@@ -81,18 +81,22 @@ export function install(P) {
     const u = pool[Math.floor(Math.random() * pool.length)], tier = p.taken[u.k] || 0;
     u.t[tier].f(p, this); p.taken[u.k] = tier + 1; this._checkSyn(p, false);
   };
-  P._checkSyn = function (p, mine) { // synergies awaken once, then re-apply per combined tier of their two lines
-    p.syn = p.syn || {};
+  P._checkSyn = function (p, mine) { // synergies awaken once, deepen per combined tier, and carry a GRADE = min(two line tiers)
+    p.syn = p.syn || {}; p.synGrade = p.synGrade || {};
     for (const s of SYN) {
       if (!s.need.every(k => p.taken[k])) continue;
       const target = s.need.reduce((t, k) => t + (p.taken[k] || 0), 0);
       let applied = p.syn[s.id] || 0;
-      if (applied >= target) continue;
+      const grade = Math.min(...s.need.map(k => p.taken[k] || 0)); // both lines epic → epic synergy
+      const oldGrade = p.synGrade[s.id] || 0;
+      if (applied >= target && grade <= oldGrade) continue;
       const fresh = !applied;
       if (fresh && s.first) s.first(p, this);
       while (applied < target) { s.f(p, this); applied++; }
       p.syn[s.id] = applied;
+      if (grade > oldGrade) { p.synGrade[s.id] = grade; if (s.grade) s.grade(p, this, grade); }
       if (mine && fresh) { this._banner(`✦ 시너지 각성 — ${s.n}! ${s.d}`, 3800); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
+      else if (mine && grade > oldGrade && grade >= 2) { this._banner(`✦ 시너지 진화 — ${s.n} [${RAR[grade - 1].n}]`, 3200); this._beep(990, .12, 'square', .05); }
       else if (mine) this._beep(880, .08, 'square', .04);
     }
   };
@@ -105,16 +109,21 @@ export function install(P) {
     if (p.down || p.sklT > 0 || (this.phase !== 'assault' && this.phase !== 'build')) return;
     p.sklT = Math.max(4, (14 - p.sklLv) * (p.sklCdMul || 1));
     const r = (3.5 + p.sklLv * .5) * (p.sklRMul || 1), dmg = (40 + p.sklLv * 20) * (p.sklDmgMul || 1);
-    if (this.isHostish()) this._shockwave(p.x, p.z, r, dmg, true);
-    else { this._shockFx(p.x, p.z); this._send({ t: 'skl', x: +p.x.toFixed(1), z: +p.z.toFixed(1), r: +r.toFixed(1), dmg: Math.round(dmg) }); }
+    const deb = p.swSlowF ? { f: p.swSlowF, t: p.swSlowT, c: p.swStunC || 0, ct: p.swStunT || 1 } : null; // 공명 폭발 debuffs
+    if (this.isHostish()) this._shockwave(p.x, p.z, r, dmg, true, deb);
+    else { this._shockFx(p.x, p.z); this._send({ t: 'skl', x: +p.x.toFixed(1), z: +p.z.toFixed(1), r: +r.toFixed(1), dmg: Math.round(dmg), deb }); }
   };
   P._shockFx = function (x, z, lv) { this._fx(x, z, true, PAL.cyanHex); this.shake = Math.max(this.shake || 0, .5); this._beep(220, .25, 'sawtooth', .08); }
-  P._shockwave = function (x, z, r, dmg, fx) {
+  P._shockwave = function (x, z, r, dmg, fx, deb) {
     if (fx !== false) this._shockFx(x, z);
     for (const e of [...this.enemies.values()]) {
       if (dist2(x, z, e.x, e.z) < r * r) {
         const d = Math.sqrt(dist2(x, z, e.x, e.z)) || 1;
         e.x = clamp(e.x + (e.x - x) / d * 2.2, 1 - HALF, HALF - 1); e.z = clamp(e.z + (e.z - z) / d * 2.2, 1 - HALF, HALF - 1);
+        if (deb) { // 공명 폭발: slow, and at epic+ a stun roll (bosses resist stun at half duration)
+          e.slowF = deb.f; e.slowT2 = Math.max(e.slowT2 || 0, deb.t);
+          if (deb.c && Math.random() < deb.c) e.stunT = Math.max(e.stunT || 0, ETYPES[e.ty] && ETYPES[e.ty].boss ? deb.ct * .5 : deb.ct);
+        }
         this._dmgEnemy(e, dmg);
       }
     }
