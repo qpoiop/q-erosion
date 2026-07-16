@@ -1,12 +1,12 @@
 // waves.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._startBuild = function () {
     this.phase = 'build'; this.phT = this.wave === 0 ? this.buildTime + 10 : this.buildTime;
     this._pickGates(); // next assault pours through the active gate(s) — nightmare opens several
     if (this.mode === 'solo') this._saveRun();
-    const bonus = 30 + this.wave * 12; this.scrap += bonus; if (this.mode !== 'solo' && this.isHost) this.allyScrap += bonus;
+    const bonus = Math.round((30 + this.wave * 12) * (DIFF_SCR[this.diffKey] || 1)); this.scrap += bonus; if (this.mode !== 'solo' && this.isHost) this.allyScrap += bonus;
     const dirs = this.activeGates.map(i => GATE_DIR[i]).join('·');
     if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus} · 다음 균열: ${dirs}쪽`, 3600); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
     else this._banner(`준비 단계 — ${dirs}쪽 균열을 막아라 (건설 버튼)`, 4200);

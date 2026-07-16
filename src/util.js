@@ -13,12 +13,13 @@ const dist2 = (ax, az, bx, bz) => { const dx = ax - bx, dz = az - bz; return dx 
 const PAL = { bg: 0x0b0c10, line: '#3a4052', panel: 'rgba(12,14,20,.82)', text: '#e8eaf0', dim: '#9aa3b5', cyan: '#25d8ff', cyanHex: 0x25d8ff, amber: '#ffb020', amberHex: 0xffb020, red: '#ff3b2a', redHex: 0xff3b2a, red7: '#c22212', red7Hex: 0xc22212 };
 const FONT = "'Chakra Petch','Noto Sans KR',sans-serif";
 /* swarm balance: many weaker mobs rather than few strong ones */
-const ETYPES = [
-  { hp: 30, sp: 3.9, dmg: 6, sdmg: 15, xp: 8, sc: 2, r: .55 },   // tri rusher
-  { hp: 115, sp: 1.9, dmg: 15, sdmg: 40, xp: 20, sc: 6, r: .75 }, // cube breaker
-  { hp: 48, sp: 2.5, dmg: 0, sdmg: 12, xp: 15, sc: 4, r: .6, rng: true }, // hex gunner
-  { hp: 700, sp: 1.5, dmg: 28, sdmg: 95, xp: 80, sc: 30, r: 1.1, boss: true }, // boss
+const ETYPES = [ // sdmg trimmed ~20% when turret retaliation landed — structures were melting
+  { hp: 30, sp: 3.9, dmg: 5, sdmg: 11, xp: 8, sc: 2, r: .55 },   // tri rusher
+  { hp: 115, sp: 1.9, dmg: 13, sdmg: 33, xp: 20, sc: 6, r: .75 }, // cube breaker
+  { hp: 48, sp: 2.5, dmg: 0, sdmg: 9, xp: 15, sc: 4, r: .6, rng: true }, // hex gunner
+  { hp: 700, sp: 1.5, dmg: 25, sdmg: 80, xp: 80, sc: 30, r: 1.1, boss: true }, // boss
 ];
+const DIFF_SCR = { easy: 1, normal: 1, hard: 1.2, nightmare: 1.45 }; // scrap income — harder waves fund a bigger arsenal
 /* card rarity tiers — each line levels 기본→레어→에픽→레전드; a tier only
    appears after the previous tier of the same line was taken */
 const RAR = [
@@ -142,4 +143,4 @@ const XP_NEED = lv => 45 + lv * 30 + Math.max(0, lv - 5) * 12; // Lv1-5: origina
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
 
-export { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T };
+export { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T };
