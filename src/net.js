@@ -127,6 +127,7 @@ export function install(P) {
     if (!this.isHost) this._peerPaused = !!m.bg;
     this.scrap = m.asc !== undefined ? m.asc : m.sc;
     this.coreHp = m.core; if (m.cm) this.coreMax = m.cm;
+    if (m.gm) Object.assign(this.g, m.gm); // shared research state — rejoiners missed the live 'gup' messages
     if (this._lastCore !== undefined && m.core < this._lastCore) this._coreHitFx();
     this._lastCore = m.core;
     this.wave = m.wv; this._qn = m.qn || 0;
@@ -155,7 +156,7 @@ export function install(P) {
       this.sendStateT -= dt;
       if (this.sendStateT <= 0) {
         this.sendStateT = .13; this.sendStT -= .13;
-        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, cm: this.coreMax, bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
+        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, cm: this.coreMax, gm: this.g, bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
           en: [...this.enemies.values()].map(e => [e.id, e.ty, Math.round(e.x * 10), Math.round(e.z * 10), Math.round(e.hp)]),
           itm: this.fitems.map(f => [f.id, f.k, Math.round(f.x * 10), Math.round(f.z * 10)]) };
         if (this.sendStT <= 0) { this.sendStT = 1.4; o.st = this._structPack(); }
