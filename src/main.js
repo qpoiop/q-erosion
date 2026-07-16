@@ -3,6 +3,8 @@ import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, R
 import { install as installScene } from './scene.js';
 import { install as installModels } from './models.js';
 import { install as installHud } from './hud.js';
+import { install as installSheets } from './sheets.js';
+import { install as installInput } from './input.js';
 import { install as installNet } from './net.js';
 import { install as installWorld } from './world.js';
 import { install as installCombat } from './combat.js';
@@ -103,5 +105,5 @@ class ErosionGame extends HTMLElement {
     this._render(dt);
   }
 }
-[installScene, installModels, installHud, installNet, installWorld, installCombat, installWaves].forEach(f => f(ErosionGame.prototype));
+[installScene, installModels, installHud, installSheets, installInput, installNet, installWorld, installCombat, installWaves].forEach(f => f(ErosionGame.prototype));
 if (!customElements.get('erosion-game')) customElements.define('erosion-game', ErosionGame);
