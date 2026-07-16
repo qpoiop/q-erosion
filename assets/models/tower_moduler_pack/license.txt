@@ -1,0 +1,11 @@
+Model Information:
+* title:	Multifunctional Tower - Modular pack
+* source:	https://sketchfab.com/3d-models/multifunctional-tower-modular-pack-df9675a363614cd2a153b708444d7ca7
+* author:	MRowa (https://sketchfab.com/MRowa)
+
+Model License:
+* license type:	CC-BY-SA-4.0 (http://creativecommons.org/licenses/by-sa/4.0/)
+* requirements:	Author must be credited. Modified versions must have the same license. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Multifunctional Tower - Modular pack" (https://sketchfab.com/3d-models/multifunctional-tower-modular-pack-df9675a363614cd2a153b708444d7ca7) by MRowa (https://sketchfab.com/MRowa) licensed under CC-BY-SA-4.0 (http://creativecommons.org/licenses/by-sa/4.0/)

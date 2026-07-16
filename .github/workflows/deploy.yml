@@ -18,7 +18,8 @@ jobs:
           cp index.html game.js sw.js manifest.webmanifest dist/
           sed -i "s/__BUILD__/${GITHUB_SHA}/" dist/sw.js
           cp -r icons dist/icons
-          cp -r assets dist/assets
+          mkdir -p dist/assets
+          cp assets/*.glb assets/*.png dist/assets/
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

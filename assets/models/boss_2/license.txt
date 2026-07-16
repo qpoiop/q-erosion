@@ -1,0 +1,11 @@
+Model Information:
+* title:	[PUR-0#]
+* source:	https://sketchfab.com/3d-models/pur-0-696dbbea6854478daa701bbdc348f9ea
+* author:	MAXIDOG_P3D (https://sketchfab.com/MAXIDOG_P3D)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "[PUR-0#]" (https://sketchfab.com/3d-models/pur-0-696dbbea6854478daa701bbdc348f9ea) by MAXIDOG_P3D (https://sketchfab.com/MAXIDOG_P3D) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
