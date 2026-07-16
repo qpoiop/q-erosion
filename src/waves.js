@@ -58,7 +58,7 @@ export function install(P) {
     // spawn OUTSIDE the gate, spread across its widened front, walk in
     const nx = g.gx === 0 ? -1 : g.gx === N - 1 ? 1 : 0, nz = g.gz === 0 ? -1 : g.gz === N - 1 ? 1 : 0;
     const off = rnd(1.8, 4), lat = rnd(-4.6, 4.6);
-    const e = { id, ty, x: g.x + nx * off + lat * (nz ? 1 : 0), z: g.z + nz * off + lat * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x + lat * (nz ? 1 : 0), gz: g.z + lat * (nx ? 1 : 0), wsp: Math.min(2, 1 + (this.wave - 1) * .07) }; // wave speed ramp — 2x by wave 15
+    const e = { id, ty, x: g.x + nx * off + lat * (nz ? 1 : 0), z: g.z + nz * off + lat * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x + lat * (nz ? 1 : 0), gz: g.z + lat * (nx ? 1 : 0), wsp: Math.min(2, 1 + (this.wave - 1) * .04 + Math.max(0, this.wave - 8) * .09) }; // late-loaded speed ramp: w5 1.16 / w10 1.54 / w15 ≈2
     if (ETYPES[ty].boss) { // boss tiers: w5 mid, w10 heavy, final wave = colossal structure-wrecker
       e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1;
       if (e.btier === 2) { e.hp *= 4; e.wsp *= 1.15; }
@@ -133,7 +133,7 @@ export function install(P) {
         for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
           const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
           const j = ti(X, Z), o2 = this.occ[j];
-          if ((smasher || o2 === 2 || ((e.id & 3) !== 0 && Math.random() < .22)) && (o2 === 1 || o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < rr2) { hit = j; break; } // everyone gnaws blockades — walls can't cheese a whole horde
+          if ((smasher || o2 === 2 || ((e.id & 3) !== 0 && Math.random() < .22 * Math.min(1, this.wave / 8))) && (o2 === 1 || o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < rr2) { hit = j; break; } // everyone gnaws blockades — walls can't cheese a whole horde
         }
         if (hit >= 0) { this._atkStruct(e, et, hit); continue; }
       }
