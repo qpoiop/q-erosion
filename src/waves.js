@@ -42,7 +42,7 @@ export function install(P) {
     const ty = this.spawnQ.shift();
     const id = this.eid++;
     const w2 = Math.min(this.wave, this.maxWave);
-    const hpMul = (1 + (w2 - 1) * .18 + Math.max(0, w2 - 8) ** 2 * .02) * this._dMul(); // quadratic late term: w15 ≈ 4.5x base (was 3.5x)
+    const hpMul = (1 + (w2 - 1) * .18 + Math.max(0, w2 - 8) ** 2 * .01) * this._dMul(); // gentle late term: w15 ≈ 4.0x base
     if (this.inf) { // infiltration: enemies pour in from the TOP of the corridor
       const e = { id, ty, x: g2w(11 + Math.floor(Math.random() * 10)), z: g2w(1) + rnd(-1, 1), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), wsp: 2 };
       if (ETYPES[ty].boss) {
@@ -133,7 +133,7 @@ export function install(P) {
         for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
           const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
           const j = ti(X, Z), o2 = this.occ[j];
-          if ((smasher || o2 === 2 || ((e.id & 3) !== 0 && Math.random() < .35)) && (o2 === 1 || o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < rr2) { hit = j; break; } // everyone gnaws blockades — walls can't cheese a whole horde
+          if ((smasher || o2 === 2 || ((e.id & 3) !== 0 && Math.random() < .22)) && (o2 === 1 || o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < rr2) { hit = j; break; } // everyone gnaws blockades — walls can't cheese a whole horde
         }
         if (hit >= 0) { this._atkStruct(e, et, hit); continue; }
       }
