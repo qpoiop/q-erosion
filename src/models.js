@@ -48,7 +48,7 @@ export function install(P) {
           const cg = this.coreMesh;
           cg.cry.visible = false;
           const m = this.mdl.core.clone(true);
-          m.traverse(o => { if (o.isMesh) o.castShadow = true; });
+          m.traverse(o => { if (o.isMesh) o.castShadow = false; }); // crystal is translucent — a baked shadow blob reads as a glitch
           m.position.y = .62; // sit on the pedestal
           cg.add(m); cg.model = m; cg.s0 = m.scale.x; // _normalize bakes its fit into root scale — renderer must scale relative to this
           cg.mats = []; m.traverse(o => { if (o.isMesh) cg.mats.push([o, o.material]); }); // for hit-flash swaps

@@ -88,13 +88,16 @@ export function install(P) {
         continue;
       }
       const gx = w2g(e.x), gz = w2g(e.z), here = ti(gx, gz);
-      // breakers & bosses smash adjacent structures even when a path exists
-      if ((e.ty === 1 || et.boss) && e.cool <= 0) {
+      // breakers & bosses smash any adjacent structure; every enemy type retaliates against adjacent TURRETS.
+      // reach scales with body radius — big bosses used to fail the old fixed 1.9u check and ignored structures
+      if (e.cool <= 0) {
+        const smasher = e.ty === 1 || et.boss;
+        const rr = 1.5 + (et.r || .55) * (e.final ? 1.6 : 1), rr2 = rr * rr;
         let hit = -1;
-        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
           const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
           const j = ti(X, Z), o2 = this.occ[j];
-          if ((o2 === 1 || o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < 3.6) { hit = j; break; }
+          if ((smasher ? (o2 === 1 || o2 === 2) : o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < rr2) { hit = j; break; }
         }
         if (hit >= 0) { this._atkStruct(e, et, hit); continue; }
       }

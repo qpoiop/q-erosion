@@ -419,7 +419,7 @@ export function install(P) {
       else m.rotation.y += dt * (e.ty === 2 ? 1.5 : .6);
       m.position.set(e.x, 0, e.z);
       if (ETYPES[e.ty] && ETYPES[e.ty].boss) { // boss: big red HP bar overhead + pulsing aura
-        if (!m.bossBar) { m.bossBar = this._mkBar(e.x, e.z, e.btier === 3 ? 4.6 : 3.6); m.bossBar.position.y = e.btier === 3 ? 6.6 : e.btier === 2 ? 4.6 : 3.4; }
+        if (!m.bossBar) { m.bossBar = this._mkBar(e.x, e.z, e.btier === 3 ? 4.6 : 3.6); const bh = new T.Box3().setFromObject(m).max.y; m.bossBar.position.y = Math.max(3.4, bh + 1); } // above the actual model, whatever its height
         m.bossBar.position.x = e.x; m.bossBar.position.z = e.z;
         this._setBar(m.bossBar, clamp(e.hp / (e.mhp || e.hp || 1), 0, 1), PAL.redHex);
         if (m.aura) { m.aura.scale.setScalar(1 + Math.sin(now * 3.2) * .12); m.aura.material.opacity = .4 + Math.sin(now * 3.2) * .2; }

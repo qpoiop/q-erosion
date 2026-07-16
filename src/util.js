@@ -135,7 +135,7 @@ const MODELS = {
   tower1: { url: 'assets/tower_t2.glb',       size: 2.2, yaw: 0, merge: true }, // band 4-9; band 10+ = same model, scaled up
   wall0:  { url: 'assets/wall_t1.glb',        size: 1.84, yaw: 0, merge: true }, // wall research 0-3 (tile is 2 units)
   wall1:  { url: 'assets/wall_t2.glb',        size: 1.84, yaw: 0, merge: true }, // wall research 4+
-  core:   { url: 'assets/core.glb',           size: 6.5, yaw: 0, merge: true }, // energy-orb core — bbox is mostly its transparent halo, so oversize it
+  core:   { url: 'assets/core.glb',           size: 4.2, yaw: 0, merge: true }, // crystal core (sits on the 4.8-wide pedestal)
 };
 const SHIP_MODEL_YAW = (() => { const q = new URLSearchParams(location.search).get('shipyaw'); return q !== null ? +q * Math.PI / 180 : 0; })();
 const XP_NEED = lv => 45 + lv * 30 + Math.max(0, lv - 5) * 12; // Lv1-5: original pace; Lv6+: +12/level extra so late cards space out gently

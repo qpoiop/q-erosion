@@ -1,11 +1,11 @@
 Model Information:
-* title:	Duchess core
-* source:	https://sketchfab.com/3d-models/duchess-core-384b049716844d87b17ea9ba5eb272c2
-* author:	ParticleAccelerator5000 (https://sketchfab.com/Tvclap)
+* title:	Crystal
+* source:	https://sketchfab.com/3d-models/crystal-d85fe6b4d16a4703879f6924c0cfd227
+* author:	rudolfs (https://sketchfab.com/rudolfs)
 
 Model License:
 * license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 * requirements:	Author must be credited. Commercial use is allowed.
 
 If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
-This work is based on "Duchess core" (https://sketchfab.com/3d-models/duchess-core-384b049716844d87b17ea9ba5eb272c2) by ParticleAccelerator5000 (https://sketchfab.com/Tvclap) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+This work is based on "Crystal" (https://sketchfab.com/3d-models/crystal-d85fe6b4d16a4703879f6924c0cfd227) by rudolfs (https://sketchfab.com/rudolfs) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
