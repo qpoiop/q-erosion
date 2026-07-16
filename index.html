@@ -255,5 +255,28 @@
   }
 })();
 </script>
+<!-- iOS ignores the manifest "orientation" key (no PWA orientation lock in WebKit),
+     so portrait phones get a rotate prompt instead -->
+<div id="rotate-hint" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(6,8,13,.94);backdrop-filter:blur(4px);flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center">
+  <div style="font-size:44px;animation:rotHint 1.6s ease-in-out infinite">📱</div>
+  <div style="font:700 17px 'Noto Sans KR',sans-serif;color:#e8ecf4">기기를 옆으로 돌려주세요</div>
+  <div style="font:400 12.5px 'Noto Sans KR',sans-serif;color:#8b93a7;line-height:1.7">침식 프로토콜은 가로 화면 전용입니다.<br>iOS는 자동 가로 전환을 지원하지 않아 직접 돌려야 합니다.<br><span style="color:#6a7180">(세로 잠금이 켜져 있다면 제어 센터에서 해제)</span></div>
+  <button id="rotate-dismiss" style="margin-top:6px;font:600 12px 'Noto Sans KR',sans-serif;padding:8px 18px;background:transparent;border:1px solid #3a4052;color:#8b93a7;cursor:pointer">그냥 진행</button>
+</div>
+<style>@keyframes rotHint{0%,100%{transform:rotate(0)}45%,70%{transform:rotate(90deg)}}</style>
+<script>
+(() => {
+  const el = document.getElementById('rotate-hint');
+  let off = false;
+  document.getElementById('rotate-dismiss').onclick = () => { off = true; el.style.display = 'none'; };
+  const chk = () => {
+    const portrait = window.innerHeight > window.innerWidth * 1.2, touch = 'ontouchstart' in window;
+    el.style.display = !off && portrait && touch ? 'flex' : 'none';
+  };
+  window.addEventListener('resize', () => { chk(); setTimeout(chk, 350); });
+  window.addEventListener('orientationchange', () => setTimeout(chk, 350));
+  chk();
+})();
+</script>
 </body>
 </html>
