@@ -3,7 +3,7 @@ import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPE
 
 export function install(P) {
   P._reset = function () {
-    const mk = (x, z) => ({ x, z, a: 0, hp: 100, maxhp: 100, speed: 6, dmg: 9, frate: 2.5, shots: 1, pierce: 0, regen: 0, dashCd: 3.5, sklLv: 1, sklT: 0, scrapMul: 1, wallMul: 1, turMul: 1, turHpMul: 1, costMul: 1, wallLv: 0, turLv: 0, fireT: 0, dashT: 0, dashing: 0, down: false, downT: 0, revP: 0, items: [], taken: {}, buys: {}, lastSeen: 0 });
+    const mk = (x, z) => ({ x, z, a: 0, hp: 100, maxhp: 100, speed: 6, dmg: 9, frate: 2.5, shots: 1, pierce: 0, regen: 0, dashCd: 3.5, sklLv: 1, sklT: 0, scrapMul: 1, range: 9, wallMul: 1, turMul: 1, turHpMul: 1, costMul: 1, wallLv: 0, turLv: 0, fireT: 0, dashT: 0, dashing: 0, down: false, downT: 0, revP: 0, items: [], taken: {}, buys: {}, lastSeen: 0 });
     this.me = mk(-2.5, 5); this.ally = mk(2.5, 5);
     this.allyOn = this.mode === 'solo';
     this.occ = new Uint8Array(N * N); this.shp = new Float32Array(N * N);
@@ -132,7 +132,7 @@ export function install(P) {
     try {
       const st = [];
       for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2) st.push([i, this.occ[i], Math.round(this.shp[i]), this.own[i]]);
-      const pick = q => ({ hp: q.hp, maxhp: q.maxhp, speed: q.speed, dmg: q.dmg, frate: q.frate, shots: q.shots, pierce: q.pierce, regen: q.regen, dashCd: q.dashCd, dashDur: q.dashDur, sklLv: q.sklLv, scrapMul: q.scrapMul, armor: q.armor, dropMul: q.dropMul, wallMul: q.wallMul, turMul: q.turMul, turHpMul: q.turHpMul, costMul: q.costMul, wallLv: q.wallLv, turLv: q.turLv, taken: q.taken, syn: q.syn || {}, buys: q.buys, items: q.items || [] });
+      const pick = q => ({ hp: q.hp, maxhp: q.maxhp, speed: q.speed, dmg: q.dmg, frate: q.frate, shots: q.shots, pierce: q.pierce, regen: q.regen, dashCd: q.dashCd, dashDur: q.dashDur, sklLv: q.sklLv, scrapMul: q.scrapMul, armor: q.armor, dropMul: q.dropMul, range: q.range, wallMul: q.wallMul, turMul: q.turMul, turHpMul: q.turHpMul, costMul: q.costMul, wallLv: q.wallLv, turLv: q.turLv, taken: q.taken, syn: q.syn || {}, synGrade: q.synGrade || {}, buys: q.buys, items: q.items || [] });
       localStorage.setItem('eg_save', JSON.stringify({ v: 1, wave: this.wave, core: Math.round(this.coreHp), coreMax: Math.round(this.coreMax), scrap: Math.round(this.scrap), lv: this.lv, xp: Math.round(this.xp), kills: this.kills, tm: Math.round(this.tm), st, me: pick(this.me), ally: pick(this.ally), diff: this.diffKey, waves: this.maxWave, bt: this.buildTime }));
     } catch (e) {}
   };

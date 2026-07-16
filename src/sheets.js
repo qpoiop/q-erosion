@@ -63,7 +63,7 @@ export function install(P) {
     if (syns.length) sec('시너지 ' + syns.length + '종');
     for (const s of syns) {
       const gr = (this.me.synGrade || {})[s.id] || 1, r = RAR[gr - 1];
-      row(r.c, '✦ ' + s.n, ROMAN[gr - 1] + ' (' + r.n + ')', s.d + ' · 누적 ' + this.me.syn[s.id] + '회');
+      row(r.c, '✦ ' + s.n, ROMAN[gr - 1] + ' (' + r.n + ')', s.d);
     }
     if (!taken.length && !syns.length) { const e = document.createElement('div'); e.textContent = '아직 획득한 증강이 없습니다'; e.style.cssText = `font:400 11px ${FONT};color:${PAL.dim}`; el.appendChild(e); }
   };
@@ -146,7 +146,7 @@ export function install(P) {
     // slot 1 favors build coherence: upgrade an owned line, or a line that completes a synergy with one
     const owned = k => (p.taken[k] || 0) > 0;
     const relevant = pool.filter(c => owned(c.u.k) || SYN.some(sy => sy.need.includes(c.u.k) && sy.need.some(k2 => k2 !== c.u.k && owned(k2))));
-    if (relevant.length) { const c = relevant[Math.floor(Math.random() * relevant.length)]; picks.push(c); pool.splice(pool.indexOf(c), 1); }
+    if (relevant.length && Math.random() < .5) { const c = relevant[Math.floor(Math.random() * relevant.length)]; picks.push(c); pool.splice(pool.indexOf(c), 1); } // 50%: build-coherent slot
     while (picks.length < 3 && pool.length) picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
     this._upBase = 'LV ' + this.lv + ' — 강화 선택' + (this.pendUp > 1 ? ' (+' + (this.pendUp - 1) + ' 대기)' : '');
     this._upDeadline = performance.now() + 30000; // 30s to choose, then the first card auto-picks

@@ -34,10 +34,6 @@ class ErosionGame extends HTMLElement {
     this.diffKey = DIFF[A('diff')] !== undefined ? A('diff') : 'normal';
     this.diffMul = DIFF[this.diffKey];
     this.maxWave = parseInt(A('waves')) || 15;
-    { // ?startwave=15 — jump straight to a late wave (map-2/finale testing); grants catch-up scrap
-      const sw = parseInt(new URLSearchParams(location.search).get('startwave'));
-      if (sw > 1) { this._startWave = Math.min(sw, this.maxWave) - 1; }
-    }
     this.buildTime = parseInt(A('buildtime')) || 40;
     this._buildDOM(); this._initAudio(); this._reset();
     try { this._initThree(); } catch (e) {
@@ -54,7 +50,6 @@ class ErosionGame extends HTMLElement {
       let resumed = false;
       if (A('resume') === '1') { try { const s = JSON.parse(localStorage.getItem('eg_save') || 'null'); if (s && s.v === 1) { this._loadRun(s); resumed = true; } } catch (e) {} }
       if (!resumed) { this.phase = 'count'; this.countT = 3; }
-      if (this._startWave) { this.wave = this._startWave; this.scrap += this._startWave * 40; } // solo test warp
     }
     else { this.phase = 'wait'; this._initNet(); }
     this._last = performance.now();
