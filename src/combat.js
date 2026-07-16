@@ -50,6 +50,9 @@ export function install(P) {
     this.xp = rem;
     if (gained <= 0) { this.lv = Math.max(this.lv, lv); return; }
     this.lv = lv; this.pendUp += gained;
+    const nowLv = performance.now(); // flair throttle: rapid host farming levelled every packet (7.7Hz of fx+animate = joiner jank)
+    if (nowLv - (this._lvFxT || 0) < 500) return;
+    this._lvFxT = nowLv;
     this._beep(600, .12, 'square', .06); this._beep(900, .18, 'square', .05);
     if (this.scene) {
       this._fx(this.me.x, this.me.z, this.lv % 5 === 0 || gained > 1, PAL.cyanHex);
