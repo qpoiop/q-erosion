@@ -1,5 +1,5 @@
 // sheets.js — modal sheets & commerce: research shop, augment cards, inventory, owned-buff viewer
-import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._toggleInv = function (force) {
@@ -99,6 +99,7 @@ export function install(P) {
     el.appendChild(note);
   };
   P._buy = function (u) {
+    if (u.max && this._buyCount(u.id) >= u.max) { this._banner('최대 레벨입니다'); return; } // UI disables, but enforce here too
     const cost = this._shopCost(u);
     if (this.scrap < cost) { this._beep(140, .1, 'sawtooth', .05); return; }
     if (this.isHostish()) {

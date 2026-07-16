@@ -1,5 +1,5 @@
 // net.js — verbatim methods from game.js (prototype-install)
-import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._initNet = function () {
@@ -26,6 +26,7 @@ export function install(P) {
       if (d) { d.textContent = '아직 응답이 없습니다 — 코드가 정확한지, 방장이 대기 화면을 열어두었는지 확인하세요.'; d.style.color = PAL.amber; }
     }, 12000);
     this._connectRelay();
+    this._mqtt2(); // parallel matchmaking channel
     this.sendPoseT = 0; this.sendStateT = 0; this.sendStT = 0;
   };
   P._onNetReady = function () { // shared post-connect handshake (relay & mqtt paths)
@@ -80,7 +81,22 @@ export function install(P) {
     };
     connect();
   };
-  P._send = function (o) { if (this.net && this.net.connected) { this._netUp = true; this.net.publish(this.pubT, JSON.stringify(o)); } }
+  P._send = function (o) {
+    const s = JSON.stringify(o);
+    if (this.net && this.net.connected) { this._netUp = true; this.net.publish(this.pubT, s); }
+    if (this.net2) { try { this.net2.publish(this.pubT, s); } catch (e) {} } // matchmaking runs on BOTH transports
+  }
+  P._mqtt2 = function () { // secondary MQTT channel for the wait phase — kills relay/MQTT split-brain during matchmaking
+    if (this.net2 || this._dead || typeof mqtt === 'undefined') return;
+    try {
+      const c = mqtt.connect('wss://broker.emqx.io:8084/mqtt', { clientId: 'eg2_' + Math.random().toString(16).slice(2, 10), clean: true, connectTimeout: 8000, reconnectPeriod: 0 });
+      c.on('connect', () => { c.subscribe(this.subT); });
+      c.on('message', (t, m) => { try { this._onMsg(JSON.parse(m.toString())); } catch (e) {} });
+      c.on('error', () => {});
+      this.net2 = c;
+    } catch (e) {}
+  };
+  P._dropMqtt2 = function () { if (this.net2) { const c = this.net2; this.net2 = null; setTimeout(() => { try { c.end(true); } catch (e) {} }, 1500); } }
   P._allyR = function () { const a = this.ally; return { wallMul: a.wallMul, turMul: a.turMul, turHpMul: a.turHpMul, costMul: a.costMul, wallLv: a.wallLv || 0, turLv: a.turLv || 0 }; }
   P._structPack = function () { const a = []; for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2 || this.occ[i] === 5) a.push([i, this.occ[i], Math.round(this.shp[i]), +this.bld[i].toFixed(2), this.own[i]]); return a; }
   P._structUnpack = function (a) {
@@ -98,6 +114,7 @@ export function install(P) {
   P._startOnline = function () {
     this._lastStateAt = performance.now(); this._peerSeenAt = performance.now(); this._hostLost = false; this._peerPaused = false;
     this.phase = 'count'; this.countT = 3; this.allyOn = true; this.allyG.visible = true;
+    setTimeout(() => this._dropMqtt2(), 2500); // matchmaking done — single transport from here
     this.pbar.ally.lab.textContent = '동료 · ' + (this.isHost ? '유닛-B' : '유닛-A');
     this.ov.style.display = 'none';
   };
@@ -105,16 +122,16 @@ export function install(P) {
     switch (m.t) {
       case 'hello': if (this.isHost) {
         if (m.v !== PV) this._banner('⚠ 상대 클라이언트가 구버전입니다 — 양쪽 모두 새로고침 권장', 5200);
-        if (this.phase === 'wait') { this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV }); this._startOnline(); }
+        if (this.phase === 'wait') { this._send({ t: 'welcome', diff: this.diffMul, dk: this.diffKey, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV }); this._startOnline(); }
         else if (performance.now() - (this._peerSeenAt || 0) > 3000) { // teammate silent 3s (wall-clock — tm freezes on pause) — allow rejoin mid-game
-          this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV });
+          this._send({ t: 'welcome', diff: this.diffMul, dk: this.diffKey, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV });
           this._banner('동료 재접속!', 2600);
         }
         else this._send({ t: 'busy' });
       } break;
       case 'welcome': if (!this.isHost && this.phase === 'wait') {
         clearInterval(this._helloIv);
-        this.diffMul = m.diff; this.maxWave = m.waves; this.buildTime = m.bt; this.scrap = m.sc;
+        this.diffMul = m.diff; if (m.dk) { this.diffKey = m.dk; this._setDiffTag && this._setDiffTag(); } this.maxWave = m.waves; this.buildTime = m.bt; this.scrap = m.sc;
         if (m.v !== PV) this._banner('⚠ 방장 클라이언트 버전이 다릅니다 — 양쪽 모두 새로고침 권장', 5200);
         if (m.ar) Object.assign(this.me, m.ar); if (m.abuys) this.me.buys = { ...m.abuys }; // rejoin: my research/buy counts live on the host
         this._structUnpack(m.st); this._startOnline();
@@ -122,13 +139,14 @@ export function install(P) {
       case 'busy': if (!this.isHost && this.phase === 'wait') { this._overlay(`<div style="font:700 20px ${FONT}">방이 가득 찼습니다</div><div style="margin-top:14px"><button id="egCancel" style="${this._obtn(false)}">돌아가기</button></div>`); this.ovIn.querySelector('#egCancel').onclick = () => this._exit(); } break;
       case 'p': { this._peerSeenAt = performance.now(); const a = this.ally; a.lastSeen = this.tm; a.tx = m.x; a.tz = m.z; a.ta = m.a; a.hp = m.hp; a.maxhp = m.mh; a.down = m.dn; a.lv = m.lv; this._peerPaused = !!m.bg; if (m.sm) a.scrapMul = m.sm; if (m.au !== undefined) a.au = m.au;
         (m.sh || []).forEach(s => this._spawnBullet(s[0], s[1], s[2], s[3], { ghost: true, ally: true, life: s[4] || .55 }));
+        if (this.isHost && m.hq) for (const [hid, hd] of m.hq) { const he = this.enemies.get(hid); if (he) this._dmgEnemy(he, Math.min(hd, 500), { ally: true }); }
         break; }
       case 'hit': if (this.isHost) { const e = this.enemies.get(m.id); if (e) this._dmgEnemy(e, m.d, { ally: true }); } break;
-      case 'bld': if (this.isHost) { if (this._canPlace(m.i)) { const c = this._cost(m.k, this.ally); if (this.allyScrap >= c) { this.allyScrap -= c; this.allyStat.b++; this._place(m.i, m.k, false, 1); this._send({ t: 'blt', i: m.i, k: m.k, o: 1, sc: Math.round(this.allyScrap) }); } } } break;
+      case 'bld': if (this.isHost) { if (this._canPlace(m.i) && this._structCount(1, m.k) < (m.k === 1 ? CAP_WALL : CAP_TUR)) { const c = this._cost(m.k, this.ally); if (this.allyScrap >= c) { this.allyScrap -= c; this.allyStat.b++; this._place(m.i, m.k, false, 1); this._send({ t: 'blt', i: m.i, k: m.k, o: 1, sc: Math.round(this.allyScrap) }); } } } break;
       case 'blt': if (!this.isHost) { if (m.o === 1) { this.scrap = m.sc; this.stat.b++; } this._place(m.i, m.k, true, m.o || 0); this._fx(g2w(m.i % N), g2w((m.i / N) | 0), false, PAL.cyanHex); } break;
       case 'sel': if (this.isHost) { const k = this.occ[m.i]; if (k === 1 || k === 2) { this.allyScrap += Math.round(this._cost(k) * .7); this._remove(m.i); this._send({ t: 'slt', i: m.i, sc: Math.round(this.allyScrap) }); } } break;
       case 'slt': if (!this.isHost) { this.scrap = m.sc; this._remove(m.i); } break;
-      case 'buy': if (this.isHost) { const u = SHOP.find(s => s.id === m.id); if (!u) break; const cost = Math.round(u.cost * Math.pow(1.5, (this._peerBuys = this._peerBuys || {}, this._peerBuys[m.id] || 0)));
+      case 'buy': if (this.isHost) { const u = SHOP.find(s => s.id === m.id); if (!u) break; if (u.max && ((this._peerBuys || {})[m.id] || 0) >= u.max) break; const cost = Math.round(u.cost * Math.pow(1.5, (this._peerBuys = this._peerBuys || {}, this._peerBuys[m.id] || 0)));
         if (this.allyScrap >= cost) { this.allyScrap -= cost; this.allyStat.r++; this._peerBuys[m.id] = (this._peerBuys[m.id] || 0) + 1; if (u.st) { this._applyStructUpg(u, this.ally, 1); this._structUpgFx(u.id); } this._send({ t: 'byk', id: m.id, sc: Math.round(this.allyScrap) }); } } break;
       case 'byk': if (!this.isHost) { const u = SHOP.find(s => s.id === m.id); this.scrap = m.sc; if (u && u.per) { this.stat.r++; this.me.buys[u.id] = this._buyCount(u.id) + 1; u.f(this.me, this); if (u.st) { this._structUpgFx(u.id); this._syncStruct(); } this._beep(760, .1, 'square', .05); if (this.shopEl.style.display === 'flex') this._renderShop(); } } break;
       case 'skl': if (this.isHost) this._shockwave(m.x, m.z, Math.min(m.r || 4, 12), Math.min(m.dmg || 60, 500), false, m.deb && { f: Math.max(.4, m.deb.f || .7), t: Math.min(m.deb.t || 2.5, 5), c: Math.min(m.deb.c || 0, .5), ct: Math.min(m.deb.ct || 1, 2) }); else this._shockFx(m.x, m.z); break;
@@ -139,7 +157,7 @@ export function install(P) {
       case 'use': { if (this.isHost && this.ally.items) { const ix = this.ally.items.indexOf(m.k); if (ix >= 0) this.ally.items.splice(ix, 1); } this._applyItemFx(m.k, m.x, m.z, false); } break;
       case 'dmg': if (!this.isHost) this._hurt(this.me, m.v); break;
       case 'eb': this.ebullets.push({ x: m.x, z: m.z, dx: m.dx, dz: m.dz, life: 3, ghost: !this.isHost }); break;
-      case 'itm': if (!this.isHost) { if (m.who === 1 && this.me.items.length < INV_MAX) { this.me.items.push(m.k); this._banner(`아이템 획득 — ${ITEMS[m.k].n} (${this.me.items.length}/${INV_MAX})`, 2600); } this.fitems = this.fitems.filter(f => f.id !== m.id); this._beep(700, .1); } break;
+      case 'itm': if (!this.isHost) { if (m.who === 1 && this.me.items.length < INV_MAX) { this.me.items.push(m.k); this._banner(`아이템 획득 — ${ITEMS[m.k].n} (${this.me.items.length}/${INV_MAX})`, 2600); } else if (m.who === 0) this._banner(`동료가 ${ITEMS[m.k].n} 획득`, 2200); this.fitems = this.fitems.filter(f => f.id !== m.id); this._beep(700, .1); } break;
       case 'ban': if (!this.isHost) this._banner(m.s); break;
       case 's': if (!this.isHost) this._applyState(m); break;
       case 'end': if (!this.isHost) this._gameOver(m.win, m.why, true); break;
@@ -169,17 +187,26 @@ export function install(P) {
       else if (m.ph === 'escape') { this._banner(`⚑ 적의 코어로 통하는 균열이 열렸다 — ${GATE_DIR[m.eg ?? this.escGate ?? 0]}쪽 균열로 진입하라!`, 6000); }
       else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); }
     } this.phT = m.pt; }
+    if (m.ebq) for (const [ex, ez, edx, edz] of m.ebq) this.ebullets.push({ x: ex, z: ez, dx: edx, dz: edz, life: 3, ghost: !this.isHost }); // batched gunner shots
     const seen = new Set();
-    (m.en || []).forEach(a => { const [id, ty, x, z, hp, fl] = a; seen.add(id); let e = this.enemies.get(id);
+    const flat = m.en || []; // flat stride-6 array — one allocation instead of one array per enemy
+    for (let fi = 0; fi < flat.length; fi += 6) {
+      const id = flat[fi], ty = flat[fi + 1], x = flat[fi + 2], z = flat[fi + 3], hp = flat[fi + 4], fl = flat[fi + 5];
+      seen.add(id); let e = this.enemies.get(id);
       if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss) { // tier travels in the packet flags — the old inference mislabeled the SOURCE as a tier-2 boss on laggy joiners
           if (fl & 2) { e.btier = 3; e.final = true; e.giant = true; }
           else if (this.inf) e.btier = (fl & 1) ? 2 : 1;
           else { e.btier = this.wave >= this.maxWave ? 3 : (fl & 1) || this.wave >= 10 ? 2 : 1; if (e.btier === 3) e.final = true; }
         } this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
-      e.tx = x / 10; e.tz = z / 10; e.hp = hp; if (!e.mhp || hp > e.mhp) e.mhp = hp; });
+      e.tx = x / 10; e.tz = z / 10; e.hp = hp; if (!e.mhp || hp > e.mhp) e.mhp = hp;
+    }
     for (const [id, e] of this.enemies) if (!seen.has(id)) { this._killFx(e); this.enemies.delete(id); }
     if (m.st) this._structUnpack(m.st);
-    this.fitems = (m.itm || []).map(t => ({ id: t[0], k: t[1], x: t[2] / 10, z: t[3] / 10 }));
+    {
+      const prev = this._fiSeen = this._fiSeen || new Set();
+      this.fitems = (m.itm || []).map(t => ({ id: t[0], k: t[1], x: t[2] / 10, z: t[3] / 10 }));
+      for (const f of this.fitems) if (!prev.has(f.id)) { prev.add(f.id); this._banner(`💠 필드 아이템 출현 — ${ITEMS[f.k].n}`, 2400); }
+    }
   };
   P._netTick = function (dt) {
     this.sendPoseT -= dt;
@@ -188,14 +215,17 @@ export function install(P) {
       const p = this.me;
       const o = { t: 'p', x: +p.x.toFixed(2), z: +p.z.toFixed(2), a: +p.a.toFixed(2), hp: Math.round(p.hp), mh: p.maxhp, dn: p.down, lv: this.lv, bg: this._bgPaused ? 1 : 0, sm: +(p.scrapMul || 1).toFixed(2), au: Object.values(p.taken || {}).reduce((a, b) => a + b, 0) };
       if (this.shotQ.length) { o.sh = this.shotQ; this.shotQ = []; }
+      if (this._hitQ && this._hitQ.length) { o.hq = this._hitQ; this._hitQ = []; }
       this._send(o);
     }
     if (this.isHost) {
       this.sendStateT -= dt;
       if (this.sendStateT <= 0) {
-        this.sendStateT = .13; this.sendStT -= .13;
-        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, eg: this.escGate, cm: this.coreMax, ss: [this.stat.k, Math.round(this.stat.g), this.stat.b, this.stat.r], as: [this.allyStat.k, Math.round(this.allyStat.g)], hr: [this.me.wallMul, this.me.turMul, this.me.turHpMul, this.me.costMul, this.me.wallLv || 0, this.me.turLv || 0], bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
-          en: [...this.enemies.values()].map(e => [e.id, e.ty, Math.round(e.x * 10), Math.round(e.z * 10), Math.round(e.hp), (e.giant ? 2 : 0) | (e.btier === 2 ? 1 : 0)]),
+        this.sendStateT = this._stIv || .13; this.sendStT -= this._stIv || .13;
+        this._stIv = this.enemies.size > 120 ? .26 : this.enemies.size > 60 ? .2 : .13; // adaptive: hordes don't need 7.7Hz
+      const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, eg: this.escGate, cm: this.coreMax, ss: [this.stat.k, Math.round(this.stat.g), this.stat.b, this.stat.r], as: [this.allyStat.k, Math.round(this.allyStat.g)], hr: [this.me.wallMul, this.me.turMul, this.me.turHpMul, this.me.costMul, this.me.wallLv || 0, this.me.turLv || 0], bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
+          en: (() => { const a = new Array(this.enemies.size * 6); let i2 = 0; for (const e of this.enemies.values()) { a[i2++] = e.id; a[i2++] = e.ty; a[i2++] = Math.round(e.x * 10); a[i2++] = Math.round(e.z * 10); a[i2++] = Math.round(e.hp); a[i2++] = (e.giant ? 2 : 0) | (e.btier === 2 ? 1 : 0); } return a; })(), // flat stride-6 — one array, cheap parse
+          ebq: this._ebQ && this._ebQ.length ? (() => { const q = this._ebQ; this._ebQ = []; return q; })() : undefined,
           itm: this.fitems.map(f => [f.id, f.k, Math.round(f.x * 10), Math.round(f.z * 10)]) };
         if (this.sendStT <= 0) { this.sendStT = 1.4; o.st = this._structPack(); }
         this._send(o);

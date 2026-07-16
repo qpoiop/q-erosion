@@ -1,5 +1,5 @@
 // scene.js — verbatim methods from game.js (prototype-install)
-import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._groundTex = function () {
@@ -303,6 +303,26 @@ export function install(P) {
   P._render = function (dt) {
     const T = THREE, now = performance.now() / 1000;
     this._fno = ((this._fno | 0) + 1) & 0xffff;
+    if (this._fpsEl === undefined) { // ?fps=1 — on-device frame meter for diagnosing role-specific jank reports
+      this._fpsEl = null;
+      if (new URLSearchParams(location.search).get('fps') === '1') {
+        this._fpsEl = this.H('div', 'position:absolute;left:50%;top:4px;transform:translateX(-50%);font:700 10px monospace;color:#7dff8a;background:rgba(0,0,0,.5);padding:2px 8px;z-index:60;pointer-events:none', this.hud);
+      }
+    }
+    if (this._fpsEl && (this._fno & 15) === 0) this._fpsEl.textContent = `${(1000 / Math.max(1, this._ftAvg || 16)).toFixed(0)}fps · ${(this._ftAvg || 16).toFixed(0)}ms${this._lowPerf ? ' · LOW' : ''}`;
+    { // perf governor: sustained jank → shed the expensive passes (weak phones died at wave 11+)
+      const ms = Math.min(100, dt * 1000);
+      this._ftAvg = (this._ftAvg || 16) * .92 + ms * .08;
+      if (!this._lowPerf && (this._ftAvg > 34 || new URLSearchParams(location.search).get('perf') === 'low')) {
+        this._lowPerf = true;
+        this.composer = null; // bloom = 5 fullscreen passes
+        this.renderer.shadowMap.autoUpdate = false; // freeze shadows instead of re-rendering the scene for them
+        this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.15));
+        this.renderer.setSize(this.cv.clientWidth, this.cv.clientHeight, false);
+        if (this.dust) this.dust.visible = false;
+        this._banner('⚙ 저사양 모드 — 그래픽 효과를 줄였습니다', 3200);
+      }
+    }
     if (this.dust) this.dust.rotation.y += dt * .01;
     // build-mode overlay: refresh placeable tiles 4x/s
     const bovOn = this.buildMode && this.buildSel !== 3 && !this.over;

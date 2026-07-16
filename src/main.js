@@ -1,5 +1,5 @@
 // main.js — ErosionGame shell: lifecycle & orchestration. Feature methods live in sibling modules.
-import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 import { install as installScene } from './scene.js';
 import { install as installModels } from './models.js';
 import { install as installHud } from './hud.js';
@@ -18,6 +18,7 @@ class ErosionGame extends HTMLElement {
     cancelAnimationFrame(this._raf);
     clearInterval(this._helloIv); clearTimeout(this._banT); clearInterval(this._wdIv); clearTimeout(this._waitHintT); clearInterval(this._relayRetryIv);
     if (this.net) { try { this.net.end(true); } catch (e) {} this.net = null; }
+    if (this.net2) { try { this.net2.end(true); } catch (e) {} this.net2 = null; }
     window.removeEventListener('resize', this._onRzBurst);
     window.removeEventListener('orientationchange', this._onRzBurst);
     if (window.visualViewport) window.visualViewport.removeEventListener('resize', this._onRzBurst);
@@ -111,6 +112,7 @@ class ErosionGame extends HTMLElement {
       } else {
         this.phT -= dt;
         for (const e of this.enemies.values()) { e.x += (e.tx - e.x) * Math.min(1, dt * 10); e.z += (e.tz - e.z) * Math.min(1, dt * 10); }
+        this._turretSim(dt); // ghost shots — joiners never saw turrets fire (damage stays host-side)
       }
       this._bulletSim(dt); this._reviveSim(dt);
       const p = this.me; if (!p.down) p.hp = Math.min(p.maxhp, p.hp + p.regen * dt);

@@ -1,5 +1,5 @@
 // hud.js — HUD shell: DOM scaffold, banners/overlays, per-frame HUD refresh
-import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._buildDOM = function () {
@@ -16,11 +16,15 @@ export function install(P) {
     const tcRow = H('div', 'display:flex;align-items:baseline;gap:7px', tl);
     this.wvEl = H('div', 'font-size:13px;font-weight:700;letter-spacing:.06em', tcRow);
     this.phEl = H('div', 'font-size:10px;font-weight:700;letter-spacing:.06em;color:' + PAL.dim, tcRow);
-    this._mkDiffTag = (parent) => { // difficulty tag — always visible so you know what you signed up for
+    this._setDiffTag = () => { // difficulty tag — joiners learn the real difficulty from welcome(dk)
       const DN = { easy: ['쉬움', PAL.cyan], normal: ['보통', '#e8eaf0'], hard: ['어려움', PAL.red], nightmare: ['☠ 악몽', '#c96bff'] };
       const [dn, dc] = DN[this.diffKey] || DN.normal;
-      const d = H('div', `font:700 10px ${FONT};letter-spacing:.08em;color:${dc};border:1px solid ${dc}66;padding:6px 9px;background:rgba(12,14,20,.6)`, parent);
-      d.textContent = dn;
+      const d = this._diffTagEl;
+      d.textContent = dn; d.style.color = dc; d.style.borderColor = dc + '66';
+    };
+    this._mkDiffTag = (parent) => {
+      this._diffTagEl = H('div', `font:700 10px ${FONT};letter-spacing:.08em;padding:6px 9px;background:rgba(12,14,20,.6);border:1px solid transparent`, parent);
+      this._setDiffTag();
     };
     const cbRow = H('div', 'display:flex;align-items:center;gap:6px', tl);
     const cb = H('div', 'flex:1;height:5px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', cbRow);
@@ -210,7 +214,7 @@ export function install(P) {
     this.itemBtn.style.cursor = nItems ? 'pointer' : 'default';
     this.itemBtn.disabled = !nItems;
     if (!nItems && this.invEl.style.display === 'flex') this._toggleInv(false); // last item spent → close the sheet
-    if (this.buildMode) { this.wallChip.textContent = `벽 · ${this._cost(1)}`; this.turChip.textContent = `포탑 · ${this._cost(2)}`; }
+    if (this.buildMode) { const ov = this.isHostish() ? 0 : 1; this.wallChip.textContent = `벽 ${this._structCount(ov, 1)}/${CAP_WALL} · ${this._cost(1)}`; this.turChip.textContent = `포탑 ${this._structCount(ov, 2)}/${CAP_TUR} · ${this._cost(2)}`; }
     // minimap
     const ctx = this.mm.getContext('2d'), S = 104 / N;
     ctx.clearRect(0, 0, 104, 104);
@@ -223,6 +227,11 @@ export function install(P) {
       ctx.fillStyle = coreBlink ? PAL.red : o === 1 ? '#cfd6e4' : o === 2 ? PAL.cyan : o === 3 ? PAL.cyan : o === 5 ? '#8a8298' : '#5f2f36';
       ctx.globalAlpha = o === 3 || o === 4 ? .9 : .8;
       ctx.fillRect(x * S, z * S, S, S);
+    }
+    for (const f of this.fitems) { // field items blink amber
+      ctx.fillStyle = PAL.amber; ctx.globalAlpha = .5 + Math.sin(this.tm * 6) * .4;
+      const fx = Math.round((f.x + HALF) / TS), fz = Math.round((f.z + HALF) / TS);
+      ctx.fillRect(fx * S - 1, fz * S - 1, S + 2, S + 2);
     }
     { // active gate(s) blink bright red on the minimap
       ctx.fillStyle = PAL.red; ctx.globalAlpha = .55 + Math.sin(this.tm * 5) * .35;

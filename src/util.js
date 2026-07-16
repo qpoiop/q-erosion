@@ -105,7 +105,7 @@ const SHOP = [
   { id: 'sskl', c: '스킬', n: '충격파 강화', d: '피해·반경 ↑, 쿨다운 ↓', cost: 40, per: true, max: 4, f: p => p.sklLv++ },
   { id: 'sdash', c: '스킬', n: '대시 모듈', d: '대시 쿨다운 −20%', cost: 30, per: true, max: 4, f: p => p.dashCd = Math.max(1.2, p.dashCd - 3.5 * .2) },
   // structure research is PER-PLAYER: it applies to structures the buyer built (st flag → owner-scoped HP rescale)
-  { id: 'gwall', c: '구조물', n: '벽 강화', d: '내가 지은 벽 내구 +40%', cost: 35, per: true, st: true, f: p => { p.wallMul *= 1.4; p.wallLv = (p.wallLv || 0) + 1; } },
+  { id: 'gwall', c: '구조물', n: '벽 강화', d: '내가 지은 벽 내구 +40%', cost: 35, per: true, st: true, max: 6, f: p => { p.wallMul = (p.wallMul || 1) + .4; p.wallLv = (p.wallLv || 0) + 1; } },
   { id: 'gtur', c: '구조물', n: '포탑 화력', d: '내 포탑 공격 +15% · 내구 +15%', cost: 40, per: true, st: true, max: 8, f: p => { p.turMul *= 1.15; p.turHpMul = (p.turHpMul || 1) * 1.15; p.turLv = (p.turLv || 0) + 1; } },
   { id: 'gcost', c: '구조물', n: '건설 자동화', d: '내 건설 비용 −15%', cost: 45, per: true, st: true, max: 3, f: p => p.costMul *= .85 },
   { id: 'crep', c: '구조물', n: '코어 수리', d: '코어 HP +150 즉시 회복', cost: 50, per: true, f: (p, g) => g && g._coreAug(0, 150) },
@@ -148,7 +148,7 @@ const SYN = [
 const ITEMS = { bomb: { n: '융단 폭격', i: '💣', d: '전 구역의 적에게 90 피해' }, turret: { n: '즉석 포탑', i: '🗼', d: '현재 위치에 포탑 즉시 건설' }, kit: { n: '응급 키트', i: '➕', d: '내 체력 완전 회복' }, slow: { n: '지연 필드', i: '⏳', d: '5초간 모든 적 감속' } };
 const ITEM_KEYS = Object.keys(ITEMS);
 const INV_MAX = 5; // item inventory slots
-const PV = 2; // net protocol version — bump on breaking message changes; peers warn on mismatch
+const PV = 3; // net protocol version — bump on breaking message changes; peers warn on mismatch
 const DIFF = { easy: .75, normal: 1, hard: 1.35, nightmare: 1.49 };   // damage: nightmare = hard +10%
 const DIFF_CNT = { easy: .8, normal: 1, hard: 1.25, nightmare: 2.5 }; // wave size: nightmare ≈ 2x hard
 const DIFF_SPT = { easy: 1.15, normal: 1, hard: .88, nightmare: .5 }; // spawn interval (2x mobs need 2x flow)
@@ -174,6 +174,7 @@ const MODELS = {
 const SHIP_MODEL_YAW = (() => { const q = new URLSearchParams(location.search).get('shipyaw'); return q !== null ? +q * Math.PI / 180 : 0; })();
 const XP_NEED = lv => 45 + lv * 30 + Math.max(0, lv - 5) * 12; // Lv1-5: original pace; Lv6+: +12/level extra so late cards space out gently
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
+const CAP_WALL = 30, CAP_TUR = 10; // per-player build caps
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
 
-export { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T };
+export { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T };

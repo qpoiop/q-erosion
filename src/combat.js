@@ -1,5 +1,5 @@
 // combat.js — verbatim methods from game.js (prototype-install)
-import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._spawnBullet = function (x, z, dx, dz, o) {
@@ -22,7 +22,7 @@ export function install(P) {
     const rng = p.range || 9;
     let best = null, bd = rng * rng; // firing range is a real stat now — 조준 광학 research extends it
     for (const e of this.enemies.values()) { const d = dist2(p.x, p.z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
-    if (best) { p.fireT = 1 / p.frate; this._fire(p, best.x, best.z, mine); }
+    if (best) { p.fireT = 1 / Math.min(6.5, p.frate); this._fire(p, best.x, best.z, mine); } // hard fire-rate ceiling
   };
   P._dmgEnemy = function (e, d, src) { // src: killing bullet/context — scrap multiplier belongs to the KILLER
     e.hp -= d; e.flash = .12;
@@ -37,7 +37,7 @@ export function install(P) {
       if (this.mode !== 'solo') this.allyScrap += gAl;
       if (src && (src.ally || src.own === 1)) this.allyStat.k++; else this.stat.k++;
       const dropMul = src && src.ally ? (this.ally.dropMul || 1) : src && src.tur ? 1 : (this.me.dropMul || 1); // killer's loot-detection augment
-      if (Math.random() < .04 * dropMul && this.fitems.length < 3) this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: e.x, z: e.z });
+      if (Math.random() < .04 * dropMul && this.fitems.length < 3) { const k2 = ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)]; this.fitems.push({ id: this.eid++, k: k2, x: e.x, z: e.z }); this._banner(`💠 필드 아이템 드랍 — ${ITEMS[k2].n}`, 2400); }
     }
   };
   P._killFx = function (e) { this._fx(e.x, e.z, !!ETYPES[e.ty]?.boss, PAL.redHex); const m = this.eMeshes.get(e.id); if (m) { if (m.bossBar) this.scene.remove(m.bossBar); this.scene.remove(m); this.eMeshes.delete(e.id); } }
@@ -175,7 +175,7 @@ export function install(P) {
         (this._turFlash = this._turFlash || {})[i] = 1; // muzzle recoil for the render pass
         // spawn at the MUZZLE, not the model's center — tall tier-2 towers were swallowing the beam
         const mx = x + Math.cos(a) * 1.2, mz = z + Math.sin(a) * 1.2, my = 1.15 + band * .45;
-        this._spawnBullet(mx, mz, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * (q.turMul || 1), tur: true, band, life: .5, own: q === this.ally ? 1 : 0, y: my });
+        this._spawnBullet(mx, mz, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * (q.turMul || 1), tur: true, band, life: .5, own: q === this.ally ? 1 : 0, y: my, ghost: !this.isHostish() });
       }
     }
   };
@@ -183,8 +183,8 @@ export function install(P) {
     for (const f of [...this.fitems]) {
       const meN = dist2(f.x, f.z, this.me.x, this.me.z) < 1.7, alN = this.allyOn && dist2(f.x, f.z, this.ally.x, this.ally.z) < 1.7;
       if (meN && !this.me.down && this.me.items.length < INV_MAX) { this.me.items.push(f.k); this.fitems = this.fitems.filter(q => q !== f); this._beep(700, .1); this._banner(`아이템 획득 — ${ITEMS[f.k].n} (${this.me.items.length}/${INV_MAX})`, 2600); if (this.mode !== 'solo') this._send({ t: 'itm', who: 0, id: f.id, k: f.k }); }
-      else if (alN && !this.ally.down && this.mode !== 'solo' && this.ally.items.length < INV_MAX) { this.ally.items.push(f.k); this.fitems = this.fitems.filter(q => q !== f); this._send({ t: 'itm', who: 1, id: f.id, k: f.k }); }
-      else if (alN && this.mode === 'solo' && this.ally.items.length < INV_MAX) { this.ally.items.push(f.k); this.fitems = this.fitems.filter(q => q !== f); }
+      else if (alN && !this.ally.down && this.mode !== 'solo' && this.ally.items.length < INV_MAX) { this.ally.items.push(f.k); this.fitems = this.fitems.filter(q => q !== f); this._banner(`동료가 ${ITEMS[f.k].n} 획득`, 2200); this._send({ t: 'itm', who: 1, id: f.id, k: f.k }); }
+      else if (alN && this.mode === 'solo' && this.ally.items.length < INV_MAX) { this.ally.items.push(f.k); this.fitems = this.fitems.filter(q => q !== f); this._banner(`유닛-B가 ${ITEMS[f.k].n} 획득`, 2200); }
     }
   };
   P._movePlayer = function (dt) {
@@ -216,10 +216,13 @@ export function install(P) {
       b.x += b.dx * dt; b.z += b.dz * dt; b.life -= dt;
       if (Math.abs(b.x) > HALF || Math.abs(b.z) > HALF) { b.life = 0; continue; }
       for (const e of this.enemies.values()) {
+        if (b.hitIds && b.hitIds.has(e.id)) continue; // a piercing bullet hits each enemy ONCE — overlap re-hits were shredding bosses
         if (dist2(b.x, b.z, e.x, e.z) < (ETYPES[e.ty].r + .2) ** 2) {
+          (b.hitIds = b.hitIds || new Set()).add(e.id);
           this._fx(b.x, b.z, false, b.tur ? (b.band === 2 ? 0xd98aff : b.band === 1 ? PAL.amberHex : PAL.cyanHex) : !b.ally ? PAL.cyanHex : PAL.amberHex);
-          if (!b.ghost) { if (host) this._dmgEnemy(e, b.dmg, b); else { e.flash = .12; this._send({ t: 'hit', id: e.id, d: +b.dmg.toFixed(1) }); } }
-          if (b.pierce > 0) b.pierce--; else b.life = 0;
+          const bd2 = ETYPES[e.ty].boss ? b.dmg * .7 : b.dmg; // bosses shrug off 30% of bullet damage
+          if (!b.ghost) { if (host) this._dmgEnemy(e, bd2, b); else { e.flash = .12; (this._hitQ = this._hitQ || []).push([e.id, +bd2.toFixed(1)]); } }
+          if (b.pierce > 0) { b.pierce--; b.dmg *= .7; } else b.life = 0; // pierce decays 30% per hop — no more free lawnmower lanes
           break;
         }
       }

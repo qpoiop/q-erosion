@@ -1,5 +1,5 @@
 // waves.js — verbatim methods from game.js (prototype-install)
-import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._startBuild = function () {
@@ -10,7 +10,7 @@ export function install(P) {
     const dirs = this.activeGates.map(i => GATE_DIR[i]).join('·');
     if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus} · 다음 균열: ${dirs}쪽`, 3600); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
     else this._banner(`준비 단계 — ${dirs}쪽 균열을 막아라 (건설 버튼)`, 4200);
-    if (this.fitems.length < 2 && this.wave > 0) { const g = this.gates[Math.floor(Math.random() * 4)]; this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: rnd(-8, 8), z: rnd(-8, 8) }); }
+    if (this.fitems.length < 2 && this.wave > 0) { const k2 = ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)]; this.fitems.push({ id: this.eid++, k: k2, x: rnd(-8, 8), z: rnd(-8, 8) }); this._banner(`💠 필드 아이템 출현 — ${ITEMS[k2].n} (미니맵 확인)`, 3000); }
   };
   P._startAssault = function () {
     this.wave++; this.phase = 'assault';
@@ -41,7 +41,8 @@ export function install(P) {
   P._spawnOne = function () {
     const ty = this.spawnQ.shift();
     const id = this.eid++;
-    const hpMul = (1 + (Math.min(this.wave, this.maxWave) - 1) * .18) * this._dMul();
+    const w2 = Math.min(this.wave, this.maxWave);
+    const hpMul = (1 + (w2 - 1) * .18 + Math.max(0, w2 - 8) ** 2 * .02) * this._dMul(); // quadratic late term: w15 ≈ 4.5x base (was 3.5x)
     if (this.inf) { // infiltration: enemies pour in from the TOP of the corridor
       const e = { id, ty, x: g2w(11 + Math.floor(Math.random() * 10)), z: g2w(1) + rnd(-1, 1), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), wsp: 2 };
       if (ETYPES[ty].boss) {
@@ -108,7 +109,7 @@ export function install(P) {
         else if (d < 4.5) { e.x -= (np.x - e.x) / d * sp * dt; e.z -= (np.z - e.z) / d * sp * dt; }
         e.shootT -= dt;
         if (e.shootT <= 0) { e.shootT = 2.8; const a = Math.atan2(np.z - e.z, np.x - e.x); const dx = Math.cos(a) * 8.5, dz = Math.sin(a) * 8.5;
-          this.ebullets.push({ x: e.x, z: e.z, dx, dz, life: 3 }); if (this.mode !== 'solo') this._send({ t: 'eb', x: +e.x.toFixed(1), z: +e.z.toFixed(1), dx: +dx.toFixed(1), dz: +dz.toFixed(1) }); }
+          this.ebullets.push({ x: e.x, z: e.z, dx, dz, life: 3 }); if (this.mode !== 'solo') (this._ebQ = this._ebQ || []).push([+e.x.toFixed(1), +e.z.toFixed(1), +dx.toFixed(1), +dz.toFixed(1)]); }
         continue;
       }
       // melee player if adjacent
@@ -132,7 +133,7 @@ export function install(P) {
         for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
           const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
           const j = ti(X, Z), o2 = this.occ[j];
-          if ((smasher ? (o2 === 1 || o2 === 2) : o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < rr2) { hit = j; break; }
+          if ((smasher || o2 === 2 || ((e.id & 3) !== 0 && Math.random() < .35)) && (o2 === 1 || o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < rr2) { hit = j; break; } // everyone gnaws blockades — walls can't cheese a whole horde
         }
         if (hit >= 0) { this._atkStruct(e, et, hit); continue; }
       }
@@ -386,7 +387,7 @@ export function install(P) {
         <div style="text-align:center">
           <div style="font:700 11px ${FONT};letter-spacing:.16em;color:${PAL.text};margin-bottom:6px">전투 기록 — ${DN[this.diffKey] || '보통'} · ${mm}:${ss}</div>
           <table style="margin:0 auto;font:700 12px ${FONT};border-collapse:collapse">
-            <tr><td></td><td style="padding:3px 10px;color:${PAL.cyan}">나</td><td style="padding:3px 10px;color:${PAL.amber}">${this.mode === 'solo' ? '유닛-B (봇)' : '동료'}</td></tr>
+            <tr><td></td><td style="padding:3px 10px;color:${PAL.cyan}">나 · ${this.isHostish() ? '유닛-A' : '유닛-B'}</td><td style="padding:3px 10px;color:${PAL.amber}">${this.mode === 'solo' ? '유닛-B (봇)' : '동료 · ' + (this.isHostish() ? '유닛-B' : '유닛-A')}</td></tr>
             ${rows}
           </table>
         </div>

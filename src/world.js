@@ -1,5 +1,5 @@
 // world.js — verbatim methods from game.js (prototype-install)
-import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._reset = function () {
@@ -29,13 +29,14 @@ export function install(P) {
     this._hudReset();
   };
   P._nmRamp = function () { // nightmare eases in: waves 1-3 play like hard, full brutality from wave 6
-    return this.diffKey === 'nightmare' ? clamp(((this.wave || 0) - 3) / 3, 0, 1) : 0;
+    return this.diffKey === 'nightmare' ? clamp(((this.wave || 0) - 3) / 7, 0, 1) : 0; // full brutality lands at wave 10, not 6
   };
   P._dMul = function () { // effective difficulty multiplier (nightmare ramps 1.35 → 1.49)
     return this.diffKey === 'nightmare' ? 1.35 + .14 * this._nmRamp() : this.diffMul;
   };
-  P._pickGates = function () { // nightmare opens 2 gates per player (solo 2, multi all 4) from wave 4; other modes 1
-    const want = this.diffKey === 'nightmare' && (this.wave || 0) >= 3 ? (this.mode === 'solo' ? 2 : 4) : 1;
+  P._pickGates = function () { // nightmare rifts stage in: w5+ solo 2 / multi 3, w9+ multi 4; other modes 1
+    const w3 = this.wave || 0;
+    const want = this.diffKey !== 'nightmare' || w3 < 4 ? 1 : this.mode === 'solo' ? 2 : (w3 >= 8 ? 4 : 3);
     const idx = [0, 1, 2, 3];
     for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
     this.activeGates = idx.slice(0, want).sort();
@@ -82,8 +83,11 @@ export function install(P) {
     if (dist2(this.me.x, this.me.z, x, z) < .9 || (this.allyOn && dist2(this.ally.x, this.ally.z, x, z) < .9)) return false;
     return true;
   };
+  P._structCount = function (ownVal, k) { let n = 0; for (let i = 0; i < N * N; i++) if (this.occ[i] === k && this.own[i] === ownVal) n++; return n; }
   P._tryBuild = function (i, k) { // local action (me)
     if (!this._canPlace(i)) return;
+    const cap = k === 1 ? CAP_WALL : CAP_TUR;
+    if (this._structCount(this.isHostish() ? 0 : 1, k) >= cap) { this._banner(`${k === 1 ? '벽' : '포탑'} 최대 ${cap}개 — 판매 후 재배치`); return; }
     const c = this._cost(k); if (this.scrap < c) { this._banner('자원 부족'); return; }
     if (this.isHostish()) { this.scrap -= c; this.stat.b++; this._place(i, k); if (this.mode !== 'solo') this._send({ t: 'blt', i, k, sc: this.scrap }); }
     else this._send({ t: 'bld', i, k });

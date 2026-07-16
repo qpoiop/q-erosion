@@ -1,5 +1,5 @@
 // models.js — verbatim methods from game.js (prototype-install)
-import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._mergeStatic = function (root) { // bake world-transformed geometry into one mesh per material
@@ -64,6 +64,11 @@ export function install(P) {
       m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); o.material.emissive = new T.Color(tint); if ('metalness' in o.material) { o.material.metalness = .5; o.material.roughness = .55; } } });
       g.shipParts.forEach(pp => pp.visible = false);
       g.add(m); g.model = m;
+      { // x-ray silhouette: drawn only where the model is OCCLUDED (behind towers/walls)
+        const xr = m.clone(true);
+        xr.traverse(o => { if (o.isMesh) { o.castShadow = false; o.material = new T.MeshBasicMaterial({ color: idx === 0 ? 0x35e0ff : 0xffb020, transparent: true, opacity: .22, depthTest: true, depthFunc: T.GreaterDepth, depthWrite: false }); o.renderOrder = 990; } });
+        g.add(xr);
+      }
     });
   };
 }
