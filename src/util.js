@@ -116,25 +116,25 @@ const SYN = [
   /* Synergy GRADE = min(the two lines' tiers) + 1, capped at 레전드:
      기본+기본 → 레어, 레어+레어 → 에픽, 에픽+에픽(이상) → 레전드.
      grade(p, g, gr) is called once per grade LEVEL reached (2=레어, 3=에픽, 4=레전드) — effects stack as it evolves. */
-  { id: 'storm', need: ['frate', 'shots'], n: '폭풍 사격', d: '연사 +10% / +12% / +15% (등급 누적)',
+  { id: 'storm', gd: ['연사 +10%', '연사 +12%', '연사 +15%'], need: ['frate', 'shots'], n: '폭풍 사격', d: '연사 +10% / +12% / +15% (등급 누적)',
     grade: (p, g, gr) => p.frate *= gr === 4 ? 1.15 : gr === 3 ? 1.12 : 1.10 },
-  { id: 'ap', need: ['dmg', 'pierce'], n: '철갑 관통', d: '각성 시 관통 +1 · 피해 +8%/+10%/+12%, 레전드 관통 +1', first: p => p.pierce++,
+  { id: 'ap', gd: ['관통 +1 · 피해 +8%', '피해 +10%', '피해 +12% · 관통 +1'], need: ['dmg', 'pierce'], n: '철갑 관통', d: '각성 시 관통 +1 · 피해 +8%/+10%/+12%, 레전드 관통 +1', first: p => p.pierce++,
     grade: (p, g, gr) => { p.dmg *= gr === 4 ? 1.12 : gr === 3 ? 1.10 : 1.08; if (gr === 4) p.pierce++; } },
-  { id: 'rush', need: ['speed', 'regen'], n: '전투 기동', d: '대시 쿨다운 −8%/−10%/−12%',
+  { id: 'rush', gd: ['대시 쿨 −8%', '대시 쿨 −10%', '대시 쿨 −12%'], need: ['speed', 'regen'], n: '전투 기동', d: '대시 쿨다운 −8%/−10%/−12%',
     grade: (p, g, gr) => p.dashCd *= gr === 4 ? .88 : gr === 3 ? .90 : .92 },
-  { id: 'fort', need: ['maxhp', 'regen'], n: '재생 장갑', d: '초당 수복 +1/+1.5/+2.5',
+  { id: 'fort', gd: ['수복 +1/s', '수복 +1.5/s', '수복 +2.5/s'], need: ['maxhp', 'regen'], n: '재생 장갑', d: '초당 수복 +1/+1.5/+2.5',
     grade: (p, g, gr) => p.regen += gr === 4 ? 2.5 : gr === 3 ? 1.5 : 1 },
-  { id: 'greed', need: ['scrap', 'dmg'], n: '약탈 프로토콜', d: '처치 자원 +10%/+12%/+15%',
+  { id: 'greed', gd: ['자원 +10%', '자원 +12%', '자원 +15%'], need: ['scrap', 'dmg'], n: '약탈 프로토콜', d: '처치 자원 +10%/+12%/+15%',
     grade: (p, g, gr) => p.scrapMul = (p.scrapMul || 1) * (gr === 4 ? 1.15 : gr === 3 ? 1.12 : 1.10) },
-  { id: 'bulwark', need: ['armor', 'maxhp'], n: '불괴 장갑', d: '받는 피해 −5%/−6%/−8%',
+  { id: 'bulwark', gd: ['받는 피해 −5%', '받는 피해 −6%', '받는 피해 −8%'], need: ['armor', 'maxhp'], n: '불괴 장갑', d: '받는 피해 −5%/−6%/−8%',
     grade: (p, g, gr) => p.armor = (p.armor || 1) * (gr === 4 ? .92 : gr === 3 ? .94 : .95) },
-  { id: 'sanctum', need: ['core', 'regen'], n: '성역 프로토콜', d: '코어 최대 +60/+90/+150 · 즉시 회복',
+  { id: 'sanctum', gd: ['코어 +60', '코어 +90', '코어 +150 · 완전 회복'], need: ['core', 'regen'], n: '성역 프로토콜', d: '코어 최대 +60/+90/+150 · 즉시 회복',
     grade: (p, g, gr) => g && g._coreAug(gr === 4 ? 150 : gr === 3 ? 90 : 60, gr === 4 ? 1e9 : gr === 3 ? 90 : 60) },
-  { id: 'hunter', need: ['drop', 'scrap'], n: '전리품 사냥꾼', d: '드랍 +15%/+20%/+30% · 자원 +5%씩',
+  { id: 'hunter', gd: ['드랍 +15% · 자원 +5%', '드랍 +20% · 자원 +5%', '드랍 +30% · 자원 +5%'], need: ['drop', 'scrap'], n: '전리품 사냥꾼', d: '드랍 +15%/+20%/+30% · 자원 +5%씩',
     grade: (p, g, gr) => { p.dropMul = (p.dropMul || 1) * (gr === 4 ? 1.3 : gr === 3 ? 1.2 : 1.15); p.scrapMul = (p.scrapMul || 1) * 1.05; } },
-  { id: 'aegis', need: ['armor', 'core'], n: '수호자 서약', d: '받는 피해 −3%/−4%/−5% · 코어 +25/+35/+50',
+  { id: 'aegis', gd: ['받는 피해 −3% · 코어 +25', '받는 피해 −4% · 코어 +35', '받는 피해 −5% · 코어 +50'], need: ['armor', 'core'], n: '수호자 서약', d: '받는 피해 −3%/−4%/−5% · 코어 +25/+35/+50',
     grade: (p, g, gr) => { p.armor = (p.armor || 1) * (gr === 4 ? .95 : gr === 3 ? .96 : .97); if (g) g._coreAug(gr === 4 ? 50 : gr === 3 ? 35 : 25, 25); } },
-  { id: 'reson', need: ['skl', 'dmg'], n: '공명 폭발', d: '충격파 피해 +8%씩 · 레어 둔화 30% → 에픽 40%+마비 20% → 레전드 50%+마비 35%',
+  { id: 'reson', gd: ['충격파 +8% · 둔화 30%', '충격파 +8% · 둔화 40%+마비 20%', '충격파 +8% · 둔화 50%+마비 35%'], need: ['skl', 'dmg'], n: '공명 폭발', d: '충격파 피해 +8%씩 · 레어 둔화 30% → 에픽 40%+마비 20% → 레전드 50%+마비 35%',
     grade: (p, g, gr) => {
       p.sklDmgMul = (p.sklDmgMul || 1) * 1.08;
       p.swSlowF = gr >= 4 ? .5 : gr >= 3 ? .6 : .7;
@@ -142,7 +142,7 @@ const SYN = [
       p.swStunC = gr >= 4 ? .35 : gr >= 3 ? .2 : 0;
       p.swStunT = gr >= 4 ? 1.2 : 1;
     } },
-  { id: 'surge', need: ['skl', 'speed'], n: '연쇄 기동', d: '충격파 쿨 −6%/−8%/−10% · 범위 +6%씩',
+  { id: 'surge', gd: ['충격파 쿨 −6% · 범위 +6%', '쿨 −8% · 범위 +6%', '쿨 −10% · 범위 +8%'], need: ['skl', 'speed'], n: '연쇄 기동', d: '충격파 쿨 −6%/−8%/−10% · 범위 +6%씩',
     grade: (p, g, gr) => { p.sklCdMul = (p.sklCdMul || 1) * (gr === 4 ? .90 : gr === 3 ? .92 : .94); p.sklRMul = (p.sklRMul || 1) * 1.06; } },
 ];
 const ITEMS = { bomb: { n: '융단 폭격', i: '💣', d: '전 구역의 적에게 90 피해' }, turret: { n: '즉석 포탑', i: '🗼', d: '현재 위치에 포탑 즉시 건설' }, kit: { n: '응급 키트', i: '➕', d: '내 체력 완전 회복' }, slow: { n: '지연 필드', i: '⏳', d: '5초간 모든 적 감속' } };
@@ -174,7 +174,7 @@ const MODELS = {
 const SHIP_MODEL_YAW = (() => { const q = new URLSearchParams(location.search).get('shipyaw'); return q !== null ? +q * Math.PI / 180 : 0; })();
 const XP_NEED = lv => 45 + lv * 30 + Math.max(0, lv - 5) * 12; // Lv1-5: original pace; Lv6+: +12/level extra so late cards space out gently
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
-const CAP_WALL = 30, CAP_TUR = 10; // per-player build caps
+const CAP_WALL = 30, CAP_TUR = 20; // per-player build caps
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
 
 export { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T };
