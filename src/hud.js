@@ -61,8 +61,9 @@ export function install(P) {
     this.hintEl = H('div', 'position:absolute;bottom:88px;left:50%;transform:translateX(-50%);font:400 11px ' + FONT + ';color:' + PAL.dim + ';letter-spacing:.05em;display:none;text-align:center;background:rgba(12,14,20,.45);padding:4px 12px;border:1px solid rgba(58,64,82,.4)', hud);
     this.hintEl.textContent = ('ontouchstart' in window) ? '드래그 이동 · 대시(무적 돌진)/아이템 버튼 · 건설/연구는 좌하단' : '이동 WASD · 대시 Space(무적 돌진) · 아이템 E · 건설/연구는 좌하단';
     // owned card lines (tier-colored) + awakened synergy badges
-    this.ownedEl = H('div', 'position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-width:64vw', hud);
-    this.synEl = H('div', 'position:absolute;bottom:64px;left:50%;transform:translateX(-50%);display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:60vw', hud);
+    // capped height + inner scroll so a stacked build can't overflow into the HUD above
+    this.ownedEl = H('div', 'position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-width:min(72vw,640px);max-height:42px;overflow-y:auto;scrollbar-width:none;pointer-events:auto', hud);
+    this.synEl = H('div', 'position:absolute;bottom:86px;left:50%;transform:translateX(-50%);display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:min(66vw,560px);max-height:26px;overflow-y:auto;scrollbar-width:none;pointer-events:auto', hud);
     // square action buttons — uniform centered label layout
     const sqBtn = (parent, label, accent) => {
       const b = H('button', pe + 'width:68px;height:68px;border:1px solid ' + (accent || PAL.line) + ';background:' + PAL.panel + ';color:' + (accent || PAL.text) + ';font:700 12px ' + FONT + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;gap:2px;text-align:center;backdrop-filter:blur(6px);line-height:1.3', parent);
@@ -199,7 +200,7 @@ export function install(P) {
     if (this.isHostish()) {
       this.scrap -= cost;
       this.me.buys[u.id] = this._buyCount(u.id) + 1;
-      if (u.per) u.f(this.me); else { u.f(this.g); this._structUpgFx(u.id); if (this.mode !== 'solo') this._send({ t: 'gup', id: u.id, sc: Math.round(this.allyScrap) }); }
+      if (u.per) u.f(this.me); else { this._applyStructUpg(u); this._structUpgFx(u.id); if (this.mode !== 'solo') this._send({ t: 'gup', id: u.id, sc: Math.round(this.allyScrap) }); }
       if (this.mode === 'solo' && u.per && Math.random() < .8) { const b = SHOP.find(s => s.id === u.id); this.ally.buys[u.id] = (this.ally.buys[u.id] || 0); } // bot upgrades via wave bonus below
       this._beep(760, .1, 'square', .05); this._renderShop(); this._refreshShp();
     } else { this._send({ t: 'buy', id: u.id }); this._beep(500, .06, 'square', .04); }
@@ -285,7 +286,7 @@ export function install(P) {
       c.innerHTML = `<span style="font:700 10px ${FONT};letter-spacing:.14em;color:${r.c}">${r.n} · ${u.k.toUpperCase()}</span><span style="font:700 18px ${FONT}">${u.n} ${ROMAN[tier]}</span><span style="font:400 12.5px ${FONT};line-height:1.5;color:${PAL.dim}">${tt.d}</span>`;
       const hint = SYN.find(s => !(p.syn || {})[s.id] && s.need.includes(u.k) && !p.taken[u.k] && s.need.every(k => k === u.k || p.taken[k]));
       if (hint) c.innerHTML += `<span style="font:700 11px ${FONT};color:${PAL.amber};margin-top:auto">✦ 시너지 각성: ${hint.n}</span>`;
-      c.onclick = () => { tt.f(p); p.taken[u.k] = tier + 1; this._checkSyn(p, true); this.pendUp--; this.upEl.style.display = 'none'; this._upDeadline = 0; this._beep(750, .08); if (this.pendUp > 0) this._showUpgrades(); };
+      c.onclick = () => { tt.f(p, this); p.taken[u.k] = tier + 1; this._checkSyn(p, true); this.pendUp--; this.upEl.style.display = 'none'; this._upDeadline = 0; this._beep(750, .08); if (this.pendUp > 0) this._showUpgrades(); };
       this.upRow.appendChild(c);
     });
     this.upEl.style.display = 'flex';

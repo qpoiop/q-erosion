@@ -208,8 +208,17 @@ export function install(P) {
   P._sMesh = function (k, i) { // structure mesh
     const T = THREE, g = new T.Group();
     if (k === 1) {
-      const b = new T.Mesh(new T.BoxGeometry(TS * .92, 1.5, TS * .92), this.mWallS); b.position.y = .75; b.castShadow = b.receiveShadow = true; g.add(b);
-      const trim = new T.Mesh(new T.BoxGeometry(TS * .96, .1, TS * .96), this.mGlowCyan); trim.position.y = 1.53; g.add(trim); g.trim = trim;
+      const wband = (this.g.wallLv || 0) >= 4 ? 1 : 0;
+      const wtpl = this.mdl && this.mdl['wall' + wband];
+      if (wtpl) {
+        const m = wtpl.clone(true); m.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+        g.add(m); g.wband = wband; g.grounded = true; // model origin is at the ground — HP squash keeps the base
+        const bh = new T.Box3().setFromObject(m).max.y;
+        const trim = new T.Mesh(new T.BoxGeometry(TS * .96, .1, TS * .96), this.mGlowCyan); trim.position.y = g.trimH = bh + .05; g.add(trim); g.trim = trim;
+      } else {
+        const b = new T.Mesh(new T.BoxGeometry(TS * .92, 1.5, TS * .92), this.mWallS); b.position.y = .75; b.castShadow = b.receiveShadow = true; g.add(b);
+        const trim = new T.Mesh(new T.BoxGeometry(TS * .96, .1, TS * .96), this.mGlowCyan); trim.position.y = g.trimH = 1.53; g.add(trim); g.trim = trim;
+      }
     } else if (k === 5) { // erosion rock — per-round terrain obstacle
       const h = 1.1 + (i % 7) * .14;
       const b1 = new T.Mesh(new T.BoxGeometry(TS * .8, h, TS * .8), this.mObs); b1.position.y = h / 2; b1.rotation.y = (i % 9) * .12; b1.castShadow = b1.receiveShadow = true; g.add(b1);
@@ -311,7 +320,9 @@ export function install(P) {
         const k = this.occ[i], has = this.sMeshes.has(i);
         if ((k === 1 || k === 2 || k === 5)) {
           let g = this.sMeshes.get(i);
-          const bandStale = k === 2 && g && g.band !== undefined && g.band !== this._turBand();
+          const wband = (this.g.wallLv || 0) >= 4 ? 1 : 0;
+          const bandStale = (k === 2 && g && ((g.band !== undefined && g.band !== this._turBand()) || (g.band === undefined && this.mdl && this.mdl.tower0)))
+            || (k === 1 && g && ((g.wband !== undefined && g.wband !== wband) || (g.wband === undefined && this.mdl && this.mdl.wall0)));
           if (!g || g.kind !== k || bandStale) { if (g) { if (g.bar) this.scene.remove(g.bar); this.scene.remove(g); } g = this._sMesh(k, i); g.kind = k; this.sMeshes.set(i, g); g.position.set(g2w(i % N), 0, g2w((i / N) | 0)); }
         } else if (has) { const old = this.sMeshes.get(i); if (old.bar) this.scene.remove(old.bar); this.scene.remove(old); this.sMeshes.delete(i); }
       }
@@ -337,7 +348,7 @@ export function install(P) {
           if (g.kind === 1 && g.trim) g.trim.scale.y = 1 + (this.g.wallLv || 0) * .8;
         }
       }
-      if (g.kind === 1) { const hpP = this.shp[i] / (WALL_HP * this.g.wallMul); g.trim.material = hpP < .35 ? this.mGlowRed : this.mGlowCyan; g.children[0].scale.y = .55 + .45 * clamp(hpP, 0, 1); g.children[0].position.y = .75 * g.children[0].scale.y; g.trim.position.y = 1.53 * g.children[0].scale.y; }
+      if (g.kind === 1) { const hpP = this.shp[i] / (WALL_HP * this.g.wallMul); g.trim.material = hpP < .35 ? this.mGlowRed : this.mGlowCyan; const sy = .55 + .45 * clamp(hpP, 0, 1); g.children[0].scale.y = sy; g.children[0].position.y = g.grounded ? 0 : .75 * sy; g.trim.position.y = (g.trimH || 1.53) * sy; }
       else if (g.gun && ((i + (this._fno | 0)) & 1) === 0) { // aim at nearest enemy — staggered: half the turrets per frame (O(T×E) scan)
         let best = null, bd = 90; const x = g.position.x, z = g.position.z;
         for (const e of this.enemies.values()) { const d = dist2(x, z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
@@ -348,8 +359,15 @@ export function install(P) {
     const c = this.coreMesh;
     c.cry.rotation.y += dt * .8; c.ring.rotation.z += dt * 1.2;
     const chp = clamp(this.coreHp / this.coreMax, 0, 1);
-    c.cry.material = (this._coreBanT && this.tm - this._coreBanT < .5) ? this.mFlash : this.mGlowCyan;
-    c.cry.scale.set(.7 + .3 * chp, 1.9 * (.7 + .3 * chp), .7 + .3 * chp);
+    const coreFlash = !!(this._coreBanT && this.tm - this._coreBanT < .5);
+    if (c.model) { // GLB core: hp shrinks it slightly, hits flash all its materials
+      c.model.rotation.y += dt * .5;
+      const cs = (c.s0 || 1) * (.8 + .25 * chp); c.model.scale.setScalar(cs);
+      if (coreFlash !== c._fl) { c._fl = coreFlash; for (const [o, m0] of c.mats) o.material = coreFlash ? this.mFlash : m0; }
+    } else {
+      c.cry.material = coreFlash ? this.mFlash : this.mGlowCyan;
+      c.cry.scale.set(.7 + .3 * chp, 1.9 * (.7 + .3 * chp), .7 + .3 * chp);
+    }
     c.lamp.intensity = 1.2 + Math.sin(now * 2.5) * .4;
     if (!this.coreBar) { this.coreBar = this._mkBar(c.position.x, c.position.z, 4.2); this.coreBar.position.y = 5.6; }
     this.coreBar.visible = true; // always visible — the core is the win/lose condition

@@ -32,7 +32,8 @@ export function install(P) {
       else if (src && src.tur) { this.scrap += base / 2; this.allyScrap += base / 2; } // turret kills split
       else if (src && src.ally) this.allyScrap += base * (this.ally.scrapMul || 1);
       else this.scrap += base * (this.me.scrapMul || 1);
-      if (Math.random() < .04 && this.fitems.length < 2) this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: e.x, z: e.z });
+      const dropMul = src && src.ally ? (this.ally.dropMul || 1) : src && src.tur ? 1 : (this.me.dropMul || 1); // killer's loot-detection augment
+      if (Math.random() < .04 * dropMul && this.fitems.length < 3) this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: e.x, z: e.z });
     }
   };
   P._killFx = function (e) { this._fx(e.x, e.z, !!ETYPES[e.ty]?.boss, PAL.redHex); const m = this.eMeshes.get(e.id); if (m) { if (m.bossBar) this.scene.remove(m.bossBar); this.scene.remove(m); this.eMeshes.delete(e.id); } }
@@ -69,18 +70,22 @@ export function install(P) {
     // build phase opens immediately, assault holds as a chip (see _hudTick).
     if (this.pendUp > 0 && this.upEl.style.display === 'none' && !this.over && (this.mode === 'solo' || this.phase !== 'assault')) this._showUpgrades();
   };
+  P._coreAug = function (add, heal) { // core augment — host-authoritative; joiners forward the request
+    if (this.isHostish()) { this.coreMax += add; this.coreHp = Math.min(this.coreMax, this.coreHp + heal); this._coreBanT = this.tm; }
+    else this._send({ t: 'caug', a: add, h: heal });
+  };
   P._botUpgrade = function () {
     const p = this.ally;
     const pool = UPG.filter(u => (p.taken[u.k] || 0) < u.t.length);
     if (!pool.length) return;
     const u = pool[Math.floor(Math.random() * pool.length)], tier = p.taken[u.k] || 0;
-    u.t[tier].f(p); p.taken[u.k] = tier + 1; this._checkSyn(p, false);
+    u.t[tier].f(p, this); p.taken[u.k] = tier + 1; this._checkSyn(p, false);
   };
   P._checkSyn = function (p, mine) { // combo of taken card lines → one-time evolution bonus
     p.syn = p.syn || {};
     for (const s of SYN) {
       if (p.syn[s.id] || !s.need.every(k => p.taken[k])) continue;
-      p.syn[s.id] = 1; s.f(p);
+      p.syn[s.id] = 1; s.f(p, this);
       if (mine) { this._banner(`✦ 시너지 각성 — ${s.n}! ${s.d}`, 3800); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
     }
   };
@@ -127,7 +132,7 @@ export function install(P) {
   };
   P._hurt = function (p, v) {
     if (p.down || p.dashing > 0 || this.over) return;
-    p.hp -= v; this._beep(140, .08, 'sawtooth', .05);
+    p.hp -= v * (p.armor || 1); this._beep(140, .08, 'sawtooth', .05);
     if (p === this.me) { this.dmgFlash = 1; this.shake = Math.max(this.shake || 0, .35); }
     if (p.hp <= 0) { p.hp = 0; p.down = true; p.downT = 40; p.revP = 0; if (p === this.me) this._banner('쓰러짐 — 동료의 구조 대기'); }
   };

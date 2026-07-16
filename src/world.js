@@ -53,7 +53,7 @@ export function install(P) {
       }
     }
   };
-  P._structHp = function (k) { return k === 1 ? WALL_HP * this.g.wallMul : TURRET_HP; }
+  P._structHp = function (k) { return k === 1 ? WALL_HP * this.g.wallMul : TURRET_HP * (this.g.turHpMul || 1); }
   P._turBand = function () { const l = this.g.turLv || 0; return l >= 10 ? 2 : l >= 4 ? 1 : 0; }
   P._place = function (i, k, silent) {
     this.occ[i] = k; this.shp[i] = this._structHp(k);
@@ -98,6 +98,15 @@ export function install(P) {
     }
   };
   P._refreshShp = function () { for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 && this.shp[i] > WALL_HP * this.g.wallMul) this.shp[i] = WALL_HP * this.g.wallMul; }
+  P._applyStructUpg = function (u) { // apply a shared structure research, keeping damaged structures' HP RATIO
+    const ow = this._structHp(1), ot = this._structHp(2);
+    u.f(this.g);
+    const rw = this._structHp(1) / ow, rt = this._structHp(2) / ot;
+    if (rw !== 1 || rt !== 1) {
+      for (let i = 0; i < N * N; i++) { if (this.occ[i] === 1) this.shp[i] *= rw; else if (this.occ[i] === 2) this.shp[i] *= rt; }
+      this._syncStruct();
+    }
+  };
   P._unstuck = function (p) { // shove a unit off a tile that just became solid
     if (!this._blockedAt(p.x, p.z)) return;
     const gx = w2g(p.x), gz = w2g(p.z);
@@ -111,12 +120,12 @@ export function install(P) {
     try {
       const st = [];
       for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2) st.push([i, this.occ[i], Math.round(this.shp[i])]);
-      const pick = q => ({ hp: q.hp, maxhp: q.maxhp, speed: q.speed, dmg: q.dmg, frate: q.frate, shots: q.shots, pierce: q.pierce, regen: q.regen, dashCd: q.dashCd, dashDur: q.dashDur, sklLv: q.sklLv, scrapMul: q.scrapMul, taken: q.taken, syn: q.syn || {}, buys: q.buys, items: q.items || [] });
-      localStorage.setItem('eg_save', JSON.stringify({ v: 1, wave: this.wave, core: Math.round(this.coreHp), scrap: Math.round(this.scrap), lv: this.lv, xp: Math.round(this.xp), kills: this.kills, tm: Math.round(this.tm), g: this.g, st, me: pick(this.me), ally: pick(this.ally), diff: this.diffKey, waves: this.maxWave, bt: this.buildTime }));
+      const pick = q => ({ hp: q.hp, maxhp: q.maxhp, speed: q.speed, dmg: q.dmg, frate: q.frate, shots: q.shots, pierce: q.pierce, regen: q.regen, dashCd: q.dashCd, dashDur: q.dashDur, sklLv: q.sklLv, scrapMul: q.scrapMul, armor: q.armor, dropMul: q.dropMul, taken: q.taken, syn: q.syn || {}, buys: q.buys, items: q.items || [] });
+      localStorage.setItem('eg_save', JSON.stringify({ v: 1, wave: this.wave, core: Math.round(this.coreHp), coreMax: Math.round(this.coreMax), scrap: Math.round(this.scrap), lv: this.lv, xp: Math.round(this.xp), kills: this.kills, tm: Math.round(this.tm), g: this.g, st, me: pick(this.me), ally: pick(this.ally), diff: this.diffKey, waves: this.maxWave, bt: this.buildTime }));
     } catch (e) {}
   };
   P._loadRun = function (s) {
-    this.wave = s.wave; this.coreHp = s.core; this.scrap = s.scrap; this.lv = s.lv; this.xp = s.xp; this.kills = s.kills; this.tm = s.tm;
+    this.wave = s.wave; this.coreHp = s.core; if (s.coreMax) this.coreMax = s.coreMax; this.scrap = s.scrap; this.lv = s.lv; this.xp = s.xp; this.kills = s.kills; this.tm = s.tm;
     Object.assign(this.g, s.g);
     for (const [i, k, hp] of s.st) { this.occ[i] = k; this.shp[i] = hp; this.bld[i] = 1; }
     Object.assign(this.me, s.me); Object.assign(this.ally, s.ally);

@@ -1,0 +1,11 @@
+Model Information:
+* title:	Futuristic army robot
+* source:	https://sketchfab.com/3d-models/futuristic-army-robot-38208b7e2ca34d3cb420bed5bbcdb03b
+* author:	iasarmientoj (https://sketchfab.com/iasarmientoj)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Futuristic army robot" (https://sketchfab.com/3d-models/futuristic-army-robot-38208b7e2ca34d3cb420bed5bbcdb03b) by iasarmientoj (https://sketchfab.com/iasarmientoj) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
