@@ -1,11 +1,8 @@
 Model Information:
-* title:	Robot_04
-* source:	https://sketchfab.com/3d-models/robot-04-d8d9528d63da458ab6019161c126c532
-* author:	taktelon (https://sketchfab.com/taktelon)
+* title:	Robot
+* source:	https://sketchfab.com/3d-models/robot-80a736ddac1044299b134cfcca87c7f9
+* author:	l0wpoly (https://sketchfab.com/l0wpoly)
 
 Model License:
-* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
-* requirements:	Author must be credited. Commercial use is allowed.
-
-If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
-This work is based on "Robot_04" (https://sketchfab.com/3d-models/robot-04-d8d9528d63da458ab6019161c126c532) by taktelon (https://sketchfab.com/taktelon) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works
