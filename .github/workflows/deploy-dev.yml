@@ -17,7 +17,7 @@ jobs:
           mkdir -p dist
           cp index.html sw.js manifest.webmanifest dist/
           cp -r src dist/src
-          sed -i "s/__BUILD__/${GITHUB_SHA}/" dist/sw.js
+          sed -i "s/__BUILD__/${GITHUB_SHA}/" dist/sw.js dist/index.html
           cp -r icons dist/icons
           mkdir -p dist/assets
           cp assets/*.glb assets/*.png dist/assets/

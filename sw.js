@@ -3,7 +3,7 @@
    - CDN assets (unpkg three/mqtt, google fonts): cache-first — URLs are version-pinned, safe to keep forever */
 const BUILD = '__BUILD__'; // stamped by CI per deploy so the browser sees a new SW → update toast
 const CACHE = 'erosion-v1';
-const APP_SHELL = ['/', '/index.html', '/src/main.js', '/src/util.js', '/src/scene.js', '/src/models.js', '/src/hud.js', '/src/net.js', '/src/world.js', '/src/combat.js', '/src/waves.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-512-maskable.png'];
+const APP_SHELL = ['/', '/index.html', '/src/main.js', '/src/util.js', '/src/scene.js', '/src/models.js', '/src/hud.js', '/src/sheets.js', '/src/input.js', '/src/net.js', '/src/world.js', '/src/combat.js', '/src/waves.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-512-maskable.png'];
 const CDN = [
   'https://unpkg.com/three@0.147.0/build/three.min.js',
   'https://unpkg.com/three@0.147.0/examples/js/shaders/CopyShader.js',

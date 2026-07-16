@@ -126,7 +126,7 @@
         3D 모델(sketchfab.com): 캐릭터 "Toy Robot" by rkmorello · 근접 "drone robot" by noortjeschuur · 원거리 "Robo_V2" by _SeF_, "Robot_04" by taktelon<br>
         보스 "Robot" by l0wpoly, "Utility Robot" by nickheitzman, "Futuristic army robot" by iasarmientoj · 타워 "Combat Turret" by SnoyCat, "Scy-fi turret" by kudinadarya<br>
         코어 "Crystal" by rudolfs · 벽 "Cube Metalic" by _sqtime_, "Yellow Metal Cube" by JakobHenerey20231 (전부 CC-BY, 캐릭터/l0wpoly 제외 명시)<br>
-        모바일: 화면 드래그 이동(가상 스틱) · 자동 조준 · 대시/아이템 버튼 — <span style="color:#9aa3b5;font-weight:700">가로 모드 플레이 권장</span> &nbsp;|&nbsp; PC: WASD 이동 · Space 대시 · E 아이템
+        모바일: 화면 드래그 이동(가상 스틱) · 자동 조준 · 대시/아이템 버튼 — <span style="color:#9aa3b5;font-weight:700">가로 모드 플레이 권장</span> &nbsp;|&nbsp; PC: WASD 이동 · Space 대시 · E 아이템<br>빌드 <span id="bver">__BUILD__</span>
       </div>
     </div>
   </div>
@@ -263,6 +263,9 @@
           t.querySelector('#sw-x').onclick = () => t.remove();
         };
         if (reg.waiting && navigator.serviceWorker.controller) toast();
+        // long-lived tabs/PWA sessions kept running pre-deploy code for days — force update checks
+        setInterval(() => reg.update().catch(() => {}), 10 * 60 * 1000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
         reg.addEventListener('updatefound', () => {
           const nw = reg.installing;
           if (nw) nw.addEventListener('statechange', () => { if (nw.state === 'installed' && navigator.serviceWorker.controller) toast(); });
@@ -270,6 +273,8 @@
       }).catch(() => {});
     });
   }
+  const bv = document.getElementById('bver');
+  if (bv) bv.textContent = bv.textContent.includes('__') ? 'local' : bv.textContent.slice(0, 7);
 })();
 </script>
 <!-- iOS ignores the manifest "orientation" key (no PWA orientation lock in WebKit),
