@@ -62,7 +62,7 @@ export function install(P) {
   };
   P._ownerOf = function (i) { const mine = this.isHostish() ? 0 : 1; return this.own[i] === mine ? this.me : this.ally; }
   P._structHp = function (k, q) { q = q || this.me; return k === 1 ? WALL_HP * (q.wallMul || 1) : TURRET_HP * (q.turHpMul || 1); }
-  P._turBand = function (q) { const l = (q || this.me).turLv || 0; return l >= 10 ? 2 : l >= 4 ? 1 : 0; }
+  P._turBand = function (q) { const l = (q || this.me).turLv || 0; return l >= 8 ? 2 : l >= 4 ? 1 : 0; }
   P._place = function (i, k, silent, owner) {
     this.occ[i] = k; this.own[i] = owner || 0; this.shp[i] = this._structHp(k, this._ownerOf(i));
     this.bld[i] = 0; this.building.add(i);

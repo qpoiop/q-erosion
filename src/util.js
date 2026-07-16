@@ -85,6 +85,11 @@ const UPG = [
     { d: '아이템 드랍 확률 +50%', f: p => p.dropMul = (p.dropMul || 1) * 1.5 },
     { d: '아이템 드랍 확률 +70%', f: p => p.dropMul = (p.dropMul || 1) * 1.7 },
     { d: '아이템 드랍 확률 2배', f: p => p.dropMul = (p.dropMul || 1) * 2 }] },
+  { k: 'skl', n: '충격파 공명', t: [ // multiplies the shockwave skill (see _useSkill)
+    { d: '충격파 피해 +30%', f: p => p.sklDmgMul = (p.sklDmgMul || 1) * 1.3 },
+    { d: '충격파 범위 +25%', f: p => p.sklRMul = (p.sklRMul || 1) * 1.25 },
+    { d: '충격파 쿨다운 −20%', f: p => p.sklCdMul = (p.sklCdMul || 1) * .8 },
+    { d: '피해 +40% · 범위 +20% · 쿨 −15%', f: p => { p.sklDmgMul = (p.sklDmgMul || 1) * 1.4; p.sklRMul = (p.sklRMul || 1) * 1.2; p.sklCdMul = (p.sklCdMul || 1) * .85; } }] },
   { k: 'core', n: '코어 정비', t: [ // second arg = game element (host-authoritative via _coreAug)
     { d: '코어 최대 HP +80 · 즉시 +80', f: (p, g) => g && g._coreAug(80, 80) },
     { d: '코어 최대 HP +100 · 즉시 +100', f: (p, g) => g && g._coreAug(100, 100) },
@@ -99,20 +104,23 @@ const SHOP = [
   { id: 'sdash', c: '스킬', n: '대시 모듈', d: '대시 쿨다운 −20%', cost: 30, per: true, max: 4, f: p => p.dashCd *= .8 },
   // structure research is PER-PLAYER: it applies to structures the buyer built (st flag → owner-scoped HP rescale)
   { id: 'gwall', c: '구조물', n: '벽 강화', d: '내가 지은 벽 내구 +40%', cost: 35, per: true, st: true, f: p => { p.wallMul *= 1.4; p.wallLv = (p.wallLv || 0) + 1; } },
-  { id: 'gtur', c: '구조물', n: '포탑 화력', d: '내 포탑 공격 +25% · 내구 +15%', cost: 40, per: true, st: true, f: p => { p.turMul *= 1.25; p.turHpMul = (p.turHpMul || 1) * 1.15; p.turLv = (p.turLv || 0) + 1; } },
+  { id: 'gtur', c: '구조물', n: '포탑 화력', d: '내 포탑 공격 +15% · 내구 +15%', cost: 40, per: true, st: true, max: 8, f: p => { p.turMul *= 1.15; p.turHpMul = (p.turHpMul || 1) * 1.15; p.turLv = (p.turLv || 0) + 1; } },
   { id: 'gcost', c: '구조물', n: '건설 자동화', d: '내 건설 비용 −15%', cost: 45, per: true, st: true, max: 3, f: p => p.costMul *= .85 },
 ];
-/* synergies: taking both level-up card lines awakens a one-time evolution bonus */
+/* synergies: awaken when both lines are taken, then DEEPEN — f re-applies for every
+   tier gained across the two lines (see _checkSyn), so leveling either line keeps paying */
 const SYN = [
-  { id: 'storm', need: ['frate', 'shots'], n: '폭풍 사격', d: '연사 +15% 추가', f: p => p.frate *= 1.15 },
-  { id: 'ap', need: ['dmg', 'pierce'], n: '철갑 관통', d: '관통 +1 · 피해 +10%', f: p => { p.pierce++; p.dmg *= 1.1; } },
-  { id: 'rush', need: ['speed', 'regen'], n: '전투 기동', d: '대시 쿨다운 −25%', f: p => p.dashCd *= .75 },
-  { id: 'fort', need: ['maxhp', 'regen'], n: '재생 장갑', d: '자가 수복 ×1.6', f: p => p.regen *= 1.6 },
-  { id: 'greed', need: ['scrap', 'dmg'], n: '약탈 프로토콜', d: '처치 자원 +20% 추가', f: p => p.scrapMul = (p.scrapMul || 1) * 1.2 },
-  { id: 'bulwark', need: ['armor', 'maxhp'], n: '불괴 장갑', d: '받는 피해 −8% 추가', f: p => p.armor = (p.armor || 1) * .92 },
-  { id: 'sanctum', need: ['core', 'regen'], n: '성역 프로토콜', d: '코어 +120 · 완전 수리', f: (p, g) => g && g._coreAug(120, 1e9) },
-  { id: 'hunter', need: ['drop', 'scrap'], n: '전리품 사냥꾼', d: '드랍 +30% · 자원 +15% 추가', f: p => { p.dropMul = (p.dropMul || 1) * 1.3; p.scrapMul = (p.scrapMul || 1) * 1.15; } },
-  { id: 'aegis', need: ['armor', 'core'], n: '수호자 서약', d: '받는 피해 −6% · 코어 +80', f: (p, g) => { p.armor = (p.armor || 1) * .94; if (g) g._coreAug(80, 80); } },
+  { id: 'storm', need: ['frate', 'shots'], n: '폭풍 사격', d: '두 계통 티어당 연사 +4%', f: p => p.frate *= 1.04 },
+  { id: 'ap', need: ['dmg', 'pierce'], n: '철갑 관통', d: '티어당 피해 +3.5% (각성 시 관통 +1)', first: p => p.pierce++, f: p => p.dmg *= 1.035 },
+  { id: 'rush', need: ['speed', 'regen'], n: '전투 기동', d: '티어당 대시 쿨다운 −4%', f: p => p.dashCd *= .96 },
+  { id: 'fort', need: ['maxhp', 'regen'], n: '재생 장갑', d: '티어당 초당 수복 +0.35', f: p => p.regen += .35 },
+  { id: 'greed', need: ['scrap', 'dmg'], n: '약탈 프로토콜', d: '티어당 처치 자원 +4%', f: p => p.scrapMul = (p.scrapMul || 1) * 1.04 },
+  { id: 'bulwark', need: ['armor', 'maxhp'], n: '불괴 장갑', d: '티어당 받는 피해 −2%', f: p => p.armor = (p.armor || 1) * .98 },
+  { id: 'sanctum', need: ['core', 'regen'], n: '성역 프로토콜', d: '티어당 코어 최대 +25 · 즉시 +25', f: (p, g) => g && g._coreAug(25, 25) },
+  { id: 'hunter', need: ['drop', 'scrap'], n: '전리품 사냥꾼', d: '티어당 드랍 +5% · 자원 +2%', f: p => { p.dropMul = (p.dropMul || 1) * 1.05; p.scrapMul = (p.scrapMul || 1) * 1.02; } },
+  { id: 'aegis', need: ['armor', 'core'], n: '수호자 서약', d: '티어당 받는 피해 −1.5% · 코어 +12', f: (p, g) => { p.armor = (p.armor || 1) * .985; if (g) g._coreAug(12, 12); } },
+  { id: 'reson', need: ['skl', 'dmg'], n: '공명 폭발', d: '티어당 충격파 피해 +5%', f: p => p.sklDmgMul = (p.sklDmgMul || 1) * 1.05 },
+  { id: 'surge', need: ['skl', 'speed'], n: '연쇄 기동', d: '티어당 충격파 쿨 −3% · 범위 +2%', f: p => { p.sklCdMul = (p.sklCdMul || 1) * .97; p.sklRMul = (p.sklRMul || 1) * 1.02; } },
 ];
 const ITEMS = { bomb: { n: '융단 폭격', i: '💣', d: '전 구역의 적에게 90 피해' }, turret: { n: '즉석 포탑', i: '🗼', d: '현재 위치에 포탑 즉시 건설' }, kit: { n: '응급 키트', i: '➕', d: '내 체력 완전 회복' }, slow: { n: '지연 필드', i: '⏳', d: '5초간 모든 적 감속' } };
 const ITEM_KEYS = Object.keys(ITEMS);
@@ -130,9 +138,9 @@ const MODELS = {
   melee:  { url: 'assets/enemy_melee.glb',    size: 1.7, yaw: 0, merge: true },
   ranged: { url: 'assets/enemy_ranged_a.glb', size: 1.7, yaw: 0, merge: true },
   ranged2:{ url: 'assets/enemy_ranged_b.glb', size: 1.7, yaw: 0, merge: true },
-  boss1:  { url: 'assets/boss_mid.glb',       size: 4.6, yaw: 0, merge: true },
-  boss2:  { url: 'assets/boss_final.glb',     size: 4.2, yaw: 0, merge: true },
-  boss3:  { url: 'assets/boss_last.glb',      size: 5.8, yaw: 0, merge: true }, // wave-15 final boss
+  boss1:  { url: 'assets/boss_mid.glb',       size: 5.2, yaw: 0, merge: true },
+  boss2:  { url: 'assets/boss_final.glb',     size: 5.0, yaw: 0, merge: true },
+  boss3:  { url: 'assets/boss_last.glb',      size: 6.8, yaw: 0, merge: true }, // wave-15 final boss
   tower0: { url: 'assets/tower_t1.glb',       size: 1.9, yaw: 0, merge: true }, // research band 0-3
   tower1: { url: 'assets/tower_t2.glb',       size: 2.2, yaw: 0, merge: true }, // band 4-9; band 10+ = same model, scaled up
   wall0:  { url: 'assets/wall_t1.glb',        size: 1.84, yaw: 0, merge: true }, // wall research 0-3 (tile is 2 units)

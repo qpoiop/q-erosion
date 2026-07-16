@@ -81,12 +81,19 @@ export function install(P) {
     const u = pool[Math.floor(Math.random() * pool.length)], tier = p.taken[u.k] || 0;
     u.t[tier].f(p, this); p.taken[u.k] = tier + 1; this._checkSyn(p, false);
   };
-  P._checkSyn = function (p, mine) { // combo of taken card lines → one-time evolution bonus
+  P._checkSyn = function (p, mine) { // synergies awaken once, then re-apply per combined tier of their two lines
     p.syn = p.syn || {};
     for (const s of SYN) {
-      if (p.syn[s.id] || !s.need.every(k => p.taken[k])) continue;
-      p.syn[s.id] = 1; s.f(p, this);
-      if (mine) { this._banner(`✦ 시너지 각성 — ${s.n}! ${s.d}`, 3800); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
+      if (!s.need.every(k => p.taken[k])) continue;
+      const target = s.need.reduce((t, k) => t + (p.taken[k] || 0), 0);
+      let applied = p.syn[s.id] || 0;
+      if (applied >= target) continue;
+      const fresh = !applied;
+      if (fresh && s.first) s.first(p, this);
+      while (applied < target) { s.f(p, this); applied++; }
+      p.syn[s.id] = applied;
+      if (mine && fresh) { this._banner(`✦ 시너지 각성 — ${s.n}! ${s.d}`, 3800); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
+      else if (mine) this._beep(880, .08, 'square', .04);
     }
   };
   P._dash = function (p) {
@@ -96,14 +103,14 @@ export function install(P) {
   P._useSkill = function () {
     const p = this.me;
     if (p.down || p.sklT > 0 || (this.phase !== 'assault' && this.phase !== 'build')) return;
-    p.sklT = Math.max(6, 14 - p.sklLv);
-    if (this.isHostish()) this._shockwave(p.x, p.z, p.sklLv, true);
-    else { this._shockFx(p.x, p.z, p.sklLv); this._send({ t: 'skl', x: +p.x.toFixed(1), z: +p.z.toFixed(1), lv: p.sklLv }); }
+    p.sklT = Math.max(4, (14 - p.sklLv) * (p.sklCdMul || 1));
+    const r = (3.5 + p.sklLv * .5) * (p.sklRMul || 1), dmg = (40 + p.sklLv * 20) * (p.sklDmgMul || 1);
+    if (this.isHostish()) this._shockwave(p.x, p.z, r, dmg, true);
+    else { this._shockFx(p.x, p.z); this._send({ t: 'skl', x: +p.x.toFixed(1), z: +p.z.toFixed(1), r: +r.toFixed(1), dmg: Math.round(dmg) }); }
   };
   P._shockFx = function (x, z, lv) { this._fx(x, z, true, PAL.cyanHex); this.shake = Math.max(this.shake || 0, .5); this._beep(220, .25, 'sawtooth', .08); }
-  P._shockwave = function (x, z, lv, fx) {
-    if (fx !== false) this._shockFx(x, z, lv);
-    const r = 3.5 + lv * .5, dmg = 40 + lv * 20;
+  P._shockwave = function (x, z, r, dmg, fx) {
+    if (fx !== false) this._shockFx(x, z);
     for (const e of [...this.enemies.values()]) {
       if (dist2(x, z, e.x, e.z) < r * r) {
         const d = Math.sqrt(dist2(x, z, e.x, e.z)) || 1;

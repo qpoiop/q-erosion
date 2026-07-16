@@ -16,6 +16,12 @@ export function install(P) {
     const tcRow = H('div', 'display:flex;align-items:baseline;gap:7px', tl);
     this.wvEl = H('div', 'font-size:13px;font-weight:700;letter-spacing:.06em', tcRow);
     this.phEl = H('div', 'font-size:10px;font-weight:700;letter-spacing:.06em;color:' + PAL.dim, tcRow);
+    { // difficulty tag — always visible so you know what you signed up for
+      const DN = { easy: ['쉬움', PAL.cyan], normal: ['보통', '#e8eaf0'], hard: ['어려움', PAL.red], nightmare: ['☠ 악몽', '#c96bff'] };
+      const [dn, dc] = DN[this.diffKey] || DN.normal;
+      const d = H('div', `margin-left:auto;font-size:9px;font-weight:700;letter-spacing:.08em;color:${dc};border:1px solid ${dc}55;padding:1px 5px`, tcRow);
+      d.textContent = dn;
+    }
     const cbRow = H('div', 'display:flex;align-items:center;gap:6px', tl);
     const cb = H('div', 'flex:1;height:5px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', cbRow);
     this.coreF = H('div', 'height:100%;width:100%;background:linear-gradient(90deg,' + PAL.cyan + ',#7ee8ff);box-shadow:0 0 10px ' + PAL.cyan, cb);

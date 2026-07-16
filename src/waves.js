@@ -98,7 +98,7 @@ export function install(P) {
         continue;
       }
       // melee player if adjacent
-      if (np && npd < 5) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this._dMul() * (this.dmgWaveMul || 1)); } continue; }
+      if (np && npd < (et.boss ? 11 : 5)) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this._dMul() * (this.dmgWaveMul || 1)); } continue; }
       // melee mobs hunt a nearby player; structures in the way get smashed
       if (!et.rng && !et.boss && np && npd < 49) {
         const dx = np.x - e.x, dz = np.z - e.z, d = Math.hypot(dx, dz) || 1;
@@ -113,7 +113,7 @@ export function install(P) {
       // reach scales with body radius — big bosses used to fail the old fixed 1.9u check and ignored structures
       if (e.cool <= 0) {
         const smasher = e.ty === 1 || et.boss;
-        const rr = 1.5 + (et.r || .55) * (e.final ? 1.6 : 1), rr2 = rr * rr;
+        const rr = 1.5 + (et.r || .55) * (et.boss ? (e.final ? 2.4 : 1.9) : 1), rr2 = rr * rr; // bosses swing wide
         let hit = -1;
         for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
           const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
@@ -122,18 +122,30 @@ export function install(P) {
         }
         if (hit >= 0) { this._atkStruct(e, et, hit); continue; }
       }
-      // flow move
+      // flow move — pick among near-best downhill neighbors (per-enemy stable choice) so columns fan out instead of single-filing
       let bi = -1, bd = this.flowD[here];
-      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
-        const j = ti(X, Z); if (this.flowD[j] < bd) { bd = this.flowD[j]; bi = j; }
+      {
+        const cands = [];
+        let best = 1e9;
+        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
+          const j = ti(X, Z), dj = this.flowD[j];
+          if (dj < bd) { cands.push([j, dj]); if (dj < best) best = dj; }
+        }
+        if (cands.length) {
+          const near = cands.filter(c => c[1] <= best + 2);
+          const pick = near[(e.id + gx * 7 + gz * 13) % near.length];
+          bi = pick[0]; bd = pick[1];
+        }
       }
       if (bi < 0) { // at core
         if (this.occ[here] === 3 || bd <= 1.5) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this._dMul() * (this.dmgWaveMul || 1), e); } }
         continue;
       }
       const o = this.occ[bi];
-      const bx = g2w(bi % N), bz = g2w((bi / N) | 0);
+      // per-enemy lateral bias inside the corridor — breaks the single-file look
+      const lat = ((e.id % 7) - 3) * .3;
+      const bx = g2w(bi % N) + ((bi % N) === gx ? lat : 0), bz = g2w((bi / N) | 0) + ((bi % N) === gx ? 0 : lat);
       if (o === 1 || o === 2) { // blocked: attack structure
         if (e.cool <= 0) this._atkStruct(e, et, bi);
         continue;

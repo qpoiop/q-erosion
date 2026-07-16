@@ -346,7 +346,7 @@ export function install(P) {
           if (g.userData.pop > 0) { g.userData.pop -= dt; sy = 1 + .22 * Math.sin(Math.min(1, 1 - g.userData.pop / .28) * Math.PI); }
           // research tiers change the silhouette: turrets grow (2x2-scale at Lv10+), wall trims thicken
           const oql = (this._ownerOf(i).turLv || 0);
-          const base = g.kind === 2 ? (g.band !== undefined ? (g.band >= 2 ? 1.35 : 1) * (1 + oql * .03) : (oql >= 10 ? 2 : 1 + oql * .07)) : 1;
+          const base = g.kind === 2 ? (g.band !== undefined ? (g.band >= 2 ? 1.35 : 1) * (1 + oql * .03) : (oql >= 8 ? 2 : 1 + oql * .07)) : 1;
           g.scale.set(base, base * sy, base);
           if (g.kind === 1 && g.trim) g.trim.scale.y = 1 + (this._ownerOf(i).wallLv || 0) * .8;
         }
