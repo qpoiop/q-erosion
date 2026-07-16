@@ -158,7 +158,7 @@ const GATE_DIR = ['북', '남', '서', '동']; // matches gates[] order
    that fails to load. size = target footprint (units), yaw = forward correction,
    merge = bake all submeshes into one static mesh per material (draw-call diet). */
 const MODELS = {
-  ship:   { url: 'assets/char.glb',           size: 1.8, yaw: 0, merge: true },
+  ship:   { url: 'assets/char.glb',           size: 2.0, yaw: 0, merge: true },
   melee:  { url: 'assets/enemy_melee.glb',    size: 1.7, yaw: 0, merge: true },
   ranged: { url: 'assets/enemy_ranged_a.glb', size: 1.7, yaw: 0, merge: true },
   ranged2:{ url: 'assets/enemy_ranged_b.glb', size: 1.7, yaw: 0, merge: true },

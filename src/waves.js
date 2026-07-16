@@ -276,6 +276,7 @@ export function install(P) {
   };
   P._buildInfMap = function () { // map 2: vertical corridor, no core, no minimap
     this.inf = true; this.infBossN = 0; this.infFinal = false;
+    this.pendUp = 0; if (this.upEl) this.upEl.style.display = 'none'; // PHASE 2: no new augment cards
     this.enemies.clear(); this.bullets = []; this.ebullets = []; this.fitems = [];
     this.occ = new Uint8Array(N * N); this.shp = new Float32Array(N * N); this.bld = new Float32Array(N * N);
     this.own = new Uint8Array(N * N); this.building = new Set();
@@ -322,7 +323,7 @@ export function install(P) {
   P._spawnSource = function () {
     const hpMul = (1 + (this.maxWave - 1) * .18) * this._dMul();
     const id = this.eid++;
-    const e = { id, ty: 3, x: g2w(15) + 1, z: g2w(4), hp: ETYPES[3].hp * hpMul * 14 * 10, cool: 0, shootT: 1, wsp: 1.6, btier: 3, final: true, smash: 2, giant: true }; // 10x the wave-15 final boss, twice the size
+    const e = { id, ty: 3, x: g2w(15) + 1, z: g2w(4), hp: ETYPES[3].hp * hpMul * 14 * 5, cool: 0, shootT: 1, wsp: 1.6, btier: 3, final: true, smash: 2, giant: true }; // 5x the wave-15 final boss, twice the size
     e.mhp = e.hp; this.enemies.set(id, e);
     this._banner('⚠⚠ 침식의 근원 — 모든 것의 시작이 모습을 드러냈다', 5200);
     this._beep(50, .8, 'sawtooth', .12); this._beep(70, 1, 'sawtooth', .1); this.shake = 1.2;

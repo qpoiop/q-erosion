@@ -447,7 +447,7 @@ export function install(P) {
       if (m.body) { if (e.flash > 0) { e.flash -= dt; m.body.material = this.mFlash; } else m.body.material = this.mEnemy; }
       else if (m.isModel && e.flash > 0) { e.flash -= dt; m.children[0].scale.setScalar(m.children[0].userData.s0 || (m.children[0].userData.s0 = m.children[0].scale.x)); m.children[0].scale.multiplyScalar(1.06); }
     }
-    for (const [id, m] of this.eMeshes) if (!this.enemies.has(id)) { this.scene.remove(m); this.eMeshes.delete(id); }
+    for (const [id, m] of this.eMeshes) if (!this.enemies.has(id)) { if (m.bossBar) this.scene.remove(m.bossBar); this.scene.remove(m); this.eMeshes.delete(id); }
     // bullets
     while (this.bMeshes.length < this.bullets.length + this.ebullets.length) { const m = new T.Mesh(this.bulletG, this.mBeamCyan); this.scene.add(m); this.bMeshes.push(m); }
     let bi = 0;
