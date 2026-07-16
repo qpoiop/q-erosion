@@ -292,8 +292,12 @@ export function install(P) {
     this.me.x = g2w(13); this.me.z = g2w(27);
     this.ally.x = g2w(18); this.ally.z = g2w(27);
     this.ov.style.display = 'none';
-    this.phase = 'inf'; this.wave = this.maxWave;
-    if (this.isHostish()) { // 2x the wave-15 horde + bosses 1 and 2 in order
+    this.phase = 'build'; this.phT = 30; this.wave = this.maxWave; // PHASE 2 prep — dig in before the horde
+    this._banner('침투 준비 — 30초 안에 방어선을 구축하라 (습격 즉시 개시 가능)', 4600);
+  };
+  P._startInfWave = function () { // the map-2 horde
+    this.phase = 'inf';
+    if (this.isHostish()) {
       let cntMul = DIFF_CNT[this.diffKey] || 1;
       if (this.diffKey === 'nightmare') cntMul = 2.5;
       this._cntMulNow = cntMul * 4; // map-2 gold pays per-wave-total, not per-mob
