@@ -161,8 +161,12 @@ export function install(P) {
       else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); }
     } this.phT = m.pt; }
     const seen = new Set();
-    (m.en || []).forEach(a => { const [id, ty, x, z, hp] = a; seen.add(id); let e = this.enemies.get(id);
-      if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss) { if (this.inf) { e.btier = this.infFinal ? 3 : ((this._infGhostB = (this._infGhostB || 0) + 1) > 5 ? 2 : 1); if (this.infFinal) { e.final = true; e.giant = true; } } else { e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1; if (e.btier === 3) e.final = true; } } this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
+    (m.en || []).forEach(a => { const [id, ty, x, z, hp, fl] = a; seen.add(id); let e = this.enemies.get(id);
+      if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss) { // tier travels in the packet flags — the old inference mislabeled the SOURCE as a tier-2 boss on laggy joiners
+          if (fl & 2) { e.btier = 3; e.final = true; e.giant = true; }
+          else if (this.inf) e.btier = (fl & 1) ? 2 : 1;
+          else { e.btier = this.wave >= this.maxWave ? 3 : (fl & 1) || this.wave >= 10 ? 2 : 1; if (e.btier === 3) e.final = true; }
+        } this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
       e.tx = x / 10; e.tz = z / 10; e.hp = hp; if (!e.mhp || hp > e.mhp) e.mhp = hp; });
     for (const [id, e] of this.enemies) if (!seen.has(id)) { this._killFx(e); this.enemies.delete(id); }
     if (m.st) this._structUnpack(m.st);
@@ -182,7 +186,7 @@ export function install(P) {
       if (this.sendStateT <= 0) {
         this.sendStateT = .13; this.sendStT -= .13;
         const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, eg: this.escGate, cm: this.coreMax, ss: [this.stat.k, Math.round(this.stat.g), this.stat.b, this.stat.r], as: [this.allyStat.k, Math.round(this.allyStat.g)], hr: [this.me.wallMul, this.me.turMul, this.me.turHpMul, this.me.costMul, this.me.wallLv || 0, this.me.turLv || 0], bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
-          en: [...this.enemies.values()].map(e => [e.id, e.ty, Math.round(e.x * 10), Math.round(e.z * 10), Math.round(e.hp)]),
+          en: [...this.enemies.values()].map(e => [e.id, e.ty, Math.round(e.x * 10), Math.round(e.z * 10), Math.round(e.hp), (e.giant ? 2 : 0) | (e.btier === 2 ? 1 : 0)]),
           itm: this.fitems.map(f => [f.id, f.k, Math.round(f.x * 10), Math.round(f.z * 10)]) };
         if (this.sendStT <= 0) { this.sendStT = 1.4; o.st = this._structPack(); }
         this._send(o);

@@ -43,6 +43,7 @@ export function install(P) {
   P._killFx = function (e) { this._fx(e.x, e.z, !!ETYPES[e.ty]?.boss, PAL.redHex); const m = this.eMeshes.get(e.id); if (m) { if (m.bossBar) this.scene.remove(m.bossBar); this.scene.remove(m); this.eMeshes.delete(e.id); } }
   P._grantXp = function (v) { this._setXp(this.xp + v); }
   P._setXpTotal = function (total) { // joiner path: host sends cumulative XP — rebuild lv/remainder
+    if (this.inf) return; // PHASE 2: no further augments
     let lv = 1, rem = total;
     while (rem >= XP_NEED(lv)) { rem -= XP_NEED(lv); lv++; }
     const gained = lv - this.lv;
@@ -59,6 +60,7 @@ export function install(P) {
     if (this.pendUp > 0 && this.upEl.style.display === 'none' && !this.over && this.phase !== 'assault') this._showUpgrades();
   };
   P._setXp = function (v) {
+    if (this.inf) return; // PHASE 2: no further augments
     this.xp = v;
     const lv0 = this.lv;
     let need = XP_NEED(this.lv);
