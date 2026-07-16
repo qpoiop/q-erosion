@@ -8,9 +8,18 @@ export function install(P) {
     this.pubT = tb + (this.isHost ? '/h' : '/g'); this.subT = tb + (this.isHost ? '/g' : '/h');
     const kick = `<div style="font:700 11px ${FONT};letter-spacing:.16em;color:${PAL.red}">`;
     this._overlay(this.isHost
-      ? `${kick}방 개설됨 — 접속 대기</div><div style="font:700 54px ${FONT};letter-spacing:.18em;margin:6px 0 2px;color:${PAL.cyan};text-shadow:0 0 20px rgba(37,216,255,.5)">${this.room}</div><div style="font:400 13px ${FONT};line-height:1.6;color:${PAL.dim}">동료가 이 코드로 참가하면 자동으로 시작됩니다.<br>릴레이 서버에 연결 중…</div><div style="margin-top:16px"><button id="egCancel" style="${this._obtn(false)}">취소</button></div>`
+      ? `${kick}방 개설됨 — 접속 대기</div><div style="font:700 54px ${FONT};letter-spacing:.18em;margin:6px 0 2px;color:${PAL.cyan};text-shadow:0 0 20px rgba(37,216,255,.5)">${this.room}</div><div style="font:400 13px ${FONT};line-height:1.6;color:${PAL.dim}">동료가 이 코드로 참가하면 자동으로 시작됩니다.<br>릴레이 서버에 연결 중…</div><div style="margin-top:16px;display:flex;gap:8px;justify-content:center"><button id="egCopy" style="${this._obtn(true)}">코드 복사</button><button id="egCancel" style="${this._obtn(false)}">취소</button></div>`
       : `${kick}참가 중</div><div style="font:700 40px ${FONT};letter-spacing:.18em;margin:6px 0 2px;color:${PAL.cyan}">${this.room}</div><div id="egWaitMsg" style="font:400 13px ${FONT};line-height:1.6;color:${PAL.dim}">방장을 찾는 중… 상대가 방을 열어두었는지 확인하세요.</div><div style="margin-top:16px"><button id="egCancel" style="${this._obtn(false)}">취소</button></div>`);
     this.ovIn.querySelector('#egCancel').onclick = () => this._exit();
+    const cp = this.ovIn.querySelector('#egCopy');
+    if (cp) cp.onclick = async () => {
+      let ok = false;
+      try { await navigator.clipboard.writeText(this.room); ok = true; } catch (e) {
+        try { const ta = document.createElement('textarea'); ta.value = this.room; document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove(); } catch (e2) {}
+      }
+      cp.textContent = ok ? '복사됨 ✓' : '복사 실패';
+      setTimeout(() => { if (cp.isConnected) cp.textContent = '코드 복사'; }, 1600);
+    };
     if (!this.isHost) this._waitHintT = setTimeout(() => {
       if (this._dead || this.phase !== 'wait') return;
       const d = this.ovIn.querySelector('#egWaitMsg');
