@@ -177,7 +177,6 @@ export function install(P) {
     if (this.shp[j] <= 0) { this._fx(x, z, false, PAL.red7Hex); this._remove(j); }
   };
   P._dmgCoreBy = function (v, e) {
-    if (this.inf) return; // map 2 has no core — the flow target is just the players' start line
     this.coreHp -= v; this.shake = Math.max(this.shake || 0, .3);
     this._burst(this.coreMesh.position.x + rnd(-1, 1), this.coreMesh.position.z + rnd(-1, 1), PAL.cyanHex, 5, 4);
     this._coreHitFx();
@@ -293,14 +292,17 @@ export function install(P) {
     this.occ = new Uint8Array(N * N); this.shp = new Float32Array(N * N); this.bld = new Float32Array(N * N);
     this.own = new Uint8Array(N * N); this.building = new Set();
     for (let z = 0; z < N; z++) { this.occ[ti(9, z)] = 5; this.occ[ti(22, z)] = 5; this.bld[ti(9, z)] = 1; this.bld[ti(22, z)] = 1; } // corridor walls
-    this.coreTiles = []; for (let x = 11; x <= 20; x++) this.coreTiles.push(ti(x, 30)); // flow target = players' start line
+    // the core RELOCATES to the bottom of the corridor — lose it and the run ends (map 2 death condition)
+    this.coreTiles = [];
+    for (let a = 15; a <= 16; a++) for (let bz = 28; bz <= 29; bz++) { this.occ[ti(a, bz)] = 3; this.coreTiles.push(ti(a, bz)); }
+    this.coreHp = this.coreMax; // fresh core for the final stand
     this._flow(); this._syncStruct();
-    if (this.coreMesh) this.coreMesh.visible = false;
-    if (this.coreBar) this.coreBar.visible = false;
+    if (this.coreMesh) { this.coreMesh.position.set(g2w(15) + TS / 2, 0, g2w(28) + TS / 2); this.coreMesh.visible = true; }
+    if (this.coreBar) { this.coreBar.position.x = g2w(15) + TS / 2; this.coreBar.position.z = g2w(28) + TS / 2; }
     this.gateMs && this.gateMs.forEach(g => { g.rift.material.opacity = 0; g.lamp.intensity = 0; });
     if (this.mm) this.mm.style.display = 'none';
-    this.me.x = g2w(14); this.me.z = g2w(29);
-    this.ally.x = g2w(17); this.ally.z = g2w(29);
+    this.me.x = g2w(13); this.me.z = g2w(27);
+    this.ally.x = g2w(18); this.ally.z = g2w(27);
     this.ov.style.display = 'none';
     this.phase = 'inf'; this.wave = this.maxWave;
     if (this.isHostish()) { // 2x the wave-15 horde + bosses 1 and 2 in order

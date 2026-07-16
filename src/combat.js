@@ -3,22 +3,24 @@ import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPE
 
 export function install(P) {
   P._spawnBullet = function (x, z, dx, dz, o) {
-    this.bullets.push({ x, z, dx, dz, life: .9, dmg: o.dmg || 0, pierce: o.pierce || 0, ghost: o.ghost, ally: o.ally, tur: o.tur, band: o.band || 0 });
+    this.bullets.push({ x, z, dx, dz, life: o.life || .55, dmg: o.dmg || 0, pierce: o.pierce || 0, ghost: o.ghost, ally: o.ally, tur: o.tur, band: o.band || 0 });
   };
   P._fire = function (p, tx, tz, mine) {
     const base = Math.atan2(tz - p.z, tx - p.x);
     for (let i = 0; i < p.shots; i++) {
       const off = (i - (p.shots - 1) / 2) * .12, a = base + off;
       const dx = Math.cos(a) * 19, dz = Math.sin(a) * 19;
-      this._spawnBullet(p.x, p.z, dx, dz, { dmg: p.dmg, pierce: p.pierce, ghost: false, ally: !mine });
-      if (mine) this.shotQ.push([+p.x.toFixed(1), +p.z.toFixed(1), +dx.toFixed(1), +dz.toFixed(1)]);
+      const life = ((p.range || 9) + 1) / 19; // projectile dies at max range
+      this._spawnBullet(p.x, p.z, dx, dz, { dmg: p.dmg, pierce: p.pierce, ghost: false, ally: !mine, life });
+      if (mine) this.shotQ.push([+p.x.toFixed(1), +p.z.toFixed(1), +dx.toFixed(1), +dz.toFixed(1), +life.toFixed(2)]);
     }
     if (!mine || !this._meMoving) p.a = base; // aim-facing only when idle; movement owns facing otherwise
   };
   P._autoCombat = function (p, dt, mine) {
     if (p.down) return;
     p.fireT -= dt; if (p.fireT > 0) return;
-    let best = null, bd = 110;
+    const rng = p.range || 9;
+    let best = null, bd = rng * rng; // firing range is a real stat now — 조준 광학 research extends it
     for (const e of this.enemies.values()) { const d = dist2(p.x, p.z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
     if (best) { p.fireT = 1 / p.frate; this._fire(p, best.x, best.z, mine); }
   };
@@ -82,32 +84,29 @@ export function install(P) {
     const u = pool[Math.floor(Math.random() * pool.length)], tier = p.taken[u.k] || 0;
     u.t[tier].f(p, this); p.taken[u.k] = tier + 1; this._checkSyn(p, false);
   };
-  P._checkSyn = function (p, mine) { // synergies awaken once, deepen per combined tier, and carry a GRADE = min(two line tiers)
+  P._checkSyn = function (p, mine) { // grade = min(two line tiers) + 1 (기본+기본 → 레어), effects apply once per grade level
     p.syn = p.syn || {}; p.synGrade = p.synGrade || {};
     for (const s of SYN) {
       if (!s.need.every(k => p.taken[k])) continue;
-      const target = s.need.reduce((t, k) => t + (p.taken[k] || 0), 0);
-      let applied = p.syn[s.id] || 0;
-      const grade = Math.min(...s.need.map(k => p.taken[k] || 0)); // both lines epic → epic synergy
+      const grade = Math.min(4, Math.min(...s.need.map(k => p.taken[k] || 0)) + 1);
       const oldGrade = p.synGrade[s.id] || 0;
-      if (applied >= target && grade <= oldGrade) continue;
-      const fresh = !applied;
+      if (grade <= oldGrade) continue;
+      const fresh = !oldGrade;
       if (fresh && s.first) s.first(p, this);
-      while (applied < target) { s.f(p, this); applied++; }
-      p.syn[s.id] = applied;
-      if (grade > oldGrade) { p.synGrade[s.id] = grade; if (s.grade) for (let lv = oldGrade + 1; lv <= grade; lv++) s.grade(p, this, lv); }
-      if (mine && fresh) { this._banner(`✦ 시너지 각성 — ${s.n}! ${s.d}`, 3800); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
-      else if (mine && grade > oldGrade && grade >= 2) { this._banner(`✦ 시너지 진화 — ${s.n} [${RAR[grade - 1].n}]`, 3200); this._beep(990, .12, 'square', .05); }
-      else if (mine) this._beep(880, .08, 'square', .04);
+      for (let lv = Math.max(2, oldGrade + 1); lv <= grade; lv++) if (s.grade) s.grade(p, this, lv);
+      p.synGrade[s.id] = grade; p.syn[s.id] = grade;
+      if (mine && fresh) { this._banner(`✦ 시너지 각성 — ${s.n} [${RAR[grade - 1].n}]! ${s.d}`, 3800); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
+      else if (mine) { this._banner(`✦ 시너지 진화 — ${s.n} [${RAR[grade - 1].n}]`, 3200); this._beep(990, .12, 'square', .05); }
     }
   };
+  P._actPhase = function () { return this.phase === 'build' || this.phase === 'assault' || this.phase === 'escape' || this.phase === 'inf'; }
   P._dash = function (p) {
-    if (p.down || p.dashT > 0 || this.phase !== 'assault' && this.phase !== 'build') return;
+    if (p.down || p.dashT > 0 || !this._actPhase()) return;
     p.dashT = p.dashCd; p.dashing = p.dashDur || .18; this._beep(300, .07, 'triangle', .04);
   };
   P._useSkill = function () {
     const p = this.me;
-    if (p.down || p.sklT > 0 || (this.phase !== 'assault' && this.phase !== 'build')) return;
+    if (p.down || p.sklT > 0 || !this._actPhase()) return;
     p.sklT = Math.max(4, (14 - p.sklLv) * (p.sklCdMul || 1));
     const r = (3.5 + p.sklLv * .5) * (p.sklRMul || 1), dmg = (40 + p.sklLv * 20) * (p.sklDmgMul || 1);
     const deb = p.swSlowF ? { f: p.swSlowF, t: p.swSlowT, c: p.swStunC || 0, ct: p.swStunT || 1 } : null; // 공명 폭발 debuffs
@@ -130,7 +129,7 @@ export function install(P) {
     }
   };
   P._useItem = function (idx) {
-    const p = this.me; if (p.down || (this.phase !== 'assault' && this.phase !== 'build')) return;
+    const p = this.me; if (p.down || !this._actPhase()) return;
     const k = p.items[idx ?? 0]; if (!k) return;
     p.items.splice(idx ?? 0, 1);
     this._applyItemFx(k, p.x, p.z, true);
@@ -166,7 +165,7 @@ export function install(P) {
       if (cd > 0) continue;
       const x = g2w(i % N), z = g2w((i / N) | 0);
       let best = null, bd = 90; for (const e of this.enemies.values()) { const d = dist2(x, z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
-      if (best) { this._turCd[i] = .3; const q = this._ownerOf(i); const a = Math.atan2(best.z - z, best.x - x); this._spawnBullet(x, z, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * (q.turMul || 1), tur: true, band: this._turBand(q) }); }
+      if (best) { this._turCd[i] = .3; const q = this._ownerOf(i); const a = Math.atan2(best.z - z, best.x - x); this._spawnBullet(x, z, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * (q.turMul || 1), tur: true, band: this._turBand(q), life: .55 }); }
     }
   };
   P._pickupSim = function () {
