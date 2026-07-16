@@ -1,6 +1,9 @@
 // waves.js — verbatim methods from game.js (prototype-install)
 import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
+const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const DIRS8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
 export function install(P) {
   P._startBuild = function () {
     this.phase = 'build'; this.phT = this.wave === 0 ? this.buildTime + 10 : this.buildTime;
@@ -72,20 +75,19 @@ export function install(P) {
     const slow = this.slowT > 0 ? .5 : 1;
     const players = [this.me]; if (this.allyOn) players.push(this.ally);
     { // soft separation: enemies sharing a tile push apart — kills the stacked-blob look and mobile overdraw
-      const grid = this._sepGrid = this._sepGrid || new Map();
+      const grid = this._sepGrid = this._sepGrid || new Map(); // tile → last enemy seen; pair-repel against it (zero allocs)
       grid.clear();
-      for (const e of this.enemies.values()) { if (e.entering) continue; const k = ti(w2g(e.x), w2g(e.z)); const arr = grid.get(k); if (arr) arr.push(e); else grid.set(k, [e]); }
-      for (const arr of grid.values()) {
-        for (let i = 1; i < arr.length; i++) { // chained pair repulsion — converges over frames, stays O(E)
-          const a = arr[i - 1], c = arr[i];
-          let dx = c.x - a.x, dz = c.z - a.z; const d2 = dx * dx + dz * dz;
-          if (d2 > .49) continue;
-          const d = Math.sqrt(d2) || .01, push = (0.7 - d) * .5;
-          dx = d > .01 ? dx / d : 1; dz = d > .01 ? dz / d : 0;
-          const heavyA = ETYPES[a.ty] && ETYPES[a.ty].boss, heavyC = ETYPES[c.ty] && ETYPES[c.ty].boss;
-          if (!heavyC) { c.x = clamp(c.x + dx * push, 1 - HALF, HALF - 1); c.z = clamp(c.z + dz * push, 1 - HALF, HALF - 1); }
-          if (!heavyA) { a.x = clamp(a.x - dx * push, 1 - HALF, HALF - 1); a.z = clamp(a.z - dz * push, 1 - HALF, HALF - 1); }
-        }
+      for (const c of this.enemies.values()) {
+        if (c.entering) continue;
+        const k = ti(w2g(c.x), w2g(c.z));
+        const a = grid.get(k); grid.set(k, c);
+        if (!a) continue;
+        let dx = c.x - a.x, dz = c.z - a.z; const d2 = dx * dx + dz * dz;
+        if (d2 > .49) continue;
+        const d = Math.sqrt(d2) || .01, push = (0.7 - d) * .5;
+        dx = d > .01 ? dx / d : 1; dz = d > .01 ? dz / d : 0;
+        if (!(ETYPES[c.ty] && ETYPES[c.ty].boss)) { c.x = clamp(c.x + dx * push, 1 - HALF, HALF - 1); c.z = clamp(c.z + dz * push, 1 - HALF, HALF - 1); }
+        if (!(ETYPES[a.ty] && ETYPES[a.ty].boss)) { a.x = clamp(a.x - dx * push, 1 - HALF, HALF - 1); a.z = clamp(a.z - dz * push, 1 - HALF, HALF - 1); }
       }
     }
     for (const e of this.enemies.values()) {
@@ -130,7 +132,7 @@ export function install(P) {
         const smasher = e.ty === 1 || et.boss;
         const rr = 1.5 + (et.r || .55) * (et.boss ? (e.final ? 2.4 : 1.9) : 1), rr2 = rr * rr; // bosses swing wide
         let hit = -1;
-        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+        for (const [a, b] of DIRS8) {
           const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
           const j = ti(X, Z), o2 = this.occ[j];
           if ((smasher || o2 === 2 || ((e.id & 3) !== 0 && Math.random() < .22 * Math.min(1, this.wave / 8))) && (o2 === 1 || o2 === 2) && dist2(e.x, e.z, g2w(X), g2w(Z)) < rr2) { hit = j; break; } // everyone gnaws blockades — walls can't cheese a whole horde
@@ -142,7 +144,7 @@ export function install(P) {
       {
         const cands = [];
         let best = 1e9;
-        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        for (const [a, b] of DIRS4) {
           const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
           const j = ti(X, Z), dj = this.flowD[j];
           if (dj < bd) { cands.push([j, dj]); if (dj < best) best = dj; }

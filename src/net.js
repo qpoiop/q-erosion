@@ -98,10 +98,11 @@ export function install(P) {
   };
   P._dropMqtt2 = function () { if (this.net2) { const c = this.net2; this.net2 = null; setTimeout(() => { try { c.end(true); } catch (e) {} }, 1500); } }
   P._allyR = function () { const a = this.ally; return { wallMul: a.wallMul, turMul: a.turMul, turHpMul: a.turHpMul, costMul: a.costMul, wallLv: a.wallLv || 0, turLv: a.turLv || 0 }; }
-  P._structPack = function () { const a = []; for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2 || this.occ[i] === 5) a.push([i, this.occ[i], Math.round(this.shp[i]), +this.bld[i].toFixed(2), this.own[i]]); return a; }
+  P._structPack = function () { const a = []; for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2 || this.occ[i] === 5) a.push(i, this.occ[i], Math.round(this.shp[i]), +this.bld[i].toFixed(2), this.own[i]); return a; } // flat stride-5
   P._structUnpack = function (a) {
     const had = new Set();
-    for (const [i, k, hp, b, ow] of a) {
+    for (let p5 = 0; p5 < a.length; p5 += 5) {
+      const i = a[p5], k = a[p5 + 1], hp = a[p5 + 2], b = a[p5 + 3], ow = a[p5 + 4];
       had.add(i); if (this.occ[i] !== k) this.occ[i] = k; this.shp[i] = hp; this.own[i] = ow || 0;
       if (k === 5) { this.bld[i] = 1; continue; }
       const nb = b ?? 1;
