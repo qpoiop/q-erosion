@@ -154,7 +154,7 @@ export function install(P) {
     } this.phT = m.pt; }
     const seen = new Set();
     (m.en || []).forEach(a => { const [id, ty, x, z, hp] = a; seen.add(id); let e = this.enemies.get(id);
-      if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss) { if (this.inf) { e.btier = this.infFinal ? 3 : ((this._infGhostB = (this._infGhostB || 0) + 1) >= 2 ? 2 : 1); if (this.infFinal) { e.final = true; e.giant = true; } } else { e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1; if (e.btier === 3) e.final = true; } } this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
+      if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss) { if (this.inf) { e.btier = this.infFinal ? 3 : ((this._infGhostB = (this._infGhostB || 0) + 1) > 5 ? 2 : 1); if (this.infFinal) { e.final = true; e.giant = true; } } else { e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1; if (e.btier === 3) e.final = true; } } this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
       e.tx = x / 10; e.tz = z / 10; e.hp = hp; if (!e.mhp || hp > e.mhp) e.mhp = hp; });
     for (const [id, e] of this.enemies) if (!seen.has(id)) { this._killFx(e); this.enemies.delete(id); }
     if (m.st) this._structUnpack(m.st);

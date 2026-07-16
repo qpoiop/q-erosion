@@ -44,8 +44,8 @@ export function install(P) {
     if (this.inf) { // infiltration: enemies pour in from the TOP of the corridor
       const e = { id, ty, x: g2w(11 + Math.floor(Math.random() * 10)), z: g2w(1) + rnd(-1, 1), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), wsp: 2 };
       if (ETYPES[ty].boss) {
-        this.infBossN = (this.infBossN || 0) + 1; // bosses 1 then 2, in order
-        e.btier = Math.min(2, this.infBossN);
+        this.infBossN = (this.infBossN || 0) + 1; // 5 mid bosses, then 5 heavy
+        e.btier = this.infBossN <= 5 ? 1 : 2;
         if (e.btier === 2) { e.hp *= 4; e.wsp *= 1.15; }
         this._banner(e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5);
       }
@@ -308,12 +308,13 @@ export function install(P) {
     if (this.isHostish()) { // 2x the wave-15 horde + bosses 1 and 2 in order
       let cntMul = DIFF_CNT[this.diffKey] || 1;
       if (this.diffKey === 'nightmare') cntMul = 2.5;
-      const count = Math.round((14 + 60 + Math.max(0, this.maxWave - 10) * 3) * cntMul * 2);
+      const count = Math.min(480, Math.round((14 + 60 + Math.max(0, this.maxWave - 10) * 3) * cntMul * 4)); // 4x the w15 horde, capped for mobile
       const q = [];
       const nG = Math.max(3, Math.round(count * .22)), nB = Math.round(count * .25);
       for (let i = 0; i < count; i++) q.push(i < nG ? 2 : i < nG + nB ? 1 : 0);
       for (let i = q.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [q[i], q[j]] = [q[j], q[i]]; }
-      q.splice(Math.floor(q.length * .35), 0, 3); q.splice(Math.floor(q.length * .7), 0, 3);
+      for (let k = 0; k < 5; k++) q.splice(Math.floor(q.length * (.28 + k * .05)), 0, 3); // 5 mid bosses
+      for (let k = 0; k < 5; k++) q.splice(Math.floor(q.length * (.62 + k * .06)), 0, 3); // then 5 heavy bosses
       this.spawnQ = q; this.spawnT = 1.2;
     }
     this._banner('⚔ 침투 개시 — 적의 소굴이다. 위에서 몰려온다!', 4200); this._beep(180, .4, 'sawtooth', .08);
