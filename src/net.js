@@ -122,16 +122,16 @@ export function install(P) {
     switch (m.t) {
       case 'hello': if (this.isHost) {
         if (m.v !== PV) this._banner('⚠ 상대 클라이언트가 구버전입니다 — 양쪽 모두 새로고침 권장', 5200);
-        if (this.phase === 'wait') { this._send({ t: 'welcome', diff: this.diffMul, dk: this.diffKey, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV }); this._startOnline(); }
+        if (this.phase === 'wait') { this._send({ t: 'welcome', diff: this.diffMul, dk: this.diffKey, waves: this.maxWave, bt: this.buildTime, wv: this.wave, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV }); this._startOnline(); }
         else if (performance.now() - (this._peerSeenAt || 0) > 3000) { // teammate silent 3s (wall-clock — tm freezes on pause) — allow rejoin mid-game
-          this._send({ t: 'welcome', diff: this.diffMul, dk: this.diffKey, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV });
+          this._send({ t: 'welcome', diff: this.diffMul, dk: this.diffKey, waves: this.maxWave, bt: this.buildTime, wv: this.wave, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV });
           this._banner('동료 재접속!', 2600);
         }
         else this._send({ t: 'busy' });
       } break;
       case 'welcome': if (!this.isHost && this.phase === 'wait') {
         clearInterval(this._helloIv);
-        this.diffMul = m.diff; if (m.dk) { this.diffKey = m.dk; this._setDiffTag && this._setDiffTag(); } this.maxWave = m.waves; this.buildTime = m.bt; this.scrap = m.sc;
+        this.diffMul = m.diff; if (m.dk) { this.diffKey = m.dk; this._setDiffTag && this._setDiffTag(); } this.maxWave = m.waves; this.buildTime = m.bt; this.scrap = m.sc; if (m.wv !== undefined) this.wave = m.wv;
         if (m.v !== PV) this._banner('⚠ 방장 클라이언트 버전이 다릅니다 — 양쪽 모두 새로고침 권장', 5200);
         if (m.ar) Object.assign(this.me, m.ar); if (m.abuys) this.me.buys = { ...m.abuys }; // rejoin: my research/buy counts live on the host
         this._structUnpack(m.st); this._startOnline();
@@ -161,7 +161,7 @@ export function install(P) {
       case 'ban': if (!this.isHost) this._banner(m.s); break;
       case 's': if (!this.isHost) this._applyState(m); break;
       case 'end': if (!this.isHost) this._gameOver(m.win, m.why, true); break;
-      case 'restart': if (!this.isHost) { this._reset(); this._startOnline(); } break;
+      case 'restart': if (!this.isHost && this.over) { this._reset(); this._startOnline(); } break; // only from the game-over screen
     }
   };
   P._applyState = function (m) {
