@@ -3,7 +3,7 @@ import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPE
 
 export function install(P) {
   P._spawnBullet = function (x, z, dx, dz, o) {
-    this.bullets.push({ x, z, dx, dz, life: o.life || .55, dmg: o.dmg || 0, pierce: o.pierce || 0, ghost: o.ghost, ally: o.ally, tur: o.tur, band: o.band || 0 });
+    this.bullets.push({ x, z, dx, dz, life: o.life || .55, dmg: o.dmg || 0, pierce: o.pierce || 0, ghost: o.ghost, ally: o.ally, tur: o.tur, own: o.own || 0, band: o.band || 0 });
   };
   P._fire = function (p, tx, tz, mine) {
     const base = Math.atan2(tz - p.z, tx - p.x);
@@ -32,8 +32,10 @@ export function install(P) {
       this._grantXp(ETYPES[e.ty].xp);
       // every kill pays BOTH units — each at their own 회수 배율 (killer no longer hogs the gold)
       const base = ETYPES[e.ty].sc * (DIFF_SCR[this.diffKey] || 1);
-      this.scrap += base * (this.me.scrapMul || 1);
-      if (this.mode !== 'solo') this.allyScrap += base * (this.ally.scrapMul || 1);
+      const gMe = base * (this.me.scrapMul || 1), gAl = base * (this.ally.scrapMul || 1);
+      this.scrap += gMe; this.stat.g += gMe; this.allyStat.g += gAl;
+      if (this.mode !== 'solo') this.allyScrap += gAl;
+      if (src && (src.ally || src.own === 1)) this.allyStat.k++; else this.stat.k++;
       const dropMul = src && src.ally ? (this.ally.dropMul || 1) : src && src.tur ? 1 : (this.me.dropMul || 1); // killer's loot-detection augment
       if (Math.random() < .04 * dropMul && this.fitems.length < 3) this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: e.x, z: e.z });
     }
@@ -165,7 +167,7 @@ export function install(P) {
       if (cd > 0) continue;
       const x = g2w(i % N), z = g2w((i / N) | 0);
       let best = null, bd = 90; for (const e of this.enemies.values()) { const d = dist2(x, z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
-      if (best) { this._turCd[i] = .3; const q = this._ownerOf(i); const a = Math.atan2(best.z - z, best.x - x); this._spawnBullet(x, z, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * (q.turMul || 1), tur: true, band: this._turBand(q), life: .55 }); }
+      if (best) { this._turCd[i] = .3; const q = this._ownerOf(i); const a = Math.atan2(best.z - z, best.x - x); this._spawnBullet(x, z, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * (q.turMul || 1), tur: true, band: this._turBand(q), life: .55, own: q === this.ally ? 1 : 0 }); }
     }
   };
   P._pickupSim = function () {

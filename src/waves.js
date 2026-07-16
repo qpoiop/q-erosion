@@ -6,7 +6,7 @@ export function install(P) {
     this.phase = 'build'; this.phT = this.wave === 0 ? this.buildTime + 10 : this.buildTime;
     this._pickGates(); // next assault pours through the active gate(s) — nightmare opens several
     if (this.mode === 'solo') this._saveRun();
-    const bonus = Math.round((30 + this.wave * 12) * (DIFF_SCR[this.diffKey] || 1)); this.scrap += bonus; if (this.mode !== 'solo' && this.isHost) this.allyScrap += bonus;
+    const bonus = Math.round((30 + this.wave * 12) * (DIFF_SCR[this.diffKey] || 1)); this.scrap += bonus; this.stat.g += bonus; this.allyStat.g += bonus; if (this.mode !== 'solo' && this.isHost) this.allyScrap += bonus;
     const dirs = this.activeGates.map(i => GATE_DIR[i]).join('·');
     if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus} · 다음 균열: ${dirs}쪽`, 3600); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
     else this._banner(`준비 단계 — ${dirs}쪽 균열을 막아라 (건설 버튼)`, 4200);
@@ -44,8 +44,8 @@ export function install(P) {
     if (this.inf) { // infiltration: enemies pour in from the TOP of the corridor
       const e = { id, ty, x: g2w(11 + Math.floor(Math.random() * 10)), z: g2w(1) + rnd(-1, 1), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), wsp: 2 };
       if (ETYPES[ty].boss) {
-        this.infBossN = (this.infBossN || 0) + 1; // bosses 1 then 2, in order
-        e.btier = Math.min(2, this.infBossN);
+        this.infBossN = (this.infBossN || 0) + 1; // 5 mid bosses, then 5 heavy
+        e.btier = this.infBossN <= 5 ? 1 : 2;
         if (e.btier === 2) { e.hp *= 4; e.wsp *= 1.15; }
         this._banner(e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5);
       }
@@ -308,12 +308,13 @@ export function install(P) {
     if (this.isHostish()) { // 2x the wave-15 horde + bosses 1 and 2 in order
       let cntMul = DIFF_CNT[this.diffKey] || 1;
       if (this.diffKey === 'nightmare') cntMul = 2.5;
-      const count = Math.round((14 + 60 + Math.max(0, this.maxWave - 10) * 3) * cntMul * 2);
+      const count = Math.min(480, Math.round((14 + 60 + Math.max(0, this.maxWave - 10) * 3) * cntMul * 4)); // 4x the w15 horde, capped for mobile
       const q = [];
       const nG = Math.max(3, Math.round(count * .22)), nB = Math.round(count * .25);
       for (let i = 0; i < count; i++) q.push(i < nG ? 2 : i < nG + nB ? 1 : 0);
       for (let i = q.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [q[i], q[j]] = [q[j], q[i]]; }
-      q.splice(Math.floor(q.length * .35), 0, 3); q.splice(Math.floor(q.length * .7), 0, 3);
+      for (let k = 0; k < 5; k++) q.splice(Math.floor(q.length * (.28 + k * .05)), 0, 3); // 5 mid bosses
+      for (let k = 0; k < 5; k++) q.splice(Math.floor(q.length * (.62 + k * .06)), 0, 3); // then 5 heavy bosses
       this.spawnQ = q; this.spawnT = 1.2;
     }
     this._banner('⚔ 침투 개시 — 적의 소굴이다. 위에서 몰려온다!', 4200); this._beep(180, .4, 'sawtooth', .08);
@@ -334,8 +335,9 @@ export function install(P) {
     this._beep(50, .8, 'sawtooth', .12); this._beep(70, 1, 'sawtooth', .1); this.shake = 1.2;
   };
   P._finalClear = function () {
-    for (let i = 0; i < 16; i++) setTimeout(() => { if (!this._dead && this.scene) { this._fx(rnd(-10, 10), rnd(-20, 10), i % 3 === 0, i % 2 ? PAL.cyanHex : 0xffffff); this.shake = Math.max(this.shake || 0, .4); } }, i * 130);
-    setTimeout(() => { if (!this._dead) this._gameOver(true, '침식의 근원 정화 — 프로토콜의 끝'); }, 1200);
+    this._banner('✦ 침식의 근원, 소멸', 4200); this._beep(700, .5, 'square', .07); this._beep(1050, .7, 'square', .06);
+    for (let i = 0; i < 30; i++) setTimeout(() => { if (!this._dead && this.scene) { this._fx(rnd(-10, 10), rnd(-24, 8), i % 3 === 0, [PAL.cyanHex, 0xffffff, PAL.amberHex][i % 3]); this.shake = Math.max(this.shake || 0, .4); } }, i * 130);
+    setTimeout(() => { if (!this._dead) this._gameOver(true, '침식의 근원 정화 — 프로토콜의 끝'); }, 4200); // fireworks first, overlay after
   };
   P._gameOver = function (win, why, fromNet) {
     if (this.over) return; this.over = { win, why };
@@ -364,11 +366,44 @@ export function install(P) {
         ${canRestart ? `<button id="egRe" style="${this._obtn(true)}">재도전</button>` : ''}
         <button id="egOut" style="${this._obtn(false)}">로비로</button>
       </div>${canRestart ? '' : `<div style="font:400 11px ${FONT};margin-top:8px;color:${PAL.dim}">방장이 재도전을 시작할 수 있습니다</div>`}`);
-    if (win && this.inf) { // ending credits
-      const cr = this.H('div', `margin-top:14px;max-height:150px;overflow:hidden;border-top:1px solid ${PAL.line};position:relative`, this.ovIn);
-      const roll = this.H('div', `font:400 11px ${FONT};color:${PAL.dim};line-height:2;text-align:center;animation:egCredits 26s linear infinite`, cr);
-      roll.innerHTML = `<b style="color:${PAL.cyan}">EROSION PROTOCOL</b><br>침식의 근원이 정화되었다.<br><br>— 3D MODELS (sketchfab, CC-BY) —<br>캐릭터 Toy Robot · rkmorello<br>근접 drone robot · noortjeschuur<br>원거리 Robo_V2 · _SeF_ / Robot_04 · taktelon<br>보스 Robot · l0wpoly / Utility Robot · nickheitzman<br>최종 보스 Futuristic army robot · iasarmientoj<br>타워 Combat Turret · SnoyCat / Scy-fi turret · kudinadarya<br>코어 Crystal · rudolfs<br>벽 Cube Metalic · _sqtime_ / Yellow Metal Cube · JakobHenerey20231<br><br>— TECH —<br>three.js · Cloudflare Pages · Durable Objects<br><br>플레이해 주셔서 감사합니다`;
-      const cs = document.createElement('style'); cs.textContent = '@keyframes egCredits { from { transform: translateY(150px); } to { transform: translateY(-100%); } }'; this.ovIn.appendChild(cs);
+    if (win && this.inf) { // full ending: logo, story, per-player stats, credits
+      this.ovIn.innerHTML = '';
+      const DN = { easy: '쉬움', normal: '보통', hard: '어려움', nightmare: '☠ 악몽' };
+      const augN = (p) => Object.values(p.taken || {}).reduce((a, b) => a + b, 0);
+      const meS = [this.stat.k, Math.round(this.stat.g), this.stat.b, this.stat.r, augN(this.me)];
+      const alS = [this.allyStat.k, Math.round(this.allyStat.g), this.allyStat.b, this.allyStat.r, this.mode === 'solo' ? augN(this.ally) : (this.ally.au || 0)];
+      const rows = ['처치', '획득 골드', '건설', '연구', '증강'].map((n, i) => `<tr><td style="padding:3px 10px;color:${PAL.dim};text-align:left">${n}</td><td style="padding:3px 10px;color:${PAL.cyan}">${meS[i]}</td><td style="padding:3px 10px;color:${PAL.amber}">${alS[i]}</td></tr>`).join('');
+      this.ovIn.style.maxHeight = '86vh'; this.ovIn.style.overflowY = 'auto';
+      this.ovIn.innerHTML = `
+        <div style="text-align:center">
+          <div style="font:700 10px ${FONT};letter-spacing:.3em;color:${PAL.cyan}">CO-OP TACTICAL SURVIVAL</div>
+          <div style="font:900 40px 'Noto Sans KR',sans-serif;color:${PAL.red};text-shadow:0 0 24px rgba(255,59,42,.6);margin:6px 0 2px">침식 프로토콜</div>
+          <div style="font:600 11px ${FONT};letter-spacing:.4em;color:${PAL.text}">E R O S I O N</div>
+        </div>
+        <div style="font:400 12.5px 'Noto Sans KR',sans-serif;line-height:2;color:${PAL.dim};text-align:center;margin:18px 0;border-top:1px solid ${PAL.line};border-bottom:1px solid ${PAL.line};padding:14px 4px">
+          균열 너머는 우리가 알던 세계가 아니었다.<br>
+          침식체의 소굴 한가운데, 물러설 곳 없는 외길에서<br>
+          모든 것을 버리고 단 하나의 힘만을 쥔 채 버텼다.<br>
+          파도처럼 밀려오는 어둠, 무너지는 방벽, 그리고 마침내 —<br>
+          모든 침식의 시작점, <b style="color:${PAL.red}">근원</b>이 무너져 내렸다.<br>
+          균열은 닫혔다. 코어의 빛이 다시 대지를 채운다.<br>
+          <b style="color:${PAL.cyan}">우리가 지켜냈다.</b>
+        </div>
+        <div style="text-align:center">
+          <div style="font:700 11px ${FONT};letter-spacing:.16em;color:${PAL.text};margin-bottom:6px">전투 기록 — ${DN[this.diffKey] || '보통'} · ${mm}:${ss}</div>
+          <table style="margin:0 auto;font:700 12px ${FONT};border-collapse:collapse">
+            <tr><td></td><td style="padding:3px 10px;color:${PAL.cyan}">나</td><td style="padding:3px 10px;color:${PAL.amber}">${this.mode === 'solo' ? '유닛-B (봇)' : '동료'}</td></tr>
+            ${rows}
+          </table>
+        </div>
+        <div style="text-align:center;margin-top:26px;font:400 12px 'Noto Sans KR',sans-serif;color:${PAL.dim};line-height:2.2">
+          제작자: <b style="color:${PAL.text}">란도</b><br><br>
+          플레이 해주셔서 감사합니다.
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px;justify-content:center">
+          ${canRestart ? `<button id="egRe" style="${this._obtn(true)}">재도전</button>` : ''}
+          <button id="egOut" style="${this._obtn(false)}">로비로</button>
+        </div>`;
     }
     this.ovIn.querySelector('#egOut').onclick = () => this._exit();
     const re = this.ovIn.querySelector('#egRe');
