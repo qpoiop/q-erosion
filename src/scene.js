@@ -1,5 +1,5 @@
 // scene.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._groundTex = function () {
@@ -73,6 +73,11 @@ export function install(P) {
     this.mBeamCyan = new T.MeshBasicMaterial({ color: 0x8ff2ff, transparent: true, opacity: .95, blending: T.AdditiveBlending, depthWrite: false });
     this.mBeamAmber = new T.MeshBasicMaterial({ color: 0xffd070, transparent: true, opacity: .95, blending: T.AdditiveBlending, depthWrite: false });
     this.mBeamTur = new T.MeshBasicMaterial({ color: 0xeafcff, transparent: true, opacity: .95, blending: T.AdditiveBlending, depthWrite: false });
+    this.mBeamTur1 = new T.MeshBasicMaterial({ color: 0xffc36e, transparent: true, opacity: .95, blending: T.AdditiveBlending, depthWrite: false }); // research band 1: amber shots
+    this.mBeamTur2 = new T.MeshBasicMaterial({ color: 0xd98aff, transparent: true, opacity: .95, blending: T.AdditiveBlending, depthWrite: false }); // band 2: violet shots
+    this.mGlowViolet = new T.MeshStandardMaterial({ color: 0x150a1e, emissive: 0xb46bff, emissiveIntensity: 1.5 });
+    this.fxRingG = new T.RingGeometry(.25, .38, 24); // shared by all impact rings (pooled in _fx)
+    this._fxPool = [];
     // core (cyan crystal at center)
     const cg = new T.Group();
     const cb = new T.Mesh(new T.CylinderGeometry(2.4, 2.8, .6, 8), this.mBody); cb.position.y = .3; cb.castShadow = cb.receiveShadow = true; cg.add(cb);
@@ -172,7 +177,7 @@ export function install(P) {
       if (e.ty === 3) {
         const aura = new T.Mesh(new T.RingGeometry(1.5, 1.85, 40), new T.MeshBasicMaterial({ color: PAL.redHex, transparent: true, opacity: .5, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
         aura.rotation.x = -Math.PI / 2; aura.position.y = .07; g.add(aura); g.aura = aura;
-        const lamp = new T.PointLight(PAL.redHex, 1.2, 8); lamp.position.y = 2; g.add(lamp);
+        // no PointLight: boss spawn/death would change the light count → full-scene shader recompile stall
       }
       if (e.final) g.scale.setScalar(2);
       this.scene.add(g); return g;
@@ -193,7 +198,6 @@ export function install(P) {
       body = new T.Mesh(new T.BoxGeometry(2, 1.5, 2), this.mEnemy); body.position.y = .85;
       const crown = new T.Mesh(new T.OctahedronGeometry(.6), this.mGlowRed); crown.position.y = 2.1; g.add(crown);
       const band = new T.Mesh(new T.BoxGeometry(2.1, .2, 2.1), this.mGlowRed7); band.position.y = .85; g.add(band);
-      const lamp = new T.PointLight(PAL.redHex, 1.2, 8); lamp.position.y = 2; g.add(lamp);
       const aura = new T.Mesh(new T.RingGeometry(1.5, 1.85, 40), new T.MeshBasicMaterial({ color: PAL.redHex, transparent: true, opacity: .5, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
       aura.rotation.x = -Math.PI / 2; aura.position.y = .07; g.add(aura); g.aura = aura;
     }
@@ -204,8 +208,17 @@ export function install(P) {
   P._sMesh = function (k, i) { // structure mesh
     const T = THREE, g = new T.Group();
     if (k === 1) {
-      const b = new T.Mesh(new T.BoxGeometry(TS * .92, 1.5, TS * .92), this.mWallS); b.position.y = .75; b.castShadow = b.receiveShadow = true; g.add(b);
-      const trim = new T.Mesh(new T.BoxGeometry(TS * .96, .1, TS * .96), this.mGlowCyan); trim.position.y = 1.53; g.add(trim); g.trim = trim;
+      const wband = (this.g.wallLv || 0) >= 4 ? 1 : 0;
+      const wtpl = this.mdl && this.mdl['wall' + wband];
+      if (wtpl) {
+        const m = wtpl.clone(true); m.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+        g.add(m); g.wband = wband; g.grounded = true; // model origin is at the ground — HP squash keeps the base
+        const bh = new T.Box3().setFromObject(m).max.y;
+        const trim = new T.Mesh(new T.BoxGeometry(TS * .96, .1, TS * .96), this.mGlowCyan); trim.position.y = g.trimH = bh + .05; g.add(trim); g.trim = trim;
+      } else {
+        const b = new T.Mesh(new T.BoxGeometry(TS * .92, 1.5, TS * .92), this.mWallS); b.position.y = .75; b.castShadow = b.receiveShadow = true; g.add(b);
+        const trim = new T.Mesh(new T.BoxGeometry(TS * .96, .1, TS * .96), this.mGlowCyan); trim.position.y = g.trimH = 1.53; g.add(trim); g.trim = trim;
+      }
     } else if (k === 5) { // erosion rock — per-round terrain obstacle
       const h = 1.1 + (i % 7) * .14;
       const b1 = new T.Mesh(new T.BoxGeometry(TS * .8, h, TS * .8), this.mObs); b1.position.y = h / 2; b1.rotation.y = (i % 9) * .12; b1.castShadow = b1.receiveShadow = true; g.add(b1);
@@ -218,17 +231,30 @@ export function install(P) {
         const m = tpl.clone(true);
         m.traverse(o => { if (o.isMesh) o.castShadow = true; });
         g.add(m); g.band = band;
-        const gun2 = new T.Mesh(new T.BoxGeometry(.12, .12, .9), this.mGlowCyan);
+        // research bands recolor barrel + base ring: cyan → amber → violet (matches the shot beams)
+        const bMat = band >= 2 ? this.mGlowViolet : band === 1 ? this.mGlowAmber : this.mGlowCyan;
+        const gun2 = new T.Mesh(new T.BoxGeometry(.14, .14, 1.1), bMat);
         const bh = new T.Box3().setFromObject(m).max.y;
         gun2.position.set(0, Math.max(1.1, bh * .82), .5); g.add(gun2); g.gun = gun2;
+        const bring = new T.Mesh(new T.TorusGeometry(.62, .055, 6, 24), bMat);
+        bring.rotation.x = -Math.PI / 2; bring.position.y = .09; g.add(bring);
         this.scene.add(g); return g;
       }
       const base = new T.Mesh(new T.BoxGeometry(.9, .5, .9), this.mWallS); base.position.y = .25; base.castShadow = true; g.add(base);
       const pod = new T.Mesh(new T.BoxGeometry(.55, .45, .8), this.mBody); pod.position.y = .75; pod.castShadow = true; g.add(pod); g.pod = pod;
-      const gun = new T.Mesh(new T.BoxGeometry(.12, .12, .7), this.mGlowCyan); gun.position.set(0, .78, .5); pod.add ? g.add(gun) : 0; g.gun = gun;
-      const cap2 = new T.Mesh(new T.BoxGeometry(.3, .08, .3), this.mGlowCyan); cap2.position.y = 1.02; g.add(cap2); // emissive glow instead of a per-turret PointLight
+      const bandMat = band >= 2 ? this.mGlowViolet : band === 1 ? this.mGlowAmber : this.mGlowCyan;
+      const gun = new T.Mesh(new T.BoxGeometry(.12, .12, .7), bandMat); gun.position.set(0, .78, .5); pod.add ? g.add(gun) : 0; g.gun = gun;
+      const cap2 = new T.Mesh(new T.BoxGeometry(.3, .08, .3), bandMat); cap2.position.y = 1.02; g.add(cap2); // emissive glow instead of a per-turret PointLight
     }
     this.scene.add(g); return g;
+  };
+  P._warmFx = function () { // fill spark/ring pools and flash them once behind the intro overlay:
+    // material shader/uniform init happens on first render, so a first mass-kill would otherwise stall one frame
+    const cx = g2w(15) + TS / 2, cz = g2w(15) + TS / 2;
+    for (let i = 0; i < 5; i++) this._burst(cx, cz, 0xffffff, 40, .01);
+    for (let i = 0; i < 24; i++) this._fx(cx, cz, false, 0xffffff);
+    for (const s of this.sparks) { s.userData.life = .1; s.material.opacity = .02; }
+    for (const f of this.fxs) { f.userData.t = .8; f.material.opacity = .02; }
   };
   P._mkBar = function (x, z, w) { // progress/HP gauge above a structure
     const T = THREE, gr = new T.Group(); w = w || 1.5;
@@ -246,13 +272,20 @@ export function install(P) {
   P._hpColor = function (p) { return p > .6 ? PAL.cyanHex : p > .3 ? PAL.amberHex : PAL.redHex; }
   P._fx = function (x, z, big, colHex) {
     const T = THREE;
-    const m = new T.Mesh(new T.RingGeometry(.25, .38, 32), new T.MeshBasicMaterial({ color: colHex ?? 0xffffff, transparent: true, opacity: .85, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
-    m.rotation.x = -Math.PI / 2; m.position.set(x, .1, z); m.userData = { t: 0, big: big ? 4 : 1.6 }; this.scene.add(m); this.fxs.push(m);
     this._burst(x, z, colHex ?? 0xffffff, big ? 26 : 7, big ? 9 : 5);
     if (big) this.shake = Math.max(this.shake || 0, .5);
+    if (!big && this.fxs.length >= 48) return; // saturation cap — mass kills keep sparks, drop extra rings
+    let m = this._fxPool.pop();
+    if (!m) m = new T.Mesh(this.fxRingG, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+    m.material.color.setHex(colHex ?? 0xffffff); m.material.opacity = .85;
+    m.rotation.x = -Math.PI / 2; m.position.set(x, .1, z); m.scale.set(1, 1, 1); m.visible = true;
+    m.userData.t = 0; m.userData.big = big ? 4 : 1.6;
+    this.scene.add(m); this.fxs.push(m);
   };
   P._burst = function (x, z, colHex, n, sp) {
     const T = THREE;
+    if (this.sparks.length > 150) n = Math.min(n, 3); // mass-death storm: thin out instead of stalling
+    if (this.sparks.length > 240) return;
     for (let i = 0; i < n; i++) {
       let m = this._sparkPool && this._sparkPool.pop();
       if (!m) m = new T.Mesh(new T.BoxGeometry(.09, .09, .09), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: T.AdditiveBlending, depthWrite: false }));
@@ -265,6 +298,7 @@ export function install(P) {
   };
   P._render = function (dt) {
     const T = THREE, now = performance.now() / 1000;
+    this._fno = ((this._fno | 0) + 1) & 0xffff;
     if (this.dust) this.dust.rotation.y += dt * .01;
     // build-mode overlay: refresh placeable tiles 4x/s
     const bovOn = this.buildMode && this.buildSel !== 3 && !this.over;
@@ -286,7 +320,9 @@ export function install(P) {
         const k = this.occ[i], has = this.sMeshes.has(i);
         if ((k === 1 || k === 2 || k === 5)) {
           let g = this.sMeshes.get(i);
-          const bandStale = k === 2 && g && g.band !== undefined && g.band !== this._turBand();
+          const wband = (this.g.wallLv || 0) >= 4 ? 1 : 0;
+          const bandStale = (k === 2 && g && ((g.band !== undefined && g.band !== this._turBand()) || (g.band === undefined && this.mdl && this.mdl.tower0)))
+            || (k === 1 && g && ((g.wband !== undefined && g.wband !== wband) || (g.wband === undefined && this.mdl && this.mdl.wall0)));
           if (!g || g.kind !== k || bandStale) { if (g) { if (g.bar) this.scene.remove(g.bar); this.scene.remove(g); } g = this._sMesh(k, i); g.kind = k; this.sMeshes.set(i, g); g.position.set(g2w(i % N), 0, g2w((i / N) | 0)); }
         } else if (has) { const old = this.sMeshes.get(i); if (old.bar) this.scene.remove(old.bar); this.scene.remove(old); this.sMeshes.delete(i); }
       }
@@ -312,8 +348,8 @@ export function install(P) {
           if (g.kind === 1 && g.trim) g.trim.scale.y = 1 + (this.g.wallLv || 0) * .8;
         }
       }
-      if (g.kind === 1) { const hpP = this.shp[i] / (WALL_HP * this.g.wallMul); g.trim.material = hpP < .35 ? this.mGlowRed : this.mGlowCyan; g.children[0].scale.y = .55 + .45 * clamp(hpP, 0, 1); g.children[0].position.y = .75 * g.children[0].scale.y; g.trim.position.y = 1.53 * g.children[0].scale.y; }
-      else if (g.gun) { // aim at nearest enemy
+      if (g.kind === 1) { const hpP = this.shp[i] / (WALL_HP * this.g.wallMul); g.trim.material = hpP < .35 ? this.mGlowRed : this.mGlowCyan; const sy = .55 + .45 * clamp(hpP, 0, 1); g.children[0].scale.y = sy; g.children[0].position.y = g.grounded ? 0 : .75 * sy; g.trim.position.y = (g.trimH || 1.53) * sy; }
+      else if (g.gun && ((i + (this._fno | 0)) & 1) === 0) { // aim at nearest enemy — staggered: half the turrets per frame (O(T×E) scan)
         let best = null, bd = 90; const x = g.position.x, z = g.position.z;
         for (const e of this.enemies.values()) { const d = dist2(x, z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
         if (best) g.rotation.y = -Math.atan2(best.z - z, best.x - x) + Math.PI / 2;
@@ -323,15 +359,22 @@ export function install(P) {
     const c = this.coreMesh;
     c.cry.rotation.y += dt * .8; c.ring.rotation.z += dt * 1.2;
     const chp = clamp(this.coreHp / this.coreMax, 0, 1);
-    c.cry.material = (this._coreBanT && this.tm - this._coreBanT < .5) ? this.mFlash : this.mGlowCyan;
-    c.cry.scale.set(.7 + .3 * chp, 1.9 * (.7 + .3 * chp), .7 + .3 * chp);
+    const coreFlash = !!(this._coreBanT && this.tm - this._coreBanT < .5);
+    if (c.model) { // GLB core: hp shrinks it slightly, hits flash all its materials
+      c.model.rotation.y += dt * .5;
+      const cs = (c.s0 || 1) * (.8 + .25 * chp); c.model.scale.setScalar(cs);
+      if (coreFlash !== c._fl) { c._fl = coreFlash; for (const [o, m0] of c.mats) o.material = coreFlash ? this.mFlash : m0; }
+    } else {
+      c.cry.material = coreFlash ? this.mFlash : this.mGlowCyan;
+      c.cry.scale.set(.7 + .3 * chp, 1.9 * (.7 + .3 * chp), .7 + .3 * chp);
+    }
     c.lamp.intensity = 1.2 + Math.sin(now * 2.5) * .4;
     if (!this.coreBar) { this.coreBar = this._mkBar(c.position.x, c.position.z, 4.2); this.coreBar.position.y = 5.6; }
     this.coreBar.visible = true; // always visible — the core is the win/lose condition
     this._setBar(this.coreBar, chp, this._hpColor(chp));
     // gates pulse
     this.gateMs.forEach((g, i) => {
-      const active = i === this.activeGate;
+      const active = (this.activeGates || [this.activeGate]).includes(i);
       // inactive rifts turn gray so the live gate is unmistakable
       g.rift.material.color.setHex(active ? PAL.redHex : 0x6a7180);
       g.rift.material.opacity = active ? .5 + Math.sin(now * 3 + i) * .2 + (this.phase === 'assault' ? .25 : 0) : .16;
@@ -389,18 +432,33 @@ export function install(P) {
     // bullets
     while (this.bMeshes.length < this.bullets.length + this.ebullets.length) { const m = new T.Mesh(this.bulletG, this.mBeamCyan); this.scene.add(m); this.bMeshes.push(m); }
     let bi = 0;
-    for (const b of this.bullets) { const m = this.bMeshes[bi++]; m.visible = true; m.geometry = b.tur ? this.bulletTurG : this.bulletG; m.material = b.tur ? this.mBeamTur : b.ally ? this.mBeamAmber : this.mBeamCyan; m.position.set(b.x, .55, b.z); m.rotation.y = -Math.atan2(b.dz, b.dx); }
-    for (const b of this.ebullets) { const m = this.bMeshes[bi++]; m.visible = true; m.geometry = this.ebulletG; m.material = this.mGlowRed; m.position.set(b.x, .55, b.z); }
+    for (const b of this.bullets) { const m = this.bMeshes[bi++]; m.visible = true; m.geometry = b.tur ? this.bulletTurG : this.bulletG; m.material = b.tur ? (b.band === 2 ? this.mBeamTur2 : b.band === 1 ? this.mBeamTur1 : this.mBeamTur) : b.ally ? this.mBeamAmber : this.mBeamCyan; m.scale.setScalar(b.tur && b.band ? (b.band === 2 ? 1.5 : 1.2) : 1); m.position.set(b.x, .55, b.z); m.rotation.y = -Math.atan2(b.dz, b.dx); }
+    for (const b of this.ebullets) { const m = this.bMeshes[bi++]; m.visible = true; m.geometry = this.ebulletG; m.material = this.mGlowRed; m.scale.setScalar(1); m.position.set(b.x, .55, b.z); }
     for (; bi < this.bMeshes.length; bi++) this.bMeshes[bi].visible = false;
     // items
-    while (this.itemMs.length < this.fitems.length) { const g = new T.Group(); const b = new T.Mesh(new T.BoxGeometry(.55, .55, .55), this.mGlowAmber); b.position.y = .5; g.add(b); const l = new T.PointLight(PAL.amberHex, .6, 4); l.position.y = 1; g.add(l); this.scene.add(g); this.itemMs.push(g); }
+    // no PointLight here: adding/removing lights changes the light count and forces a full-scene shader recompile (one-frame stall)
+    while (this.itemMs.length < this.fitems.length) { const g = new T.Group(); const b = new T.Mesh(new T.BoxGeometry(.55, .55, .55), this.mGlowAmber); b.position.y = .5; g.add(b); const halo = new T.Mesh(new T.CircleGeometry(.7, 20), new T.MeshBasicMaterial({ color: PAL.amberHex, transparent: true, opacity: .22, blending: T.AdditiveBlending, depthWrite: false })); halo.rotation.x = -Math.PI / 2; halo.position.y = .06; g.add(halo); this.scene.add(g); this.itemMs.push(g); }
     this.itemMs.forEach((g, i) => { const f = this.fitems[i]; if (f) { g.visible = true; g.position.set(f.x, Math.sin(now * 2.2) * .15 + .1, f.z); g.children[0].rotation.y += dt * 2; } else g.visible = false; });
     // fx
-    for (const f of [...this.fxs]) { f.userData.t += dt * 3; const s = 1 + f.userData.t * f.userData.big; f.scale.set(s, s, s); f.material.opacity = Math.max(0, .85 - f.userData.t); if (f.material.opacity <= 0) { this.scene.remove(f); f.material.dispose(); this.fxs.splice(this.fxs.indexOf(f), 1); } }
+    for (let i = this.fxs.length - 1; i >= 0; i--) {
+      const f = this.fxs[i]; f.userData.t += dt * 3;
+      const s = 1 + f.userData.t * f.userData.big; f.scale.set(s, s, s);
+      f.material.opacity = Math.max(0, .85 - f.userData.t);
+      if (f.material.opacity <= 0) {
+        f.visible = false; this.scene.remove(f);
+        this.fxs[i] = this.fxs[this.fxs.length - 1]; this.fxs.pop();
+        if (this._fxPool.length < 64) this._fxPool.push(f); else f.material.dispose(); // geometry is shared — material only
+      }
+    }
     if (!this._sparkPool) this._sparkPool = [];
-    for (const s of [...this.sparks]) {
-      const u = s.userData; u.life -= dt;
-      if (u.life <= 0) { s.visible = false; this.scene.remove(s); this.sparks.splice(this.sparks.indexOf(s), 1); if (this._sparkPool.length < 80) this._sparkPool.push(s); continue; }
+    for (let i = this.sparks.length - 1; i >= 0; i--) {
+      const s = this.sparks[i], u = s.userData; u.life -= dt;
+      if (u.life <= 0) {
+        s.visible = false; this.scene.remove(s);
+        this.sparks[i] = this.sparks[this.sparks.length - 1]; this.sparks.pop();
+        if (this._sparkPool.length < 160) this._sparkPool.push(s);
+        continue;
+      }
       u.vy -= 18 * dt; s.position.x += u.vx * dt; s.position.y += u.vy * dt; s.position.z += u.vz * dt;
       if (s.position.y < .05) { s.position.y = .05; u.vy *= -.4; }
       s.material.opacity = Math.min(1, u.life * 3);

@@ -1,5 +1,5 @@
 // net.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._initNet = function () {
@@ -106,14 +106,15 @@ export function install(P) {
       case 'sel': if (this.isHost) { const k = this.occ[m.i]; if (k === 1 || k === 2) { this.allyScrap += Math.round(this._cost(k) * .7); this._remove(m.i); this._send({ t: 'slt', i: m.i, sc: Math.round(this.allyScrap) }); } } break;
       case 'slt': if (!this.isHost) { this.scrap = m.sc; this._remove(m.i); } break;
       case 'buy': if (this.isHost) { const u = SHOP.find(s => s.id === m.id); if (!u) break; const cost = Math.round(u.cost * Math.pow(1.5, (this._peerBuys = this._peerBuys || {}, this._peerBuys[m.id] || 0)));
-        if (this.allyScrap >= cost) { this.allyScrap -= cost; this._peerBuys[m.id] = (this._peerBuys[m.id] || 0) + 1; if (u.g) { u.f(this.g); this._structUpgFx(m.id); this._send({ t: 'gup', id: m.id, sc: Math.round(this.allyScrap) }); } else this._send({ t: 'byk', id: m.id, sc: Math.round(this.allyScrap) }); } } break;
+        if (this.allyScrap >= cost) { this.allyScrap -= cost; this._peerBuys[m.id] = (this._peerBuys[m.id] || 0) + 1; if (u.g) { this._applyStructUpg(u); this._structUpgFx(m.id); this._send({ t: 'gup', id: m.id, sc: Math.round(this.allyScrap) }); } else this._send({ t: 'byk', id: m.id, sc: Math.round(this.allyScrap) }); } } break;
       case 'byk': if (!this.isHost) { const u = SHOP.find(s => s.id === m.id); this.scrap = m.sc; if (u && u.per) { this.me.buys[u.id] = this._buyCount(u.id) + 1; u.f(this.me); this._beep(760, .1, 'square', .05); if (this.shopEl.style.display === 'flex') this._renderShop(); } } break;
       case 'gup': { const u = SHOP.find(s => s.id === m.id); if (this.isHost) break; this.scrap = m.sc; if (u) { u.f(this.g); this._structUpgFx(m.id); this._banner('공용 연구 완료 — ' + u.n); if (this.shopEl.style.display === 'flex') this._renderShop(); } } break;
       case 'skl': if (this.isHost) this._shockwave(m.x, m.z, m.lv, false); else this._shockFx(m.x, m.z, m.lv); break;
-      case 'use': this._applyItemFx(m.k, m.x, m.z, false); break;
+      case 'caug': if (this.isHost) this._coreAug(m.a, m.h); break;
+      case 'use': { if (this.isHost && this.ally.items) { const ix = this.ally.items.indexOf(m.k); if (ix >= 0) this.ally.items.splice(ix, 1); } this._applyItemFx(m.k, m.x, m.z, false); } break;
       case 'dmg': if (!this.isHost) this._hurt(this.me, m.v); break;
       case 'eb': this.ebullets.push({ x: m.x, z: m.z, dx: m.dx, dz: m.dz, life: 3, ghost: !this.isHost }); break;
-      case 'itm': if (!this.isHost) { if (m.who === 1) { this.me.item = m.k; this._banner('아이템 획득 — ' + ITEMS[m.k].n + ' (E)', 2600); } this.fitems = this.fitems.filter(f => f.id !== m.id); this._beep(700, .1); } break;
+      case 'itm': if (!this.isHost) { if (m.who === 1 && this.me.items.length < INV_MAX) { this.me.items.push(m.k); this._banner(`아이템 획득 — ${ITEMS[m.k].n} (${this.me.items.length}/${INV_MAX})`, 2600); } this.fitems = this.fitems.filter(f => f.id !== m.id); this._beep(700, .1); } break;
       case 'ban': if (!this.isHost) this._banner(m.s); break;
       case 's': if (!this.isHost) this._applyState(m); break;
       case 'end': if (!this.isHost) this._gameOver(m.win, m.why, true); break;
@@ -125,11 +126,12 @@ export function install(P) {
     this._lastStateAt = performance.now(); this._peerSeenAt = performance.now(); this._hostLost = false;
     if (!this.isHost) this._peerPaused = !!m.bg;
     this.scrap = m.asc !== undefined ? m.asc : m.sc;
-    this.coreHp = m.core;
+    this.coreHp = m.core; if (m.cm) this.coreMax = m.cm;
     if (this._lastCore !== undefined && m.core < this._lastCore) this._coreHitFx();
     this._lastCore = m.core;
     this.wave = m.wv; this._qn = m.qn || 0;
-    if (m.gt !== undefined && m.gt !== this.activeGate) { this.activeGate = m.gt; if (this.phase === 'build') this._banner(`다음 균열: ${GATE_DIR[m.gt]}쪽`, 2600); }
+    const gts = m.gts || (m.gt !== undefined ? [m.gt] : null);
+    if (gts && gts.join() !== (this.activeGates || []).join()) { this.activeGates = gts; this.activeGate = gts[0]; if (this.phase === 'build') this._banner(`다음 균열: ${gts.map(i => GATE_DIR[i]).join('·')}쪽`, 2600); }
     const wasPhase = this.phase;
     if (this.phase !== 'over' && this.phase !== 'count' && m.ph) { if (m.ph !== this.phase) { this.phase = m.ph; if (m.ph === 'assault') this._banner('WAVE ' + this.wave + ' — 습격!'); else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); } } this.phT = m.pt; }
     const seen = new Set();
@@ -153,7 +155,7 @@ export function install(P) {
       this.sendStateT -= dt;
       if (this.sendStateT <= 0) {
         this.sendStateT = .13; this.sendStT -= .13;
-        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
+        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, cm: this.coreMax, bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
           en: [...this.enemies.values()].map(e => [e.id, e.ty, Math.round(e.x * 10), Math.round(e.z * 10), Math.round(e.hp)]),
           itm: this.fitems.map(f => [f.id, f.k, Math.round(f.x * 10), Math.round(f.z * 10)]) };
         if (this.sendStT <= 0) { this.sendStT = 1.4; o.st = this._structPack(); }

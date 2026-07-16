@@ -74,6 +74,21 @@ const UPG = [
     { d: '처치 자원 +35%', f: p => p.scrapMul = (p.scrapMul || 1) * 1.35 },
     { d: '처치 자원 +45%', f: p => p.scrapMul = (p.scrapMul || 1) * 1.45 },
     { d: '처치 자원 +60%', f: p => p.scrapMul = (p.scrapMul || 1) * 1.6 }] },
+  { k: 'armor', n: '피해 감쇠', t: [ // multiplies damage TAKEN (see _hurt)
+    { d: '받는 피해 −10%', f: p => p.armor = (p.armor || 1) * .9 },
+    { d: '받는 피해 −12%', f: p => p.armor = (p.armor || 1) * .88 },
+    { d: '받는 피해 −15%', f: p => p.armor = (p.armor || 1) * .85 },
+    { d: '받는 피해 −20%', f: p => p.armor = (p.armor || 1) * .8 }] },
+  { k: 'drop', n: '전리품 탐지', t: [ // my kills roll item drops more often
+    { d: '아이템 드랍 확률 +40%', f: p => p.dropMul = (p.dropMul || 1) * 1.4 },
+    { d: '아이템 드랍 확률 +50%', f: p => p.dropMul = (p.dropMul || 1) * 1.5 },
+    { d: '아이템 드랍 확률 +70%', f: p => p.dropMul = (p.dropMul || 1) * 1.7 },
+    { d: '아이템 드랍 확률 2배', f: p => p.dropMul = (p.dropMul || 1) * 2 }] },
+  { k: 'core', n: '코어 정비', t: [ // second arg = game element (host-authoritative via _coreAug)
+    { d: '코어 최대 HP +80 · 즉시 +80', f: (p, g) => g && g._coreAug(80, 80) },
+    { d: '코어 최대 HP +100 · 즉시 +100', f: (p, g) => g && g._coreAug(100, 100) },
+    { d: '코어 최대 HP +130 · 즉시 +130', f: (p, g) => g && g._coreAug(130, 130) },
+    { d: '코어 최대 HP +160 · 완전 수리', f: (p, g) => g && g._coreAug(160, 1e9) }] },
 ];
 const SHOP = [
   { id: 'php', c: '캐릭터', n: '장갑 보강', d: '최대 HP +25', cost: 30, per: true, f: p => { p.maxhp += 25; p.hp += 25; } },
@@ -82,7 +97,7 @@ const SHOP = [
   { id: 'sskl', c: '스킬', n: '충격파 강화', d: '피해·반경 ↑, 쿨다운 ↓', cost: 40, per: true, max: 4, f: p => p.sklLv++ },
   { id: 'sdash', c: '스킬', n: '대시 모듈', d: '대시 쿨다운 −20%', cost: 30, per: true, max: 4, f: p => p.dashCd *= .8 },
   { id: 'gwall', c: '구조물', n: '벽 강화', d: '벽 내구 +40% (공용)', cost: 35, g: true, f: g => { g.wallMul *= 1.4; g.wallLv = (g.wallLv || 0) + 1; } },
-  { id: 'gtur', c: '구조물', n: '포탑 화력', d: '포탑 공격 +25% (공용)', cost: 40, g: true, f: g => { g.turMul *= 1.25; g.turLv = (g.turLv || 0) + 1; } },
+  { id: 'gtur', c: '구조물', n: '포탑 화력', d: '포탑 공격 +25% · 내구 +15% (공용)', cost: 40, g: true, f: g => { g.turMul *= 1.25; g.turHpMul = (g.turHpMul || 1) * 1.15; g.turLv = (g.turLv || 0) + 1; } },
   { id: 'gcost', c: '구조물', n: '건설 자동화', d: '건설 비용 −15% (공용)', cost: 45, g: true, max: 3, f: g => g.costMul *= .85 },
 ];
 /* synergies: taking both level-up card lines awakens a one-time evolution bonus */
@@ -92,12 +107,17 @@ const SYN = [
   { id: 'rush', need: ['speed', 'regen'], n: '전투 기동', d: '대시 쿨다운 −25%', f: p => p.dashCd *= .75 },
   { id: 'fort', need: ['maxhp', 'regen'], n: '재생 장갑', d: '자가 수복 ×1.6', f: p => p.regen *= 1.6 },
   { id: 'greed', need: ['scrap', 'dmg'], n: '약탈 프로토콜', d: '처치 자원 +20% 추가', f: p => p.scrapMul = (p.scrapMul || 1) * 1.2 },
+  { id: 'bulwark', need: ['armor', 'maxhp'], n: '불괴 장갑', d: '받는 피해 −8% 추가', f: p => p.armor = (p.armor || 1) * .92 },
+  { id: 'sanctum', need: ['core', 'regen'], n: '성역 프로토콜', d: '코어 +120 · 완전 수리', f: (p, g) => g && g._coreAug(120, 1e9) },
+  { id: 'hunter', need: ['drop', 'scrap'], n: '전리품 사냥꾼', d: '드랍 +30% · 자원 +15% 추가', f: p => { p.dropMul = (p.dropMul || 1) * 1.3; p.scrapMul = (p.scrapMul || 1) * 1.15; } },
+  { id: 'aegis', need: ['armor', 'core'], n: '수호자 서약', d: '받는 피해 −6% · 코어 +80', f: (p, g) => { p.armor = (p.armor || 1) * .94; if (g) g._coreAug(80, 80); } },
 ];
-const ITEMS = { bomb: { n: '융단 폭격' }, turret: { n: '즉석 포탑' }, kit: { n: '응급 키트' }, slow: { n: '지연 필드' } };
+const ITEMS = { bomb: { n: '융단 폭격', i: '💣', d: '전 구역의 적에게 90 피해' }, turret: { n: '즉석 포탑', i: '🗼', d: '현재 위치에 포탑 즉시 건설' }, kit: { n: '응급 키트', i: '➕', d: '내 체력 완전 회복' }, slow: { n: '지연 필드', i: '⏳', d: '5초간 모든 적 감속' } };
 const ITEM_KEYS = Object.keys(ITEMS);
-const DIFF = { easy: .75, normal: 1, hard: 1.35 };
-const DIFF_CNT = { easy: .8, normal: 1, hard: 1.25 };  // wave size multiplier
-const DIFF_SPT = { easy: 1.15, normal: 1, hard: .88 }; // spawn interval multiplier
+const INV_MAX = 5; // item inventory slots
+const DIFF = { easy: .75, normal: 1, hard: 1.35, nightmare: 1.49 };   // damage: nightmare = hard +10%
+const DIFF_CNT = { easy: .8, normal: 1, hard: 1.25, nightmare: 2.5 }; // wave size: nightmare ≈ 2x hard
+const DIFF_SPT = { easy: 1.15, normal: 1, hard: .88, nightmare: .5 }; // spawn interval (2x mobs need 2x flow)
 const RELAY = 'wss://q-erosion-relay.qpoiop3.workers.dev'; // dedicated DO relay (public MQTT is the fallback)
 const GATE_DIR = ['북', '남', '서', '동']; // matches gates[] order
 /* GLB model manifest — primitives remain the automatic fallback for anything
@@ -112,10 +132,13 @@ const MODELS = {
   boss2:  { url: 'assets/boss_final.glb',     size: 4.2, yaw: 0, merge: true },
   tower0: { url: 'assets/tower_t1.glb',       size: 1.9, yaw: 0, merge: true }, // research band 0-3
   tower1: { url: 'assets/tower_t2.glb',       size: 2.2, yaw: 0, merge: true }, // band 4-9; band 10+ = same model, scaled up
+  wall0:  { url: 'assets/wall_t1.glb',        size: 1.84, yaw: 0, merge: true }, // wall research 0-3 (tile is 2 units)
+  wall1:  { url: 'assets/wall_t2.glb',        size: 1.84, yaw: 0, merge: true }, // wall research 4+
+  core:   { url: 'assets/core.glb',           size: 6.5, yaw: 0, merge: true }, // energy-orb core — bbox is mostly its transparent halo, so oversize it
 };
 const SHIP_MODEL_YAW = (() => { const q = new URLSearchParams(location.search).get('shipyaw'); return q !== null ? +q * Math.PI / 180 : 0; })();
-const XP_NEED = lv => 45 + lv * 30;  // steeper curve — augments should take real kills
+const XP_NEED = lv => 45 + lv * 30 + Math.max(0, lv - 5) * 12; // Lv1-5: original pace; Lv6+: +12/level extra so late cards space out gently
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
 
-export { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T };
+export { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T };

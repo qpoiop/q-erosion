@@ -1,0 +1,11 @@
+Model Information:
+* title:	Cube Metalic (make in blender)
+* source:	https://sketchfab.com/3d-models/cube-metalic-make-in-blender-fb013aec67684808848e6f9c35da1ac9
+* author:	_sqtime_ (https://sketchfab.com/kiavsd)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Cube Metalic (make in blender)" (https://sketchfab.com/3d-models/cube-metalic-make-in-blender-fb013aec67684808848e6f9c35da1ac9) by _sqtime_ (https://sketchfab.com/kiavsd) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

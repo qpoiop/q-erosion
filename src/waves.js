@@ -1,14 +1,15 @@
 // waves.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._startBuild = function () {
     this.phase = 'build'; this.phT = this.wave === 0 ? this.buildTime + 10 : this.buildTime;
-    this.activeGate = Math.floor(Math.random() * 4); // next assault pours through one random gate
+    this._pickGates(); // next assault pours through the active gate(s) — nightmare opens several
     if (this.mode === 'solo') this._saveRun();
     const bonus = 30 + this.wave * 12; this.scrap += bonus; if (this.mode !== 'solo' && this.isHost) this.allyScrap += bonus;
-    if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus} · 다음 균열: ${GATE_DIR[this.activeGate]}쪽`, 3600); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
-    else this._banner(`준비 단계 — ${GATE_DIR[this.activeGate]}쪽 균열을 막아라 (건설 버튼)`, 4200);
+    const dirs = this.activeGates.map(i => GATE_DIR[i]).join('·');
+    if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus} · 다음 균열: ${dirs}쪽`, 3600); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
+    else this._banner(`준비 단계 — ${dirs}쪽 균열을 막아라 (건설 버튼)`, 4200);
     if (this.fitems.length < 2 && this.wave > 0) { const g = this.gates[Math.floor(Math.random() * 4)]; this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: rnd(-8, 8), z: rnd(-8, 8) }); }
   };
   P._startAssault = function () {
@@ -34,7 +35,7 @@ export function install(P) {
   };
   P._spawnOne = function () {
     const ty = this.spawnQ.shift();
-    const g = this.gates[this.activeGate]; // the whole wave streams through the active gate
+    const g = this.gates[this.activeGates[Math.floor(Math.random() * this.activeGates.length)]]; // wave streams through the active gate(s)
     const id = this.eid++;
     const hpMul = (1 + (this.wave - 1) * .18) * this.diffMul;
     // spawn OUTSIDE the gate, spread across its widened front, walk in
@@ -154,7 +155,7 @@ export function install(P) {
     if (d > .6) { const nx = b.x + dx / d * b.speed * dt, nz = b.z + dz / d * b.speed * dt; if (!this._blockedAt(nx, b.z)) b.x = nx; if (!this._blockedAt(b.x, nz)) b.z = nz; if (!th) b.a = Math.atan2(dz, dx); }
     b.x = clamp(b.x, 1 - HALF, HALF - 1); b.z = clamp(b.z, 1 - HALF, HALF - 1);
     b.hp = Math.min(b.maxhp, b.hp + (1 + b.regen) * dt * .5);
-    if (b.item && this.enemies.size > 6) { this._applyItemFx(b.item, b.x, b.z, false); if (b.item === 'kit') b.hp = b.maxhp; b.item = null; }
+    if (b.items && b.items.length && this.enemies.size > 6) { const k = b.items.shift(); this._applyItemFx(k, b.x, b.z, false); if (k === 'kit') b.hp = b.maxhp; }
     this._autoCombat(b, dt, false);
   };
   P._reviveSim = function (dt) {

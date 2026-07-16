@@ -1,9 +1,9 @@
 // combat.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._spawnBullet = function (x, z, dx, dz, o) {
-    this.bullets.push({ x, z, dx, dz, life: .9, dmg: o.dmg || 0, pierce: o.pierce || 0, ghost: o.ghost, ally: o.ally, tur: o.tur });
+    this.bullets.push({ x, z, dx, dz, life: .9, dmg: o.dmg || 0, pierce: o.pierce || 0, ghost: o.ghost, ally: o.ally, tur: o.tur, band: o.band || 0 });
   };
   P._fire = function (p, tx, tz, mine) {
     const base = Math.atan2(tz - p.z, tx - p.x);
@@ -32,7 +32,8 @@ export function install(P) {
       else if (src && src.tur) { this.scrap += base / 2; this.allyScrap += base / 2; } // turret kills split
       else if (src && src.ally) this.allyScrap += base * (this.ally.scrapMul || 1);
       else this.scrap += base * (this.me.scrapMul || 1);
-      if (Math.random() < .04 && this.fitems.length < 2) this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: e.x, z: e.z });
+      const dropMul = src && src.ally ? (this.ally.dropMul || 1) : src && src.tur ? 1 : (this.me.dropMul || 1); // killer's loot-detection augment
+      if (Math.random() < .04 * dropMul && this.fitems.length < 3) this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: e.x, z: e.z });
     }
   };
   P._killFx = function (e) { this._fx(e.x, e.z, !!ETYPES[e.ty]?.boss, PAL.redHex); const m = this.eMeshes.get(e.id); if (m) { if (m.bossBar) this.scene.remove(m.bossBar); this.scene.remove(m); this.eMeshes.delete(e.id); } }
@@ -69,18 +70,22 @@ export function install(P) {
     // build phase opens immediately, assault holds as a chip (see _hudTick).
     if (this.pendUp > 0 && this.upEl.style.display === 'none' && !this.over && (this.mode === 'solo' || this.phase !== 'assault')) this._showUpgrades();
   };
+  P._coreAug = function (add, heal) { // core augment — host-authoritative; joiners forward the request
+    if (this.isHostish()) { this.coreMax += add; this.coreHp = Math.min(this.coreMax, this.coreHp + heal); this._coreBanT = this.tm; }
+    else this._send({ t: 'caug', a: add, h: heal });
+  };
   P._botUpgrade = function () {
     const p = this.ally;
     const pool = UPG.filter(u => (p.taken[u.k] || 0) < u.t.length);
     if (!pool.length) return;
     const u = pool[Math.floor(Math.random() * pool.length)], tier = p.taken[u.k] || 0;
-    u.t[tier].f(p); p.taken[u.k] = tier + 1; this._checkSyn(p, false);
+    u.t[tier].f(p, this); p.taken[u.k] = tier + 1; this._checkSyn(p, false);
   };
   P._checkSyn = function (p, mine) { // combo of taken card lines → one-time evolution bonus
     p.syn = p.syn || {};
     for (const s of SYN) {
       if (p.syn[s.id] || !s.need.every(k => p.taken[k])) continue;
-      p.syn[s.id] = 1; s.f(p);
+      p.syn[s.id] = 1; s.f(p, this);
       if (mine) { this._banner(`✦ 시너지 각성 — ${s.n}! ${s.d}`, 3800); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
     }
   };
@@ -107,9 +112,10 @@ export function install(P) {
       }
     }
   };
-  P._useItem = function () {
-    const p = this.me; if (!p.item || p.down || (this.phase !== 'assault' && this.phase !== 'build')) return;
-    const k = p.item; p.item = null;
+  P._useItem = function (idx) {
+    const p = this.me; if (p.down || (this.phase !== 'assault' && this.phase !== 'build')) return;
+    const k = p.items[idx ?? 0]; if (!k) return;
+    p.items.splice(idx ?? 0, 1);
     this._applyItemFx(k, p.x, p.z, true);
     if (this.mode !== 'solo') this._send({ t: 'use', k, x: +p.x.toFixed(1), z: +p.z.toFixed(1) });
   };
@@ -126,7 +132,7 @@ export function install(P) {
   };
   P._hurt = function (p, v) {
     if (p.down || p.dashing > 0 || this.over) return;
-    p.hp -= v; this._beep(140, .08, 'sawtooth', .05);
+    p.hp -= v * (p.armor || 1); this._beep(140, .08, 'sawtooth', .05);
     if (p === this.me) { this.dmgFlash = 1; this.shake = Math.max(this.shake || 0, .35); }
     if (p.hp <= 0) { p.hp = 0; p.down = true; p.downT = 40; p.revP = 0; if (p === this.me) this._banner('쓰러짐 — 동료의 구조 대기'); }
   };
@@ -143,15 +149,15 @@ export function install(P) {
       if (cd > 0) continue;
       const x = g2w(i % N), z = g2w((i / N) | 0);
       let best = null, bd = 90; for (const e of this.enemies.values()) { const d = dist2(x, z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
-      if (best) { this._turCd[i] = .3; const a = Math.atan2(best.z - z, best.x - x); this._spawnBullet(x, z, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * this.g.turMul, tur: true }); }
+      if (best) { this._turCd[i] = .3; const a = Math.atan2(best.z - z, best.x - x); this._spawnBullet(x, z, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * this.g.turMul, tur: true, band: this._turBand() }); }
     }
   };
   P._pickupSim = function () {
     for (const f of [...this.fitems]) {
       const meN = dist2(f.x, f.z, this.me.x, this.me.z) < 1.7, alN = this.allyOn && dist2(f.x, f.z, this.ally.x, this.ally.z) < 1.7;
-      if (meN && !this.me.down && !this.me.item) { this.me.item = f.k; this.fitems = this.fitems.filter(q => q !== f); this._beep(700, .1); this._banner('아이템 획득 — ' + ITEMS[f.k].n + ' (E)', 2600); if (this.mode !== 'solo') this._send({ t: 'itm', who: 0, id: f.id, k: f.k }); }
-      else if (alN && !this.ally.down && this.mode !== 'solo') { this.fitems = this.fitems.filter(q => q !== f); this._send({ t: 'itm', who: 1, id: f.id, k: f.k }); }
-      else if (alN && this.mode === 'solo' && !this.ally.item) { this.ally.item = f.k; this.fitems = this.fitems.filter(q => q !== f); }
+      if (meN && !this.me.down && this.me.items.length < INV_MAX) { this.me.items.push(f.k); this.fitems = this.fitems.filter(q => q !== f); this._beep(700, .1); this._banner(`아이템 획득 — ${ITEMS[f.k].n} (${this.me.items.length}/${INV_MAX})`, 2600); if (this.mode !== 'solo') this._send({ t: 'itm', who: 0, id: f.id, k: f.k }); }
+      else if (alN && !this.ally.down && this.mode !== 'solo' && this.ally.items.length < INV_MAX) { this.ally.items.push(f.k); this.fitems = this.fitems.filter(q => q !== f); this._send({ t: 'itm', who: 1, id: f.id, k: f.k }); }
+      else if (alN && this.mode === 'solo' && this.ally.items.length < INV_MAX) { this.ally.items.push(f.k); this.fitems = this.fitems.filter(q => q !== f); }
     }
   };
   P._movePlayer = function (dt) {
@@ -184,7 +190,7 @@ export function install(P) {
       if (Math.abs(b.x) > HALF || Math.abs(b.z) > HALF) { b.life = 0; continue; }
       for (const e of this.enemies.values()) {
         if (dist2(b.x, b.z, e.x, e.z) < (ETYPES[e.ty].r + .2) ** 2) {
-          this._fx(b.x, b.z, false, b.tur || !b.ally ? PAL.cyanHex : PAL.amberHex);
+          this._fx(b.x, b.z, false, b.tur ? (b.band === 2 ? 0xd98aff : b.band === 1 ? PAL.amberHex : PAL.cyanHex) : !b.ally ? PAL.cyanHex : PAL.amberHex);
           if (!b.ghost) { if (host) this._dmgEnemy(e, b.dmg, b); else { e.flash = .12; this._send({ t: 'hit', id: e.id, d: +b.dmg.toFixed(1) }); } }
           if (b.pierce > 0) b.pierce--; else b.life = 0;
           break;

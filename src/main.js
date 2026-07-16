@@ -1,5 +1,5 @@
 // main.js — ErosionGame shell: lifecycle & orchestration. Feature methods live in sibling modules.
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 import { install as installScene } from './scene.js';
 import { install as installModels } from './models.js';
 import { install as installHud } from './hud.js';
@@ -41,6 +41,7 @@ class ErosionGame extends HTMLElement {
       return;
     }
     this._bindInput();
+    this._warmFx(); // pre-compile particle materials while the intro overlay covers the screen
     this._onVis = () => { this._bgPaused = document.hidden; };
     document.addEventListener('visibilitychange', this._onVis);
     if (this.mode === 'solo') {

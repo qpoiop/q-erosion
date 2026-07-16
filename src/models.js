@@ -1,5 +1,5 @@
 // models.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._mergeStatic = function (root) { // bake world-transformed geometry into one mesh per material
@@ -43,7 +43,16 @@ export function install(P) {
         let root = cfg.merge ? this._mergeStatic(gl.scene) : gl.scene;
         this.mdl[key] = this._normalize(root, cfg.size, key === 'ship' ? SHIP_MODEL_YAW : cfg.yaw);
         if (key === 'ship') this._applyShip();
-        if (key.startsWith('tower')) this._syncStruct();
+        if (key.startsWith('tower') || key.startsWith('wall')) this._syncStruct();
+        if (key === 'core' && this.coreMesh) { // swap the placeholder crystal for the core model
+          const cg = this.coreMesh;
+          cg.cry.visible = false;
+          const m = this.mdl.core.clone(true);
+          m.traverse(o => { if (o.isMesh) o.castShadow = true; });
+          m.position.y = .62; // sit on the pedestal
+          cg.add(m); cg.model = m; cg.s0 = m.scale.x; // _normalize bakes its fit into root scale — renderer must scale relative to this
+          cg.mats = []; m.traverse(o => { if (o.isMesh) cg.mats.push([o, o.material]); }); // for hit-flash swaps
+        }
       }, undefined, e => console.warn('[erosion] model load failed (' + key + ') — primitive kept', e));
     }
   };

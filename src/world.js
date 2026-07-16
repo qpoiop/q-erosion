@@ -1,9 +1,9 @@
 // world.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._reset = function () {
-    const mk = (x, z) => ({ x, z, a: 0, hp: 100, maxhp: 100, speed: 6, dmg: 9, frate: 2.5, shots: 1, pierce: 0, regen: 0, dashCd: 3.5, sklLv: 1, sklT: 0, scrapMul: 1, fireT: 0, dashT: 0, dashing: 0, down: false, downT: 0, revP: 0, item: null, taken: {}, buys: {}, lastSeen: 0 });
+    const mk = (x, z) => ({ x, z, a: 0, hp: 100, maxhp: 100, speed: 6, dmg: 9, frate: 2.5, shots: 1, pierce: 0, regen: 0, dashCd: 3.5, sklLv: 1, sklT: 0, scrapMul: 1, fireT: 0, dashT: 0, dashing: 0, down: false, downT: 0, revP: 0, items: [], taken: {}, buys: {}, lastSeen: 0 });
     this.me = mk(-2.5, 5); this.ally = mk(2.5, 5);
     this.allyOn = this.mode === 'solo';
     this.occ = new Uint8Array(N * N); this.shp = new Float32Array(N * N);
@@ -22,9 +22,16 @@ export function install(P) {
     // wide gates (4 tiles) at 4 mid-edges; one is active per wave
     this.gates = [{ gx: 15, gz: 0 }, { gx: 15, gz: N - 1 }, { gx: 0, gz: 15 }, { gx: N - 1, gz: 15 }];
     this.gates.forEach(g => { for (let o = -2; o < 4; o++) { const x = g.gx + (g.gz === 0 || g.gz === N - 1 ? o : 0), z = g.gz + (g.gx === 0 || g.gx === N - 1 ? o : 0); this.occ[ti(x, z)] = 4; } g.x = g2w(g.gx + (g.gz === 0 || g.gz === N - 1 ? .5 : 0) * 1); g.z = g2w(g.gz) + (g.gx === 0 || g.gx === N - 1 ? TS / 2 : 0); });
-    this.activeGate = Math.floor(Math.random() * 4);
+    this._pickGates();
     this._flow(); this._syncStruct();
     this._hudReset();
+  };
+  P._pickGates = function () { // nightmare opens 2 gates per player (solo 2, multi all 4); other modes 1
+    const want = this.diffKey === 'nightmare' ? (this.mode === 'solo' ? 2 : 4) : 1;
+    const idx = [0, 1, 2, 3];
+    for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+    this.activeGates = idx.slice(0, want).sort();
+    this.activeGate = this.activeGates[0];
   };
   P._flow = function () {
     const dist = this.flowD = new Float32Array(N * N).fill(1e9);
@@ -46,7 +53,7 @@ export function install(P) {
       }
     }
   };
-  P._structHp = function (k) { return k === 1 ? WALL_HP * this.g.wallMul : TURRET_HP; }
+  P._structHp = function (k) { return k === 1 ? WALL_HP * this.g.wallMul : TURRET_HP * (this.g.turHpMul || 1); }
   P._turBand = function () { const l = this.g.turLv || 0; return l >= 10 ? 2 : l >= 4 ? 1 : 0; }
   P._place = function (i, k, silent) {
     this.occ[i] = k; this.shp[i] = this._structHp(k);
@@ -91,6 +98,15 @@ export function install(P) {
     }
   };
   P._refreshShp = function () { for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 && this.shp[i] > WALL_HP * this.g.wallMul) this.shp[i] = WALL_HP * this.g.wallMul; }
+  P._applyStructUpg = function (u) { // apply a shared structure research, keeping damaged structures' HP RATIO
+    const ow = this._structHp(1), ot = this._structHp(2);
+    u.f(this.g);
+    const rw = this._structHp(1) / ow, rt = this._structHp(2) / ot;
+    if (rw !== 1 || rt !== 1) {
+      for (let i = 0; i < N * N; i++) { if (this.occ[i] === 1) this.shp[i] *= rw; else if (this.occ[i] === 2) this.shp[i] *= rt; }
+      this._syncStruct();
+    }
+  };
   P._unstuck = function (p) { // shove a unit off a tile that just became solid
     if (!this._blockedAt(p.x, p.z)) return;
     const gx = w2g(p.x), gz = w2g(p.z);
@@ -104,15 +120,17 @@ export function install(P) {
     try {
       const st = [];
       for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2) st.push([i, this.occ[i], Math.round(this.shp[i])]);
-      const pick = q => ({ hp: q.hp, maxhp: q.maxhp, speed: q.speed, dmg: q.dmg, frate: q.frate, shots: q.shots, pierce: q.pierce, regen: q.regen, dashCd: q.dashCd, dashDur: q.dashDur, sklLv: q.sklLv, scrapMul: q.scrapMul, taken: q.taken, syn: q.syn || {}, buys: q.buys });
-      localStorage.setItem('eg_save', JSON.stringify({ v: 1, wave: this.wave, core: Math.round(this.coreHp), scrap: Math.round(this.scrap), lv: this.lv, xp: Math.round(this.xp), kills: this.kills, tm: Math.round(this.tm), g: this.g, st, me: pick(this.me), ally: pick(this.ally), diff: this.diffKey, waves: this.maxWave, bt: this.buildTime }));
+      const pick = q => ({ hp: q.hp, maxhp: q.maxhp, speed: q.speed, dmg: q.dmg, frate: q.frate, shots: q.shots, pierce: q.pierce, regen: q.regen, dashCd: q.dashCd, dashDur: q.dashDur, sklLv: q.sklLv, scrapMul: q.scrapMul, armor: q.armor, dropMul: q.dropMul, taken: q.taken, syn: q.syn || {}, buys: q.buys, items: q.items || [] });
+      localStorage.setItem('eg_save', JSON.stringify({ v: 1, wave: this.wave, core: Math.round(this.coreHp), coreMax: Math.round(this.coreMax), scrap: Math.round(this.scrap), lv: this.lv, xp: Math.round(this.xp), kills: this.kills, tm: Math.round(this.tm), g: this.g, st, me: pick(this.me), ally: pick(this.ally), diff: this.diffKey, waves: this.maxWave, bt: this.buildTime }));
     } catch (e) {}
   };
   P._loadRun = function (s) {
-    this.wave = s.wave; this.coreHp = s.core; this.scrap = s.scrap; this.lv = s.lv; this.xp = s.xp; this.kills = s.kills; this.tm = s.tm;
+    this.wave = s.wave; this.coreHp = s.core; if (s.coreMax) this.coreMax = s.coreMax; this.scrap = s.scrap; this.lv = s.lv; this.xp = s.xp; this.kills = s.kills; this.tm = s.tm;
     Object.assign(this.g, s.g);
     for (const [i, k, hp] of s.st) { this.occ[i] = k; this.shp[i] = hp; this.bld[i] = 1; }
     Object.assign(this.me, s.me); Object.assign(this.ally, s.ally);
+    // saves from the single-slot era carry `item`; fold it into the inventory
+    for (const q of [this.me, this.ally]) if (!Array.isArray(q.items)) q.items = q.item ? [q.item] : [];
     this._flow(); this._syncStruct();
     this.phase = 'build'; this.phT = this.buildTime;
     this.ov.style.display = 'none';

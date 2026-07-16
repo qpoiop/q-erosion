@@ -1,5 +1,5 @@
 // hud.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._buildDOM = function () {
@@ -61,8 +61,9 @@ export function install(P) {
     this.hintEl = H('div', 'position:absolute;bottom:88px;left:50%;transform:translateX(-50%);font:400 11px ' + FONT + ';color:' + PAL.dim + ';letter-spacing:.05em;display:none;text-align:center;background:rgba(12,14,20,.45);padding:4px 12px;border:1px solid rgba(58,64,82,.4)', hud);
     this.hintEl.textContent = ('ontouchstart' in window) ? '드래그 이동 · 대시(무적 돌진)/아이템 버튼 · 건설/연구는 좌하단' : '이동 WASD · 대시 Space(무적 돌진) · 아이템 E · 건설/연구는 좌하단';
     // owned card lines (tier-colored) + awakened synergy badges
-    this.ownedEl = H('div', 'position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-width:64vw', hud);
-    this.synEl = H('div', 'position:absolute;bottom:64px;left:50%;transform:translateX(-50%);display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:60vw', hud);
+    // capped height + inner scroll so a stacked build can't overflow into the HUD above
+    this.ownedEl = H('div', 'position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-width:min(72vw,640px);max-height:42px;overflow-y:auto;scrollbar-width:none;pointer-events:auto', hud);
+    this.synEl = H('div', 'position:absolute;bottom:86px;left:50%;transform:translateX(-50%);display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:min(66vw,560px);max-height:26px;overflow-y:auto;scrollbar-width:none;pointer-events:auto', hud);
     // square action buttons — uniform centered label layout
     const sqBtn = (parent, label, accent) => {
       const b = H('button', pe + 'width:68px;height:68px;border:1px solid ' + (accent || PAL.line) + ';background:' + PAL.panel + ';color:' + (accent || PAL.text) + ';font:700 12px ' + FONT + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;gap:2px;text-align:center;backdrop-filter:blur(6px);line-height:1.3', parent);
@@ -85,7 +86,11 @@ export function install(P) {
     this.shopBtn = sqBtn(blRow, '연구', PAL.amber);
     press(this.shopBtn, () => this._toggleShop());
     this.itemBtn = sqBtn(blRow, '아이템');
-    press(this.itemBtn, () => this._useItem());
+    press(this.itemBtn, () => this._toggleInv());
+    // item inventory sheet — pick one of the carried items to use
+    this.invBg = H('div', 'position:absolute;inset:0;display:none;background:rgba(5,6,10,.45);z-index:24;' + pe, hud);
+    this.invBg.addEventListener('pointerdown', e => { e.stopPropagation(); this._toggleInv(false); });
+    this.invEl = H('div', 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;flex-direction:column;gap:8px;z-index:25;' + pe + panel + 'padding:16px;min-width:min(86vw,320px);max-height:70vh;overflow:auto', hud);
     // banner / revive
     this.ban = H('div', 'position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(12,14,20,.6);border:1px solid rgba(58,64,82,.55);backdrop-filter:blur(4px);color:' + PAL.text + ';font:700 12px ' + FONT + ';padding:6px 13px;letter-spacing:.07em;display:none;white-space:nowrap;border-left:3px solid ' + PAL.red, hud);
     this.revEl = H('div', 'position:absolute;left:50%;top:58%;transform:translateX(-50%);display:none;' + panel + 'padding:7px 14px;font:700 12px ' + FONT, hud);
@@ -113,7 +118,7 @@ export function install(P) {
     [this.wallChip, this.turChip, this.sellChip].forEach((c, i) => { const on = sel === i + 1; c.style.borderColor = on ? PAL.cyan : PAL.line; c.style.color = on ? PAL.cyan : PAL.text; c.style.background = on ? 'rgba(37,216,255,.14)' : PAL.panel; });
   };
   P._obtn = function (primary) { return `font:700 13px ${FONT};border:1px solid ${primary ? PAL.red : PAL.line};background:${primary ? PAL.red : 'transparent'};color:${primary ? '#fff' : PAL.text};padding:10px 16px;cursor:pointer;letter-spacing:.04em`; }
-  P._hudReset = function () { if (this.upEl) { this.upEl.style.display = 'none'; this.shopEl.style.display = 'none'; if (this.shopBg) { this.shopBg.style.display = 'none'; this.shopBtn.textContent = '연구'; this.shopBtn.style.background = PAL.panel; } this.ov.style.display = 'none'; this.buildMode = false; this._buildBarSync(); } }
+  P._hudReset = function () { if (this.upEl) { this.upEl.style.display = 'none'; this.shopEl.style.display = 'none'; if (this.shopBg) { this.shopBg.style.display = 'none'; this.shopBtn.textContent = '연구'; this.shopBtn.style.background = PAL.panel; } if (this.invEl) { this.invEl.style.display = 'none'; this.invBg.style.display = 'none'; } this.ov.style.display = 'none'; this.buildMode = false; this._buildBarSync(); } }
   P._banner = function (t, ms) { this.ban.textContent = t; this.ban.style.display = 'block'; clearTimeout(this._banT); this._banT = setTimeout(() => this.ban.style.display = 'none', ms || 2600); }
   P._exitConfirm = function () { // exit button & browser-back both land here
     if (this.phase === 'over' || this.phase === 'wait') { this._exit(); return; } // no game in progress — leave directly
@@ -129,6 +134,35 @@ export function install(P) {
   P._overlay = function (html) { this.ov.style.display = 'flex'; this.ovIn.innerHTML = html; }
   P._buyCount = function (id) { return this.me.buys[id] || 0; }
   P._shopCost = function (u) { return Math.round(u.cost * Math.pow(1.5, this._buyCount(u.id))); }
+  P._toggleInv = function (force) {
+    const open = force !== undefined ? force : this.invEl.style.display !== 'flex';
+    if (open && !this.me.items.length) { this._banner('보유한 아이템이 없습니다'); return; }
+    this.invEl.style.display = open ? 'flex' : 'none';
+    this.invBg.style.display = open ? 'block' : 'none';
+    if (open) this._renderInv();
+  };
+  P._renderInv = function () {
+    const el = this.invEl; el.innerHTML = '';
+    const head = document.createElement('div');
+    head.style.cssText = `display:flex;justify-content:space-between;align-items:center;font:700 13px ${FONT};letter-spacing:.1em`;
+    head.innerHTML = `<span>인벤토리 <span style="color:${PAL.dim}">${this.me.items.length}/${INV_MAX}</span></span>`;
+    const close = document.createElement('button');
+    close.textContent = '✕'; close.style.cssText = `background:transparent;border:none;color:${PAL.dim};font:700 14px ${FONT};cursor:pointer;padding:2px 6px`;
+    close.onclick = () => this._toggleInv(false); head.appendChild(close);
+    el.appendChild(head);
+    this.me.items.forEach((k, idx) => {
+      const it = ITEMS[k];
+      const row = document.createElement('button');
+      row.style.cssText = `display:flex;gap:10px;align-items:center;text-align:left;background:rgba(20,23,32,.85);border:1px solid ${PAL.line};padding:10px 12px;cursor:pointer;color:${PAL.text}`;
+      row.innerHTML = `<span style="font-size:20px">${it.i || '▪'}</span><span style="flex:1"><span style="font:700 13px ${FONT};display:block">${it.n}</span><span style="font:400 11px ${FONT};color:${PAL.dim}">${it.d || ''}</span></span><span style="font:700 11px ${FONT};color:${PAL.cyan}">사용</span>`;
+      row.onclick = () => { this._useItem(idx); this._beep(500, .1); this.me.items.length ? this._renderInv() : this._toggleInv(false); };
+      el.appendChild(row);
+    });
+    const note = document.createElement('div');
+    note.textContent = '단축키 E — 인벤토리 열기/닫기';
+    note.style.cssText = `font:400 10.5px ${FONT};color:${PAL.dim};letter-spacing:.05em;text-align:center;margin-top:2px`;
+    el.appendChild(note);
+  };
   P._toggleShop = function () {
     const open = this.shopEl.style.display !== 'flex';
     this.shopEl.style.display = open ? 'flex' : 'none';
@@ -166,7 +200,7 @@ export function install(P) {
     if (this.isHostish()) {
       this.scrap -= cost;
       this.me.buys[u.id] = this._buyCount(u.id) + 1;
-      if (u.per) u.f(this.me); else { u.f(this.g); this._structUpgFx(u.id); if (this.mode !== 'solo') this._send({ t: 'gup', id: u.id, sc: Math.round(this.allyScrap) }); }
+      if (u.per) u.f(this.me); else { this._applyStructUpg(u); this._structUpgFx(u.id); if (this.mode !== 'solo') this._send({ t: 'gup', id: u.id, sc: Math.round(this.allyScrap) }); }
       if (this.mode === 'solo' && u.per && Math.random() < .8) { const b = SHOP.find(s => s.id === u.id); this.ally.buys[u.id] = (this.ally.buys[u.id] || 0); } // bot upgrades via wave bonus below
       this._beep(760, .1, 'square', .05); this._renderShop(); this._refreshShp();
     } else { this._send({ t: 'buy', id: u.id }); this._beep(500, .06, 'square', .04); }
@@ -183,7 +217,7 @@ export function install(P) {
     this._kd = e => {
       this.keys[e.code] = true;
       if (e.code === 'Space' || e.code === 'ShiftLeft') { this._dash(this.me); e.preventDefault(); }
-      if (e.code === 'KeyE') this._useItem();
+      if (e.code === 'KeyE') this._toggleInv();
       if (e.code === 'KeyQ') this._useSkill();
       if (e.code === 'KeyB') { this.buildMode = !this.buildMode; this._buildBarSync(); }
       if (e.code === 'Digit1') { this.buildSel = 1; this._buildBarSync(); }
@@ -252,7 +286,7 @@ export function install(P) {
       c.innerHTML = `<span style="font:700 10px ${FONT};letter-spacing:.14em;color:${r.c}">${r.n} · ${u.k.toUpperCase()}</span><span style="font:700 18px ${FONT}">${u.n} ${ROMAN[tier]}</span><span style="font:400 12.5px ${FONT};line-height:1.5;color:${PAL.dim}">${tt.d}</span>`;
       const hint = SYN.find(s => !(p.syn || {})[s.id] && s.need.includes(u.k) && !p.taken[u.k] && s.need.every(k => k === u.k || p.taken[k]));
       if (hint) c.innerHTML += `<span style="font:700 11px ${FONT};color:${PAL.amber};margin-top:auto">✦ 시너지 각성: ${hint.n}</span>`;
-      c.onclick = () => { tt.f(p); p.taken[u.k] = tier + 1; this._checkSyn(p, true); this.pendUp--; this.upEl.style.display = 'none'; this._upDeadline = 0; this._beep(750, .08); if (this.pendUp > 0) this._showUpgrades(); };
+      c.onclick = () => { tt.f(p, this); p.taken[u.k] = tier + 1; this._checkSyn(p, true); this.pendUp--; this.upEl.style.display = 'none'; this._upDeadline = 0; this._beep(750, .08); if (this.pendUp > 0) this._showUpgrades(); };
       this.upRow.appendChild(c);
     });
     this.upEl.style.display = 'flex';
@@ -321,12 +355,14 @@ export function install(P) {
     this.sklBtn.innerHTML = p.sklT > 0 ? '충격파<br>' + Math.ceil(p.sklT) + 's' : '충격파<br>Lv' + p.sklLv;
     this.sklBtn.style.opacity = p.sklT > 0 ? .45 : 1;
     this.sklBtn.style.borderColor = p.sklT > 0 ? PAL.line : PAL.cyan; this.sklBtn.style.color = p.sklT > 0 ? PAL.text : PAL.cyan;
-    if (p.item) this.itemBtn.textContent = ITEMS[p.item].n; else this.itemBtn.innerHTML = '아이템<br>없음';
-    this.itemBtn.style.background = p.item ? PAL.red : PAL.panel; this.itemBtn.style.color = p.item ? '#fff' : PAL.dim;
-    this.itemBtn.style.boxShadow = p.item ? '0 0 14px rgba(255,59,42,.5)' : 'none';
-    this.itemBtn.style.opacity = p.item ? 1 : .45;
-    this.itemBtn.style.cursor = p.item ? 'pointer' : 'default';
-    this.itemBtn.disabled = !p.item;
+    const nItems = p.items.length;
+    this.itemBtn.innerHTML = nItems ? `아이템<br>${nItems}/${INV_MAX}` : '아이템<br>없음';
+    this.itemBtn.style.background = nItems ? PAL.red : PAL.panel; this.itemBtn.style.color = nItems ? '#fff' : PAL.dim;
+    this.itemBtn.style.boxShadow = nItems ? '0 0 14px rgba(255,59,42,.5)' : 'none';
+    this.itemBtn.style.opacity = nItems ? 1 : .45;
+    this.itemBtn.style.cursor = nItems ? 'pointer' : 'default';
+    this.itemBtn.disabled = !nItems;
+    if (!nItems && this.invEl.style.display === 'flex') this._toggleInv(false); // last item spent → close the sheet
     if (this.buildMode) { this.wallChip.textContent = `벽 · ${this._cost(1)}`; this.turChip.textContent = `포탑 · ${this._cost(2)}`; }
     // minimap
     const ctx = this.mm.getContext('2d'), S = 104 / N;
@@ -341,10 +377,10 @@ export function install(P) {
       ctx.globalAlpha = o === 3 || o === 4 ? .9 : .8;
       ctx.fillRect(x * S, z * S, S, S);
     }
-    { // active gate blinks bright red on the minimap
-      const ag = this.gates[this.activeGate];
-      if (ag) {
-        ctx.fillStyle = PAL.red; ctx.globalAlpha = .55 + Math.sin(this.tm * 5) * .35;
+    { // active gate(s) blink bright red on the minimap
+      ctx.fillStyle = PAL.red; ctx.globalAlpha = .55 + Math.sin(this.tm * 5) * .35;
+      for (const gi of this.activeGates || [this.activeGate]) {
+        const ag = this.gates[gi]; if (!ag) continue;
         for (let o = -2; o < 4; o++) { const x = ag.gx + (ag.gz === 0 || ag.gz === N - 1 ? o : 0), z = ag.gz + (ag.gx === 0 || ag.gx === N - 1 ? o : 0); ctx.fillRect(x * S, z * S, S, S); }
       }
     }
