@@ -126,7 +126,7 @@ export function install(P) {
       this._banner('융단 폭격 — 전 구역 타격');
       for (let i = 0; i < 22; i++) setTimeout(() => { if (!this._dead && this.scene) { this._fx(rnd(4 - HALF, HALF - 4), rnd(4 - HALF, HALF - 4), i % 5 === 0, 0xffffff); this.shake = Math.max(this.shake || 0, .3); } }, i * 70);
     }
-    else if (k === 'turret') { if (this.isHostish()) { const i = ti(w2g(x), w2g(z)); const spots = [i, i + 1, i - 1, i + N, i - N].filter(j => j >= 0 && j < N * N && !this.occ[j]); if (spots.length) { this._place(spots[0], 2); this.bld[spots[0]] = .75; this.sendStT = 0; } } }
+    else if (k === 'turret') { if (this.isHostish()) { const i = ti(w2g(x), w2g(z)); const spots = [i, i + 1, i - 1, i + N, i - N].filter(j => j >= 0 && j < N * N && !this.occ[j]); if (spots.length) { this._place(spots[0], 2, false, mine ? 0 : 1); this.bld[spots[0]] = .75; this.sendStT = 0; } } }
     else if (k === 'kit') { if (mine) this.me.hp = this.me.maxhp; }
     else if (k === 'slow') { this.slowT = 5; this._banner('지연 필드 — 적 감속'); }
   };
@@ -149,7 +149,7 @@ export function install(P) {
       if (cd > 0) continue;
       const x = g2w(i % N), z = g2w((i / N) | 0);
       let best = null, bd = 90; for (const e of this.enemies.values()) { const d = dist2(x, z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
-      if (best) { this._turCd[i] = .3; const a = Math.atan2(best.z - z, best.x - x); this._spawnBullet(x, z, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * this.g.turMul, tur: true, band: this._turBand() }); }
+      if (best) { this._turCd[i] = .3; const q = this._ownerOf(i); const a = Math.atan2(best.z - z, best.x - x); this._spawnBullet(x, z, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * (q.turMul || 1), tur: true, band: this._turBand(q) }); }
     }
   };
   P._pickupSim = function () {

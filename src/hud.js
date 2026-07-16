@@ -192,7 +192,7 @@ export function install(P) {
     }
     const note = document.createElement('div');
     note.style.cssText = `font-size:10px;color:${PAL.dim};margin-top:4px`;
-    note.textContent = '비용은 본인 지갑에서 차감 · 구조물 연구 효과는 팀 전체 적용';
+    note.textContent = '모든 연구는 개인 단위 — 구조물 연구는 내가 지은 벽·포탑에 적용';
     el.appendChild(note);
   };
   P._buy = function (u) {
@@ -201,7 +201,7 @@ export function install(P) {
     if (this.isHostish()) {
       this.scrap -= cost;
       this.me.buys[u.id] = this._buyCount(u.id) + 1;
-      if (u.per) u.f(this.me); else { this._applyStructUpg(u); this._structUpgFx(u.id); if (this.mode !== 'solo') this._send({ t: 'gup', id: u.id, sc: Math.round(this.allyScrap) }); }
+      if (u.st) { this._applyStructUpg(u, this.me, 0); this._structUpgFx(u.id); } else u.f(this.me);
       if (this.mode === 'solo' && u.per && Math.random() < .8) { const b = SHOP.find(s => s.id === u.id); this.ally.buys[u.id] = (this.ally.buys[u.id] || 0); } // bot upgrades via wave bonus below
       this._beep(760, .1, 'square', .05); this._renderShop(); this._refreshShp();
     } else { this._send({ t: 'buy', id: u.id }); this._beep(500, .06, 'square', .04); }

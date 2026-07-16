@@ -208,7 +208,8 @@ export function install(P) {
   P._sMesh = function (k, i) { // structure mesh
     const T = THREE, g = new T.Group();
     if (k === 1) {
-      const wband = (this.g.wallLv || 0) >= 4 ? 1 : 0;
+      const oq = this._ownerOf(i);
+      const wband = (oq.wallLv || 0) >= 4 ? 1 : 0;
       const wtpl = this.mdl && this.mdl['wall' + wband];
       if (wtpl) {
         const m = wtpl.clone(true); m.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
@@ -225,7 +226,7 @@ export function install(P) {
       const b2 = new T.Mesh(new T.BoxGeometry(TS * .5, h * .6, TS * .5), this.mObs); b2.position.set(.3 - (i % 3) * .3, h * .55, .25 - (i % 2) * .5); b2.rotation.y = .5 + (i % 5) * .3; b2.castShadow = true; g.add(b2);
       const rim = new T.Mesh(new T.BoxGeometry(TS * .86, .07, TS * .86), this.mGlowRed7); rim.position.y = .05; g.add(rim);
     } else {
-      const band = this._turBand();
+      const band = this._turBand(this._ownerOf(i));
       const tpl = this.mdl && this.mdl['tower' + Math.min(band, 1)]; // top band reuses t2, scaled
       if (tpl) {
         const m = tpl.clone(true);
@@ -320,8 +321,9 @@ export function install(P) {
         const k = this.occ[i], has = this.sMeshes.has(i);
         if ((k === 1 || k === 2 || k === 5)) {
           let g = this.sMeshes.get(i);
-          const wband = (this.g.wallLv || 0) >= 4 ? 1 : 0;
-          const bandStale = (k === 2 && g && ((g.band !== undefined && g.band !== this._turBand()) || (g.band === undefined && this.mdl && this.mdl.tower0)))
+          const oq = this._ownerOf(i);
+          const wband = (oq.wallLv || 0) >= 4 ? 1 : 0;
+          const bandStale = (k === 2 && g && ((g.band !== undefined && g.band !== this._turBand(oq)) || (g.band === undefined && this.mdl && this.mdl.tower0)))
             || (k === 1 && g && ((g.wband !== undefined && g.wband !== wband) || (g.wband === undefined && this.mdl && this.mdl.wall0)));
           if (!g || g.kind !== k || bandStale) { if (g) { if (g.bar) this.scene.remove(g.bar); this.scene.remove(g); } g = this._sMesh(k, i); g.kind = k; this.sMeshes.set(i, g); g.position.set(g2w(i % N), 0, g2w((i / N) | 0)); }
         } else if (has) { const old = this.sMeshes.get(i); if (old.bar) this.scene.remove(old.bar); this.scene.remove(old); this.sMeshes.delete(i); }
@@ -343,12 +345,13 @@ export function install(P) {
           let sy = 1;
           if (g.userData.pop > 0) { g.userData.pop -= dt; sy = 1 + .22 * Math.sin(Math.min(1, 1 - g.userData.pop / .28) * Math.PI); }
           // research tiers change the silhouette: turrets grow (2x2-scale at Lv10+), wall trims thicken
-          const base = g.kind === 2 ? (g.band !== undefined ? (g.band >= 2 ? 1.35 : 1) * (1 + (this.g.turLv || 0) * .03) : ((this.g.turLv || 0) >= 10 ? 2 : 1 + (this.g.turLv || 0) * .07)) : 1;
+          const oql = (this._ownerOf(i).turLv || 0);
+          const base = g.kind === 2 ? (g.band !== undefined ? (g.band >= 2 ? 1.35 : 1) * (1 + oql * .03) : (oql >= 10 ? 2 : 1 + oql * .07)) : 1;
           g.scale.set(base, base * sy, base);
-          if (g.kind === 1 && g.trim) g.trim.scale.y = 1 + (this.g.wallLv || 0) * .8;
+          if (g.kind === 1 && g.trim) g.trim.scale.y = 1 + (this._ownerOf(i).wallLv || 0) * .8;
         }
       }
-      if (g.kind === 1) { const hpP = this.shp[i] / (WALL_HP * this.g.wallMul); g.trim.material = hpP < .35 ? this.mGlowRed : this.mGlowCyan; const sy = .55 + .45 * clamp(hpP, 0, 1); g.children[0].scale.y = sy; g.children[0].position.y = g.grounded ? 0 : .75 * sy; g.trim.position.y = (g.trimH || 1.53) * sy; }
+      if (g.kind === 1) { const hpP = this.shp[i] / this._structHp(1, this._ownerOf(i)); g.trim.material = hpP < .35 ? this.mGlowRed : this.mGlowCyan; const sy = .55 + .45 * clamp(hpP, 0, 1); g.children[0].scale.y = sy; g.children[0].position.y = g.grounded ? 0 : .75 * sy; g.trim.position.y = (g.trimH || 1.53) * sy; }
       else if (g.gun && ((i + (this._fno | 0)) & 1) === 0) { // aim at nearest enemy — staggered: half the turrets per frame (O(T×E) scan)
         let best = null, bd = 90; const x = g.position.x, z = g.position.z;
         for (const e of this.enemies.values()) { const d = dist2(x, z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
