@@ -162,7 +162,7 @@ export function install(P) {
   };
   P._eMesh = function (e) {
     const T = THREE;
-    const key = e.ty === 3 ? (e.final ? 'boss2' : 'boss1') : e.ty === 2 ? 'ranged' : 'melee';
+    const key = e.ty === 3 ? (e.final ? 'boss2' : 'boss1') : e.ty === 2 ? (e.id % 2 ? 'ranged' : (this.mdl && this.mdl.ranged2 ? 'ranged2' : 'ranged')) : 'melee';
     const tpl = this.mdl && this.mdl[key];
     if (tpl) {
       const g = new T.Group();

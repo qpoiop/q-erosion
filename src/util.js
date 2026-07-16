@@ -107,6 +107,7 @@ const MODELS = {
   ship:   { url: 'assets/char.glb',   size: 2.3, yaw: 0, merge: true },
   melee:  { url: 'assets/melee.glb',  size: 1.7, yaw: 0, merge: true },
   ranged: { url: 'assets/ranged.glb', size: 1.7, yaw: 0, merge: true },
+  ranged2:{ url: 'assets/ranged2.glb', size: 1.7, yaw: 0, merge: true },
   boss1:  { url: 'assets/boss1.glb',  size: 3.6, yaw: 0, merge: true },
   boss2:  { url: 'assets/boss2.glb',  size: 4.2, yaw: 0, merge: true },
   tower0: { url: 'assets/tower1.glb', size: 1.9, yaw: 0, merge: true },
