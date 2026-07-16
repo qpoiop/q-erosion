@@ -213,7 +213,7 @@ export function install(P) {
       const rim = new T.Mesh(new T.BoxGeometry(TS * .86, .07, TS * .86), this.mGlowRed7); rim.position.y = .05; g.add(rim);
     } else {
       const band = this._turBand();
-      const tpl = this.mdl && this.mdl['tower' + band];
+      const tpl = this.mdl && this.mdl['tower' + Math.min(band, 1)]; // top band reuses t2, scaled
       if (tpl) {
         const m = tpl.clone(true);
         m.traverse(o => { if (o.isMesh) o.castShadow = true; });
@@ -307,7 +307,7 @@ export function install(P) {
           let sy = 1;
           if (g.userData.pop > 0) { g.userData.pop -= dt; sy = 1 + .22 * Math.sin(Math.min(1, 1 - g.userData.pop / .28) * Math.PI); }
           // research tiers change the silhouette: turrets grow (2x2-scale at Lv10+), wall trims thicken
-          const base = g.kind === 2 ? (g.band !== undefined ? 1 + (this.g.turLv || 0) * .03 : ((this.g.turLv || 0) >= 10 ? 2 : 1 + (this.g.turLv || 0) * .07)) : 1;
+          const base = g.kind === 2 ? (g.band !== undefined ? (g.band >= 2 ? 1.35 : 1) * (1 + (this.g.turLv || 0) * .03) : ((this.g.turLv || 0) >= 10 ? 2 : 1 + (this.g.turLv || 0) * .07)) : 1;
           g.scale.set(base, base * sy, base);
           if (g.kind === 1 && g.trim) g.trim.scale.y = 1 + (this.g.wallLv || 0) * .8;
         }

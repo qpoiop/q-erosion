@@ -104,15 +104,14 @@ const GATE_DIR = ['북', '남', '서', '동']; // matches gates[] order
    that fails to load. size = target footprint (units), yaw = forward correction,
    merge = bake all submeshes into one static mesh per material (draw-call diet). */
 const MODELS = {
-  ship:   { url: 'assets/char.glb',   size: 2.3, yaw: 0, merge: true },
-  melee:  { url: 'assets/melee.glb',  size: 1.7, yaw: 0, merge: true },
-  ranged: { url: 'assets/ranged.glb', size: 1.7, yaw: 0, merge: true },
-  ranged2:{ url: 'assets/ranged2.glb', size: 1.7, yaw: 0, merge: true },
-  boss1:  { url: 'assets/boss1.glb',  size: 3.6, yaw: 0, merge: true },
-  boss2:  { url: 'assets/boss2.glb',  size: 4.2, yaw: 0, merge: true },
-  tower0: { url: 'assets/tower1.glb', size: 1.9, yaw: 0, merge: true },
-  tower1: { url: 'assets/tower2.glb', size: 2.1, yaw: 0, merge: true },
-  tower2: { url: 'assets/tower3.glb', size: 2.4, yaw: 0, merge: true },
+  ship:   { url: 'assets/char.glb',           size: 1.8, yaw: 0, merge: true },
+  melee:  { url: 'assets/enemy_melee.glb',    size: 1.7, yaw: 0, merge: true },
+  ranged: { url: 'assets/enemy_ranged_a.glb', size: 1.7, yaw: 0, merge: true },
+  ranged2:{ url: 'assets/enemy_ranged_b.glb', size: 1.7, yaw: 0, merge: true },
+  boss1:  { url: 'assets/boss_mid.glb',       size: 4.6, yaw: 0, merge: true },
+  boss2:  { url: 'assets/boss_final.glb',     size: 4.2, yaw: 0, merge: true },
+  tower0: { url: 'assets/tower_t1.glb',       size: 1.9, yaw: 0, merge: true }, // research band 0-3
+  tower1: { url: 'assets/tower_t2.glb',       size: 2.2, yaw: 0, merge: true }, // band 4-9; band 10+ = same model, scaled up
 };
 const SHIP_MODEL_YAW = (() => { const q = new URLSearchParams(location.search).get('shipyaw'); return q !== null ? +q * Math.PI / 180 : 0; })();
 const XP_NEED = lv => 45 + lv * 30;  // steeper curve — augments should take real kills
