@@ -31,7 +31,7 @@ export function install(P) {
       if (e.giant && this.inf) { this._finalClear(); } // the SOURCE falls — final clear
       this._grantXp(ETYPES[e.ty].xp);
       // every kill pays BOTH units — each at their own 회수 배율 (killer no longer hogs the gold)
-      const base = ETYPES[e.ty].sc * (DIFF_SCR[this.diffKey] || 1);
+      const base = ETYPES[e.ty].sc * (DIFF_SCR[this.diffKey] || 1) / (this._cntMulNow || 1); // horde size doesn't multiply total gold
       const gMe = base * (this.me.scrapMul || 1), gAl = base * (this.ally.scrapMul || 1);
       this.scrap += gMe; this.stat.g += gMe; this.allyStat.g += gAl;
       if (this.mode !== 'solo') this.allyScrap += gAl;

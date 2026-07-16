@@ -67,8 +67,13 @@ class ErosionGame extends HTMLElement {
     if (!this.renderer) return;
     if (this.phase === 'count') {
       this.countT -= dt;
-      this._overlay(`<div style="font:700 11px ${FONT};letter-spacing:.18em;color:${PAL.red}">EROSION PROTOCOL</div><div style="font:700 68px ${FONT};color:${PAL.cyan};text-shadow:0 0 24px rgba(37,216,255,.5)">${Math.ceil(this.countT)}</div><div style="font:400 13px ${FONT};line-height:1.7;color:${PAL.dim}">웨이브마다 무작위 균열 하나가 열린다.<br>붉게 빛나는 균열을 벽과 포탑으로 막고, 중앙의 정화 코어를 ${this.maxWave}웨이브 동안 지켜라.</div>`);
-      if (this.countT <= 0) { this.phase = 'none'; this.ov.style.display = 'none'; if (this.isHostish()) this._startBuild(); }
+      if (this._infCount) this._infCountOverlay();
+      else this._overlay(`<div style="font:700 11px ${FONT};letter-spacing:.18em;color:${PAL.red}">${this.diffKey === 'nightmare' ? 'PHASE 1 — 코어 방어' : 'EROSION PROTOCOL'}</div><div style="font:700 68px ${FONT};color:${PAL.cyan};text-shadow:0 0 24px rgba(37,216,255,.5)">${Math.ceil(this.countT)}</div><div style="font:400 13px ${FONT};line-height:1.7;color:${PAL.dim}">웨이브마다 무작위 균열 하나가 열린다.<br>붉게 빛나는 균열을 벽과 포탑으로 막고, 중앙의 정화 코어를 ${this.maxWave}웨이브 동안 지켜라.</div>`);
+      if (this.countT <= 0) {
+        this.phase = 'none'; this.ov.style.display = 'none';
+        if (this._infCount) { this._infCount = null; this._buildInfMap(); }
+        else if (this.isHostish()) this._startBuild();
+      }
     }
     // pause sources: solo augment sheet, tab in background (mine OR peer's), host silent
     const inPhase = this.phase === 'build' || this.phase === 'assault' || this.phase === 'escape' || this.phase === 'inf';
@@ -85,16 +90,16 @@ class ErosionGame extends HTMLElement {
       if (this.mode === 'solo') this._botSim(dt);
       if (this.phase === 'escape') this._escapeSim();
       if (this.isHostish()) {
-        if (this.phase === 'build') { this.phT -= dt; if (this.phT <= 0) this._startAssault(); }
+        if (this.phase === 'build') { this.phT -= dt; if (this.phT <= 0) { if (this.inf) this._startInfWave(); else this._startAssault(); } }
         else if (this.phase === 'escape') { /* waiting for a unit to enter the rift */ }
         else if (this.phase === 'inf') {
           this._spawnLogic(dt); this._enemySim(dt);
           if (!this.spawnQ.length && this.enemies.size === 0 && !this.infFinal) this._startFinale();
         }
-        else {
+        else if (this.phase === 'assault') { // guard: phases can flip to 'count' mid-tick (PHASE 2 transition)
           this._spawnLogic(dt); this._enemySim(dt);
           if (!this.spawnQ.length && this.enemies.size === 0) {
-            if (this.wave >= this.maxWave) this._startEscape(); // the way to the enemy core opens
+            if (this.wave >= this.maxWave) { this.diffKey === 'nightmare' ? this._startEscape() : this._gameOver(true, `${this.maxWave}웨이브 방어 완수`); } // PHASE 2 is nightmare-only
             else this._startBuild();
           }
         }

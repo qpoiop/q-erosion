@@ -19,6 +19,7 @@ export function install(P) {
     const w = this.wave, q = [];
     let cntMul = DIFF_CNT[this.diffKey] || 1;
     if (this.diffKey === 'nightmare') cntMul = 1.25 + (2.5 - 1.25) * this._nmRamp(); // waves 1-3 ≈ hard, full 2.5x by wave 6
+    this._cntMulNow = cntMul; // kill gold divides by this — bigger hordes must not mean proportionally more gold
     const count = Math.round((14 + Math.min(w, 10) * 6 + Math.max(0, w - 10) * 3) * cntMul); // waves 11+ grow slower — 15 waves shouldn't become a swarm wall
     // guaranteed mix: ranged gunners from wave 2, breakers from wave 3, rest melee rushers
     const nG = w >= 2 ? Math.max(3, Math.round(count * .22)) : 0;
@@ -242,49 +243,36 @@ export function install(P) {
     this._beep(880, .3, 'square', .07); this._beep(1320, .4, 'square', .06);
     if (this.mode === 'solo') { try { localStorage.removeItem('eg_save'); } catch (e) {} } // one-way trip
   };
-  P._escapeSim = function () { // host + local: entering the open rift starts the infiltration pick
+  P._escapeSim = function () { // entering the open rift starts PHASE 2
     const g = this.gates[this.escGate]; if (!g) return;
     const near = (p) => dist2(p.x, p.z, g.x, g.z) < 9;
-    if (near(this.me)) { if (this.isHostish()) this._startInfPick(); else this._send({ t: 'inen' }); }
-    else if (this.isHostish() && this.allyOn && near(this.ally)) this._startInfPick();
+    if (near(this.me)) { if (this.isHostish()) this._startInfiltration(); else this._send({ t: 'inen' }); }
+    else if (this.isHostish() && this.allyOn && near(this.ally)) this._startInfiltration();
   };
-  P._startInfPick = function () {
-    if (this.phase === 'infpick') return;
-    this.phase = 'infpick'; this._infMe = null; this._infAlly = this.mode === 'solo' ? '증강' : null;
-    if (this.isHostish() && this.mode !== 'solo') this._send({ t: 'inpk' });
-    this._showInfPick();
+  P._sellAllStructs = function () { // structures can't cross the rift — auto-sell each builder's at 70%
+    let meR = 0, alR = 0;
+    for (let i = 0; i < N * N; i++) {
+      const k = this.occ[i]; if (k !== 1 && k !== 2) continue;
+      const mine = this.own[i] === 0;
+      const v = Math.round(this._cost(k, mine ? this.me : this.ally) * .7);
+      if (mine) meR += v; else alR += v;
+    }
+    return { meR, alR };
   };
-  P._infKeep = function (choice) { // keep ONE thing; everything else resets (침투는 몸이 가벼워야 한다)
-    const p = this.me;
-    const kept = { taken: { ...p.taken }, buys: { ...p.buys }, scrap: this.scrap };
-    const base = { hp: 100, maxhp: 100, speed: 6, dmg: 9, frate: 2.5, shots: 1, pierce: 0, regen: 0, dashCd: 3.5, dashDur: undefined, sklLv: 1, scrapMul: 1, armor: 1, dropMul: 1, sklDmgMul: 1, sklRMul: 1, sklCdMul: 1, swSlowF: 0, swStunC: 0, wallMul: 1, turMul: 1, turHpMul: 1, costMul: 1, wallLv: 0, turLv: 0 };
-    Object.assign(p, base, { taken: {}, buys: {}, syn: {}, synGrade: {}, items: p.items, down: false, downT: 0 });
-    this.scrap = 60; this.lv = 1; this.xp = 0; this.pendUp = 0;
-    this._noCore = true; // core augments are meaningless on map 2 — replay must not touch coreHp
-    if (choice === '증강') {
-      for (const u of UPG) { const t = kept.taken[u.k] || 0; for (let i = 0; i < t; i++) u.t[i].f(p, this); if (t) p.taken[u.k] = t; }
-      this._checkSyn(p, false);
-      this.lv = 1 + Object.values(p.taken).reduce((a, b) => a + b, 0);
-    } else if (choice === '연구') {
-      for (const u of SHOP) { if (u.st || u.id === 'crep') continue; const n = kept.buys[u.id] || 0; for (let i = 0; i < n; i++) u.f(p, this); if (n) p.buys[u.id] = n; }
-    } else if (choice === '구조물') {
-      for (const u of SHOP) { if (!u.st) continue; const n = kept.buys[u.id] || 0; for (let i = 0; i < n; i++) u.f(p, this); if (n) p.buys[u.id] = n; }
-    } else if (choice === '자금') this.scrap = kept.scrap;
-    p.hp = p.maxhp;
-    this._infMe = choice;
-    if (this.mode !== 'solo') this._send({ t: 'inch', c: choice });
-    this._tryStartInf();
+  P._startInfiltration = function () { // research & augments carry over; structures liquidate; 3-2-1 into map 2
+    if (this.inf || this._infCount) return;
+    const { meR, alR } = this.isHostish() ? this._sellAllStructs() : { meR: 0, alR: 0 };
+    if (this.isHostish()) {
+      this.scrap += meR; if (this.mode !== 'solo') this.allyScrap += alR;
+      if (this.mode !== 'solo') this._send({ t: 'ingo', ar: alR });
+      this._infCount = { ref: meR };
+    }
+    this.phase = 'count'; this.countT = 3.4;
+    if (this.mode === 'solo') { try { localStorage.removeItem('eg_save'); } catch (e) {} }
   };
-  P._tryStartInf = function () {
-    if (!this.isHostish()) return;
-    if (this._infMe && this._infAlly) this._startInfiltration();
-    else this._banner('동료의 선택을 기다리는 중…', 2600);
-  };
-  P._startInfiltration = function () {
-    if (this.inf) return;
-    if (this.isHostish() && this.mode !== 'solo') this._send({ t: 'ingo' });
-    this._overlay(`<div style="font:700 11px ${FONT};letter-spacing:.18em;color:${PAL.red}">INFILTRATION</div><div style="font:700 30px ${FONT};margin:8px 0">적의 코어로 침투 중…</div><div style="font:400 12px ${FONT};color:${PAL.dim}">돌아올 수 없다. 전부 쓰러뜨려라.</div>`);
-    setTimeout(() => { if (this._dead) return; this._buildInfMap(); }, 1600);
+  P._infCountOverlay = function () { // reuses the intro countdown shell — PHASE 2 briefing
+    const ref = (this._infCount && this._infCount.ref) || 0;
+    this._overlay(`<div style="font:700 11px ${FONT};letter-spacing:.18em;color:${PAL.red}">PHASE 2 — 균열 침투</div><div style="font:700 68px ${FONT};color:${PAL.cyan};text-shadow:0 0 24px rgba(37,216,255,.5)">${Math.ceil(this.countT)}</div><div style="font:400 13px ${FONT};line-height:1.8;color:${PAL.dim}">적의 심장부로 진입한다. 연구와 증강은 그대로 —<br>구조물은 가져갈 수 없어 자동 매각되었다 <b style="color:${PAL.amber}">+${ref} ◈</b><br>위에서 몰려온다. 코어를 등지고 버텨라.</div>`);
   };
   P._buildInfMap = function () { // map 2: vertical corridor, no core, no minimap
     this.inf = true; this.infBossN = 0; this.infFinal = false;
@@ -304,10 +292,15 @@ export function install(P) {
     this.me.x = g2w(13); this.me.z = g2w(27);
     this.ally.x = g2w(18); this.ally.z = g2w(27);
     this.ov.style.display = 'none';
-    this.phase = 'inf'; this.wave = this.maxWave;
-    if (this.isHostish()) { // 2x the wave-15 horde + bosses 1 and 2 in order
+    this.phase = 'build'; this.phT = 30; this.wave = this.maxWave; // PHASE 2 prep — dig in before the horde
+    this._banner('침투 준비 — 30초 안에 방어선을 구축하라 (습격 즉시 개시 가능)', 4600);
+  };
+  P._startInfWave = function () { // the map-2 horde
+    this.phase = 'inf';
+    if (this.isHostish()) {
       let cntMul = DIFF_CNT[this.diffKey] || 1;
       if (this.diffKey === 'nightmare') cntMul = 2.5;
+      this._cntMulNow = cntMul * 4; // map-2 gold pays per-wave-total, not per-mob
       const count = Math.min(480, Math.round((14 + 60 + Math.max(0, this.maxWave - 10) * 3) * cntMul * 4)); // 4x the w15 horde, capped for mobile
       const q = [];
       const nG = Math.max(3, Math.round(count * .22)), nB = Math.round(count * .25);
