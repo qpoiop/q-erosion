@@ -25,6 +25,12 @@ export function install(P) {
     this.gates = [{ gx: 15, gz: 0 }, { gx: 15, gz: N - 1 }, { gx: 0, gz: 15 }, { gx: N - 1, gz: 15 }];
     this.gates.forEach(g => { for (let o = -2; o < 4; o++) { const x = g.gx + (g.gz === 0 || g.gz === N - 1 ? o : 0), z = g.gz + (g.gx === 0 || g.gx === N - 1 ? o : 0); this.occ[ti(x, z)] = 4; } g.x = g2w(g.gx + (g.gz === 0 || g.gz === N - 1 ? .5 : 0) * 1); g.z = g2w(g.gz) + (g.gx === 0 || g.gx === N - 1 ? TS / 2 : 0); });
     this._pickGates();
+    // stale cross-game state: restart reuses the element, so net/infiltration scope must clear too
+    this.inf = false; this.infFinal = false; this.infBossN = 0; this._infCount = null; this.escGate = undefined;
+    this._cntMulNow = 1; this._infGhostB = 0; this._peerBuys = {}; if (this._fiSeen) this._fiSeen.clear();
+    if (this.coreMesh) { this.coreMesh.position.set(g2w(15) + TS / 2, 0, g2w(15) + TS / 2); this.coreMesh.visible = true; }
+    if (this.coreBar) { this.coreBar.position.x = g2w(15) + TS / 2; this.coreBar.position.z = g2w(15) + TS / 2; }
+    if (this.mm) this.mm.style.display = '';
     this._flow(); this._syncStruct();
     this._hudReset();
   };
