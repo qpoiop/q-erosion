@@ -1,5 +1,5 @@
 // net.js — verbatim methods from game.js (prototype-install)
-import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._initNet = function () {
@@ -141,7 +141,7 @@ export function install(P) {
         (m.sh || []).forEach(s => this._spawnBullet(s[0], s[1], s[2], s[3], { ghost: true, ally: true, life: s[4] || .55 }));
         break; }
       case 'hit': if (this.isHost) { const e = this.enemies.get(m.id); if (e) this._dmgEnemy(e, m.d, { ally: true }); } break;
-      case 'bld': if (this.isHost) { if (this._canPlace(m.i)) { const c = this._cost(m.k, this.ally); if (this.allyScrap >= c) { this.allyScrap -= c; this.allyStat.b++; this._place(m.i, m.k, false, 1); this._send({ t: 'blt', i: m.i, k: m.k, o: 1, sc: Math.round(this.allyScrap) }); } } } break;
+      case 'bld': if (this.isHost) { if (this._canPlace(m.i) && this._structCount(1, m.k) < (m.k === 1 ? CAP_WALL : CAP_TUR)) { const c = this._cost(m.k, this.ally); if (this.allyScrap >= c) { this.allyScrap -= c; this.allyStat.b++; this._place(m.i, m.k, false, 1); this._send({ t: 'blt', i: m.i, k: m.k, o: 1, sc: Math.round(this.allyScrap) }); } } } break;
       case 'blt': if (!this.isHost) { if (m.o === 1) { this.scrap = m.sc; this.stat.b++; } this._place(m.i, m.k, true, m.o || 0); this._fx(g2w(m.i % N), g2w((m.i / N) | 0), false, PAL.cyanHex); } break;
       case 'sel': if (this.isHost) { const k = this.occ[m.i]; if (k === 1 || k === 2) { this.allyScrap += Math.round(this._cost(k) * .7); this._remove(m.i); this._send({ t: 'slt', i: m.i, sc: Math.round(this.allyScrap) }); } } break;
       case 'slt': if (!this.isHost) { this.scrap = m.sc; this._remove(m.i); } break;

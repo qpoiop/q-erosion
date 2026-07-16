@@ -1,5 +1,5 @@
 // hud.js — HUD shell: DOM scaffold, banners/overlays, per-frame HUD refresh
-import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._buildDOM = function () {
@@ -214,7 +214,7 @@ export function install(P) {
     this.itemBtn.style.cursor = nItems ? 'pointer' : 'default';
     this.itemBtn.disabled = !nItems;
     if (!nItems && this.invEl.style.display === 'flex') this._toggleInv(false); // last item spent → close the sheet
-    if (this.buildMode) { this.wallChip.textContent = `벽 · ${this._cost(1)}`; this.turChip.textContent = `포탑 · ${this._cost(2)}`; }
+    if (this.buildMode) { const ov = this.isHostish() ? 0 : 1; this.wallChip.textContent = `벽 ${this._structCount(ov, 1)}/${CAP_WALL} · ${this._cost(1)}`; this.turChip.textContent = `포탑 ${this._structCount(ov, 2)}/${CAP_TUR} · ${this._cost(2)}`; }
     // minimap
     const ctx = this.mm.getContext('2d'), S = 104 / N;
     ctx.clearRect(0, 0, 104, 104);
