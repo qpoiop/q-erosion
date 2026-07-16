@@ -114,10 +114,8 @@ export function install(P) {
       case 'byk': if (!this.isHost) { const u = SHOP.find(s => s.id === m.id); this.scrap = m.sc; if (u && u.per) { this.stat.r++; this.me.buys[u.id] = this._buyCount(u.id) + 1; u.f(this.me, this); if (u.st) { this._structUpgFx(u.id); this._syncStruct(); } this._beep(760, .1, 'square', .05); if (this.shopEl.style.display === 'flex') this._renderShop(); } } break;
       case 'skl': if (this.isHost) this._shockwave(m.x, m.z, Math.min(m.r || 4, 12), Math.min(m.dmg || 60, 500), false, m.deb && { f: Math.max(.4, m.deb.f || .7), t: Math.min(m.deb.t || 2.5, 5), c: Math.min(m.deb.c || 0, .5), ct: Math.min(m.deb.ct || 1, 2) }); else this._shockFx(m.x, m.z); break;
       case 'caug': if (this.isHost) this._coreAug(m.a, m.h); break;
-      case 'inen': if (this.isHost && this.phase === 'escape') this._startInfPick(); break; // joiner stepped into the rift
-      case 'inpk': if (!this.isHost && this.phase !== 'infpick') { this.phase = 'infpick'; this._infMe = null; this._showInfPick(); } break;
-      case 'inch': if (this.isHost) { this._infAlly = m.c; if (m.c !== '구조물') Object.assign(this.ally, { wallMul: 1, turMul: 1, turHpMul: 1, costMul: 1, wallLv: 0, turLv: 0 }); this._tryStartInf(); } break;
-      case 'ingo': if (!this.isHost) this._startInfiltration(); break;
+      case 'inen': if (this.isHost && this.phase === 'escape') this._startInfiltration(); break; // joiner stepped into the rift
+      case 'ingo': if (!this.isHost && !this.inf && !this._infCount) { this._infCount = { ref: m.ar || 0 }; this.phase = 'count'; this.countT = 3.4; } break;
       case 'infin': if (!this.isHost) { this.infFinal = true; this._startFinale ? (() => {})() : 0; const bl = this.H('div', 'position:absolute;inset:0;background:#000;z-index:45;opacity:0;pointer-events:none', this.hud); let c2 = 0; const iv = setInterval(() => { bl.style.opacity = bl.style.opacity === '1' ? '0' : '1'; if (++c2 >= 6) { clearInterval(iv); bl.remove(); } }, 300); this._banner('⚠⚠ 침식의 근원 — 모든 것의 시작이 모습을 드러냈다', 5200); this.shake = 1.2; } break;
       case 'use': { if (this.isHost && this.ally.items) { const ix = this.ally.items.indexOf(m.k); if (ix >= 0) this.ally.items.splice(ix, 1); } this._applyItemFx(m.k, m.x, m.z, false); } break;
       case 'dmg': if (!this.isHost) this._hurt(this.me, m.v); break;
@@ -145,7 +143,7 @@ export function install(P) {
     if (gts && gts.join() !== (this.activeGates || []).join()) { this.activeGates = gts; this.activeGate = gts[0]; if (this.phase === 'build') this._banner(`다음 균열: ${gts.map(i => GATE_DIR[i]).join('·')}쪽`, 2600); }
     const wasPhase = this.phase;
     if (m.eg !== undefined) this.escGate = m.eg;
-    if (this.phase !== 'over' && this.phase !== 'count' && this.phase !== 'wait' && this.phase !== 'infpick' && m.ph) { if (m.ph !== this.phase) {
+    if (this.phase !== 'over' && this.phase !== 'count' && this.phase !== 'wait' && m.ph) { if (m.ph !== this.phase) {
       if (m.ph === 'inf' && !this.inf) this._buildInfMap(); // host advanced without me (missed ingo) — catch up
       this.phase = m.ph;
       if (m.ph === 'assault') this._banner('WAVE ' + this.wave + ' — 습격!');
