@@ -26,8 +26,14 @@ export function install(P) {
     this._flow(); this._syncStruct();
     this._hudReset();
   };
-  P._pickGates = function () { // nightmare opens 2 gates per player (solo 2, multi all 4); other modes 1
-    const want = this.diffKey === 'nightmare' ? (this.mode === 'solo' ? 2 : 4) : 1;
+  P._nmRamp = function () { // nightmare eases in: waves 1-3 play like hard, full brutality from wave 6
+    return this.diffKey === 'nightmare' ? clamp(((this.wave || 0) - 3) / 3, 0, 1) : 0;
+  };
+  P._dMul = function () { // effective difficulty multiplier (nightmare ramps 1.35 → 1.49)
+    return this.diffKey === 'nightmare' ? 1.35 + .14 * this._nmRamp() : this.diffMul;
+  };
+  P._pickGates = function () { // nightmare opens 2 gates per player (solo 2, multi all 4) from wave 4; other modes 1
+    const want = this.diffKey === 'nightmare' && (this.wave || 0) >= 3 ? (this.mode === 'solo' ? 2 : 4) : 1;
     const idx = [0, 1, 2, 3];
     for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
     this.activeGates = idx.slice(0, want).sort();

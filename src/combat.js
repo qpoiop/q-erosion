@@ -201,8 +201,8 @@ export function install(P) {
     for (const b of this.ebullets) {
       b.x += b.dx * dt; b.z += b.dz * dt; b.life -= dt;
       if (host) {
-        if (!this.me.down && dist2(b.x, b.z, this.me.x, this.me.z) < .49) { this._hurt(this.me, 6 * this.diffMul * (this.dmgWaveMul || 1)); b.life = 0; }
-        else if (this.allyOn && !this.ally.down && dist2(b.x, b.z, this.ally.x, this.ally.z) < .49) { this._dealToPlayer(this.ally, 6 * this.diffMul * (this.dmgWaveMul || 1)); b.life = 0; }
+        if (!this.me.down && dist2(b.x, b.z, this.me.x, this.me.z) < .49) { this._hurt(this.me, 6 * this._dMul() * (this.dmgWaveMul || 1)); b.life = 0; }
+        else if (this.allyOn && !this.ally.down && dist2(b.x, b.z, this.ally.x, this.ally.z) < .49) { this._dealToPlayer(this.ally, 6 * this._dMul() * (this.dmgWaveMul || 1)); b.life = 0; }
       } else if (!this.me.down && dist2(b.x, b.z, this.me.x, this.me.z) < .49) { b.life = 0; }
     }
     this.ebullets = this.ebullets.filter(b => b.life > 0);

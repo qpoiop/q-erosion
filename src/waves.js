@@ -17,7 +17,9 @@ export function install(P) {
     this.dmgWaveMul = 1 + (this.wave - 1) * .05; // late waves hit harder, not just tankier
     this._banner('WAVE ' + this.wave + ' — 습격!'); this._beep(180, .3, 'sawtooth', .07);
     const w = this.wave, q = [];
-    const count = Math.round((14 + Math.min(w, 10) * 6 + Math.max(0, w - 10) * 3) * (DIFF_CNT[this.diffKey] || 1)); // waves 11+ grow slower — 15 waves shouldn't become a swarm wall
+    let cntMul = DIFF_CNT[this.diffKey] || 1;
+    if (this.diffKey === 'nightmare') cntMul = 1.25 + (2.5 - 1.25) * this._nmRamp(); // waves 1-3 ≈ hard, full 2.5x by wave 6
+    const count = Math.round((14 + Math.min(w, 10) * 6 + Math.max(0, w - 10) * 3) * cntMul); // waves 11+ grow slower — 15 waves shouldn't become a swarm wall
     // guaranteed mix: ranged gunners from wave 2, breakers from wave 3, rest melee rushers
     const nG = w >= 2 ? Math.max(3, Math.round(count * .22)) : 0;
     const nB = w >= 3 ? Math.round(count * .25) : 0;
@@ -29,7 +31,9 @@ export function install(P) {
   P._spawnLogic = function (dt) {
     if (!this.spawnQ.length) return;
     this.spawnT -= dt; if (this.spawnT > 0) return;
-    this.spawnT = Math.max(.24, (.7 - this.wave * .035) * (DIFF_SPT[this.diffKey] || 1));
+    let sptMul = DIFF_SPT[this.diffKey] || 1;
+    if (this.diffKey === 'nightmare') sptMul = .88 + (.5 - .88) * this._nmRamp();
+    this.spawnT = Math.max(.24, (.7 - this.wave * .035) * sptMul);
     const burst = Math.min(3, 1 + ((this.wave / 3) | 0)); // w1-2: 1, w3-5: 2, w6+: 3 at once
     for (let bn = 0; bn < burst && this.spawnQ.length; bn++) this._spawnOne();
   };
@@ -37,7 +41,7 @@ export function install(P) {
     const ty = this.spawnQ.shift();
     const g = this.gates[this.activeGates[Math.floor(Math.random() * this.activeGates.length)]]; // wave streams through the active gate(s)
     const id = this.eid++;
-    const hpMul = (1 + (this.wave - 1) * .18) * this.diffMul;
+    const hpMul = (1 + (this.wave - 1) * .18) * this._dMul();
     // spawn OUTSIDE the gate, spread across its widened front, walk in
     const nx = g.gx === 0 ? -1 : g.gx === N - 1 ? 1 : 0, nz = g.gz === 0 ? -1 : g.gz === N - 1 ? 1 : 0;
     const off = rnd(1.8, 4), lat = rnd(-4.6, 4.6);
@@ -56,7 +60,7 @@ export function install(P) {
     const players = [this.me]; if (this.allyOn) players.push(this.ally);
     for (const e of this.enemies.values()) {
       const et = ETYPES[e.ty];
-      let sp = et.sp * slow * this.diffMul * (e.wsp || 1);
+      let sp = et.sp * slow * this._dMul() * (e.wsp || 1);
       e.cool -= dt;
       // spawned outside: walk in through the gate before anything else
       if (e.entering) {
@@ -77,7 +81,7 @@ export function install(P) {
         continue;
       }
       // melee player if adjacent
-      if (np && npd < 5) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this.diffMul * (this.dmgWaveMul || 1)); } continue; }
+      if (np && npd < 5) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this._dMul() * (this.dmgWaveMul || 1)); } continue; }
       // melee mobs hunt a nearby player; structures in the way get smashed
       if (!et.rng && !et.boss && np && npd < 49) {
         const dx = np.x - e.x, dz = np.z - e.z, d = Math.hypot(dx, dz) || 1;
@@ -108,7 +112,7 @@ export function install(P) {
         const j = ti(X, Z); if (this.flowD[j] < bd) { bd = this.flowD[j]; bi = j; }
       }
       if (bi < 0) { // at core
-        if (this.occ[here] === 3 || bd <= 1.5) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this.diffMul * (this.dmgWaveMul || 1), e); } }
+        if (this.occ[here] === 3 || bd <= 1.5) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this._dMul() * (this.dmgWaveMul || 1), e); } }
         continue;
       }
       const o = this.occ[bi];
@@ -117,7 +121,7 @@ export function install(P) {
         if (e.cool <= 0) this._atkStruct(e, et, bi);
         continue;
       }
-      if (o === 3) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this.diffMul * 2 * (this.dmgWaveMul || 1), e); } continue; }
+      if (o === 3) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this._dMul() * 2 * (this.dmgWaveMul || 1), e); } continue; }
       const dx = bx - e.x, dz = bz - e.z, d = Math.hypot(dx, dz) || 1;
       e.x += dx / d * sp * dt; e.z += dz / d * sp * dt;
       e.x = clamp(e.x, 1 - HALF, HALF - 1); e.z = clamp(e.z, 1 - HALF, HALF - 1);
@@ -126,7 +130,7 @@ export function install(P) {
   P._atkStruct = function (e, et, j) {
     e.cool = .8;
     const x = g2w(j % N), z = g2w((j / N) | 0);
-    this.shp[j] -= et.sdmg * this.diffMul * (this.dmgWaveMul || 1) * (e.smash || 1); // final boss wrecks structures at 2x
+    this.shp[j] -= et.sdmg * this._dMul() * (this.dmgWaveMul || 1) * (e.smash || 1); // final boss wrecks structures at 2x
     this._burst(x, z, PAL.redHex, 4, 4); this._beep(190, .05, 'square', .02);
     if (this.shp[j] <= 0) { this._fx(x, z, false, PAL.red7Hex); this._remove(j); }
   };
