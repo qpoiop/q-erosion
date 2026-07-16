@@ -354,10 +354,15 @@ export function install(P) {
         }
       }
       if (g.kind === 1) { const hpP = this.shp[i] / this._structHp(1, this._ownerOf(i)); g.trim.material = hpP < .35 ? this.mGlowRed : this.mGlowCyan; const sy = .55 + .45 * clamp(hpP, 0, 1); g.children[0].scale.y = sy; g.children[0].position.y = g.grounded ? 0 : .75 * sy; g.trim.position.y = (g.trimH || 1.53) * sy; }
-      else if (g.gun && ((i + (this._fno | 0)) & 1) === 0) { // aim at nearest enemy — staggered: half the turrets per frame (O(T×E) scan)
-        let best = null, bd = 90; const x = g.position.x, z = g.position.z;
-        for (const e of this.enemies.values()) { const d = dist2(x, z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
-        if (best) g.rotation.y = -Math.atan2(best.z - z, best.x - x) + Math.PI / 2;
+      else if (g.gun) {
+        if (((i + (this._fno | 0)) & 1) === 0) { // aim at nearest enemy — staggered: half the turrets per frame (O(T×E) scan)
+          let best = null, bd = 90; const x = g.position.x, z = g.position.z;
+          for (const e of this.enemies.values()) { const d = dist2(x, z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
+          if (best) g.rotation.y = -Math.atan2(best.z - z, best.x - x) + Math.PI / 2;
+        }
+        const tf = this._turFlash && this._turFlash[i]; // muzzle recoil: barrel kicks back and stretches on fire
+        if (tf > 0) { this._turFlash[i] = tf - dt * 5; g.gun.scale.z = 1 + tf * .5; g.gun.position.z = (g.gunZ0 ?? (g.gunZ0 = g.gun.position.z)) - tf * .22; }
+        else if (g.gunZ0 !== undefined) { g.gun.scale.z = 1; g.gun.position.z = g.gunZ0; }
       }
     }
     // core
@@ -446,7 +451,7 @@ export function install(P) {
     // bullets
     while (this.bMeshes.length < this.bullets.length + this.ebullets.length) { const m = new T.Mesh(this.bulletG, this.mBeamCyan); this.scene.add(m); this.bMeshes.push(m); }
     let bi = 0;
-    for (const b of this.bullets) { const m = this.bMeshes[bi++]; m.visible = true; m.geometry = b.tur ? this.bulletTurG : this.bulletG; m.material = b.tur ? (b.band === 2 ? this.mBeamTur2 : b.band === 1 ? this.mBeamTur1 : this.mBeamTur) : b.ally ? this.mBeamAmber : this.mBeamCyan; m.scale.setScalar(b.tur && b.band ? (b.band === 2 ? 1.5 : 1.2) : 1); m.position.set(b.x, .55, b.z); m.rotation.y = -Math.atan2(b.dz, b.dx); }
+    for (const b of this.bullets) { const m = this.bMeshes[bi++]; m.visible = true; m.geometry = b.tur ? this.bulletTurG : this.bulletG; m.material = b.tur ? (b.band === 2 ? this.mBeamTur2 : b.band === 1 ? this.mBeamTur1 : this.mBeamTur) : b.ally ? this.mBeamAmber : this.mBeamCyan; m.scale.setScalar(b.tur && b.band ? (b.band === 2 ? 1.5 : 1.2) : 1); m.position.set(b.x, b.y || .55, b.z); m.rotation.y = -Math.atan2(b.dz, b.dx); }
     for (const b of this.ebullets) { const m = this.bMeshes[bi++]; m.visible = true; m.geometry = this.ebulletG; m.material = this.mGlowRed; m.scale.setScalar(1); m.position.set(b.x, .55, b.z); }
     for (; bi < this.bMeshes.length; bi++) this.bMeshes[bi].visible = false;
     // items

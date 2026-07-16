@@ -16,7 +16,7 @@ class ErosionGame extends HTMLElement {
   _destroy() {
     this._dead = true;
     cancelAnimationFrame(this._raf);
-    clearInterval(this._helloIv); clearTimeout(this._banT); clearInterval(this._wdIv); clearTimeout(this._waitHintT);
+    clearInterval(this._helloIv); clearTimeout(this._banT); clearInterval(this._wdIv); clearTimeout(this._waitHintT); clearInterval(this._relayRetryIv);
     if (this.net) { try { this.net.end(true); } catch (e) {} this.net = null; }
     window.removeEventListener('resize', this._onRzBurst);
     window.removeEventListener('orientationchange', this._onRzBurst);
