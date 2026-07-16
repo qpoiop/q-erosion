@@ -1,0 +1,11 @@
+Model Information:
+* title:	Scy-fi turret
+* source:	https://sketchfab.com/3d-models/scy-fi-turret-a34f9bba01764fc6874e2ee21a33b2e8
+* author:	kudinadarya (https://sketchfab.com/kudinadarya)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Scy-fi turret" (https://sketchfab.com/3d-models/scy-fi-turret-a34f9bba01764fc6874e2ee21a33b2e8) by kudinadarya (https://sketchfab.com/kudinadarya) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

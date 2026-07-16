@@ -1,11 +1,11 @@
-name: Deploy to Cloudflare Pages
+name: Deploy DEV to Cloudflare Pages
 
 on:
   push:
-    branches: [production]
+    branches: [development]
 
 jobs:
-  deploy:
+  deploy-dev:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -22,17 +22,9 @@ jobs:
           mkdir -p dist/assets
           cp assets/*.glb assets/*.png dist/assets/
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy to Cloudflare Pages (dev)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=q-erosion --branch=production
-
-      - name: Deploy relay Worker (Durable Object)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: relay
-          command: deploy
+          command: pages deploy dist --project-name=q-erosion-dev --branch=development
