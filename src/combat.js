@@ -99,8 +99,8 @@ export function install(P) {
       if (fresh && s.first) s.first(p, this);
       for (let lv = Math.max(2, oldGrade + 1); lv <= grade; lv++) if (s.grade) s.grade(p, this, lv);
       p.synGrade[s.id] = grade; p.syn[s.id] = grade;
-      if (mine && fresh) { this._banner(`✦ 시너지 각성 — ${s.n} [${RAR[grade - 1].n}]! ${s.d}`, 3800); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
-      else if (mine) { this._banner(`✦ 시너지 진화 — ${s.n} [${RAR[grade - 1].n}]`, 3200); this._beep(990, .12, 'square', .05); }
+      if (mine && fresh) { this._banner(`✦ 시너지 각성 — ${s.n} [${RAR[grade - 1].n}] ${s.gd ? s.gd[grade - 2] || '' : ''}`, 3600); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
+      else if (mine) { this._banner(`✦ 시너지 진화 — ${s.n} [${RAR[grade - 1].n}] ${s.gd ? s.gd[grade - 2] || '' : ''}`, 3200); this._beep(990, .12, 'square', .05); }
     }
   };
   P._actPhase = function () { return this.phase === 'build' || this.phase === 'assault' || this.phase === 'escape' || this.phase === 'inf'; }

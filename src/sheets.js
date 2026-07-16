@@ -141,7 +141,7 @@ export function install(P) {
       c.onmouseleave = () => c.style.transform = '';
       c.innerHTML = `<span style="font:700 10px ${FONT};letter-spacing:.14em;color:${r.c}">${r.n} · ${u.k.toUpperCase()}</span><span style="font:700 18px ${FONT}">${u.n} ${ROMAN[tier]}</span><span style="font:400 12.5px ${FONT};line-height:1.5;color:${PAL.dim}">${tt.d}</span>`;
       const hint = SYN.find(s => !(p.syn || {})[s.id] && s.need.includes(u.k) && !p.taken[u.k] && s.need.every(k => k === u.k || p.taken[k]));
-      if (hint) c.innerHTML += `<span style="margin-top:auto"><span style="font:700 11px ${FONT};color:${PAL.amber};display:block">✦ 시너지 각성: ${hint.n}</span><span style="font:400 10.5px ${FONT};color:${PAL.dim};display:block;line-height:1.4">${hint.d}</span></span>`;
+      if (hint) c.innerHTML += `<span style="margin-top:auto"><span style="font:700 11px ${FONT};color:${PAL.amber};display:block">✦ 시너지 각성: ${hint.n} [레어]</span><span style="font:400 10.5px ${FONT};color:${PAL.dim};display:block;line-height:1.4">${hint.gd ? hint.gd[0] : hint.d}</span></span>`;
       c.onclick = () => { tt.f(p, this); p.taken[u.k] = tier + 1; this._checkSyn(p, true); this.pendUp--; this.upEl.style.display = 'none'; this._upDeadline = 0; this._beep(750, .08); if (this.pendUp > 0) this._showUpgrades(); };
       this.upRow.appendChild(c);
     });
