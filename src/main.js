@@ -31,7 +31,7 @@ class ErosionGame extends HTMLElement {
     this.room = (A('room') || '').toUpperCase();
     this.diffKey = DIFF[A('diff')] !== undefined ? A('diff') : 'normal';
     this.diffMul = DIFF[this.diffKey];
-    this.maxWave = parseInt(A('waves')) || 10;
+    this.maxWave = parseInt(A('waves')) || 15;
     this.buildTime = parseInt(A('buildtime')) || 40;
     this._buildDOM(); this._initAudio(); this._reset();
     try { this._initThree(); } catch (e) {

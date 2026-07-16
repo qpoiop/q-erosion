@@ -116,7 +116,8 @@
       <div style="padding:16px 0 34px;font-size:11px;line-height:1.7;color:#5a6377;font-family:'Noto Sans KR',sans-serif;text-align:center">
         온라인 협동은 무료 공개 WebSocket 릴레이로 연결됩니다 — 서버 설치·비용 없음.<br>
         3D 모델(sketchfab.com): 캐릭터 "Toy Robot" by rkmorello · 근접 "drone robot" by noortjeschuur · 원거리 "Robo_V2" by _SeF_, "Robot_04" by taktelon<br>
-        보스 "Robot" by l0wpoly, "Utility Robot" by nickheitzman · 타워 "Combat Turret" by SnoyCat, "Scy-fi turret" by kudinadarya (전부 CC-BY, 캐릭터/l0wpoly 제외 명시)<br>
+        보스 "Robot" by l0wpoly, "Utility Robot" by nickheitzman, "Futuristic army robot" by iasarmientoj · 타워 "Combat Turret" by SnoyCat, "Scy-fi turret" by kudinadarya<br>
+        코어 "Duchess core" by ParticleAccelerator5000 · 벽 "Cube Metalic" by _sqtime_, "Yellow Metal Cube" by JakobHenerey20231 (전부 CC-BY, 캐릭터/l0wpoly 제외 명시)<br>
         모바일: 화면 드래그 이동(가상 스틱) · 자동 조준 · 대시/아이템 버튼 &nbsp;|&nbsp; PC: WASD 이동 · Space 대시 · E 아이템
       </div>
     </div>
@@ -126,7 +127,7 @@
 <script>
 (() => {
   // props (design data-props): difficulty enum easy|normal|hard (default normal),
-  // waves int 4..15 (default 8), buildTime int 15..60 (default 25).
+  // waves int 4..20 (default 15), buildTime int 15..60 (default 25).
   // Overridable via URL query: ?diff=hard&waves=10&buildtime=30
   const q = new URLSearchParams(location.search);
   const clampInt = (v, def, min, max) => {
@@ -135,7 +136,7 @@
   };
   const props = {
     difficulty: ['easy', 'normal', 'hard'].includes(q.get('diff')) ? q.get('diff') : 'normal',
-    waves: clampInt(q.get('waves'), 10, 4, 15),
+    waves: clampInt(q.get('waves'), 15, 4, 20),
     buildTime: clampInt(q.get('buildtime'), 40, 15, 60),
   };
 

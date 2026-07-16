@@ -130,6 +130,7 @@ const MODELS = {
   ranged2:{ url: 'assets/enemy_ranged_b.glb', size: 1.7, yaw: 0, merge: true },
   boss1:  { url: 'assets/boss_mid.glb',       size: 4.6, yaw: 0, merge: true },
   boss2:  { url: 'assets/boss_final.glb',     size: 4.2, yaw: 0, merge: true },
+  boss3:  { url: 'assets/boss_last.glb',      size: 5.8, yaw: 0, merge: true }, // wave-15 final boss
   tower0: { url: 'assets/tower_t1.glb',       size: 1.9, yaw: 0, merge: true }, // research band 0-3
   tower1: { url: 'assets/tower_t2.glb',       size: 2.2, yaw: 0, merge: true }, // band 4-9; band 10+ = same model, scaled up
   wall0:  { url: 'assets/wall_t1.glb',        size: 1.84, yaw: 0, merge: true }, // wall research 0-3 (tile is 2 units)

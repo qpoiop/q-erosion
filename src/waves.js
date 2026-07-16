@@ -17,7 +17,7 @@ export function install(P) {
     this.dmgWaveMul = 1 + (this.wave - 1) * .05; // late waves hit harder, not just tankier
     this._banner('WAVE ' + this.wave + ' — 습격!'); this._beep(180, .3, 'sawtooth', .07);
     const w = this.wave, q = [];
-    const count = Math.round((14 + w * 6) * (DIFF_CNT[this.diffKey] || 1));
+    const count = Math.round((14 + Math.min(w, 10) * 6 + Math.max(0, w - 10) * 3) * (DIFF_CNT[this.diffKey] || 1)); // waves 11+ grow slower — 15 waves shouldn't become a swarm wall
     // guaranteed mix: ranged gunners from wave 2, breakers from wave 3, rest melee rushers
     const nG = w >= 2 ? Math.max(3, Math.round(count * .22)) : 0;
     const nB = w >= 3 ? Math.round(count * .25) : 0;
@@ -42,10 +42,14 @@ export function install(P) {
     const nx = g.gx === 0 ? -1 : g.gx === N - 1 ? 1 : 0, nz = g.gz === 0 ? -1 : g.gz === N - 1 ? 1 : 0;
     const off = rnd(1.8, 4), lat = rnd(-4.6, 4.6);
     const e = { id, ty, x: g.x + nx * off + lat * (nz ? 1 : 0), z: g.z + nz * off + lat * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x + lat * (nz ? 1 : 0), gz: g.z + lat * (nx ? 1 : 0), wsp: 1 + (this.wave - 1) * .035 };
-    if (ETYPES[ty].boss && this.wave >= this.maxWave) { e.final = true; e.hp *= 10; } // final boss — beefed up
+    if (ETYPES[ty].boss) { // boss tiers: w5 mid, w10 heavy, final wave = colossal structure-wrecker
+      e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1;
+      if (e.btier === 2) e.hp *= 4;
+      else if (e.btier === 3) { e.final = true; e.hp *= 14; e.smash = 2; }
+    }
     e.mhp = e.hp;
     this.enemies.set(id, e);
-    if (ETYPES[ty].boss) { this._banner(e.final ? '⚠ 최종 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5); }
+    if (ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5); }
   };
   P._enemySim = function (dt) {
     const slow = this.slowT > 0 ? .5 : 1;
@@ -119,7 +123,7 @@ export function install(P) {
   P._atkStruct = function (e, et, j) {
     e.cool = .8;
     const x = g2w(j % N), z = g2w((j / N) | 0);
-    this.shp[j] -= et.sdmg * this.diffMul * (this.dmgWaveMul || 1);
+    this.shp[j] -= et.sdmg * this.diffMul * (this.dmgWaveMul || 1) * (e.smash || 1); // final boss wrecks structures at 2x
     this._burst(x, z, PAL.redHex, 4, 4); this._beep(190, .05, 'square', .02);
     if (this.shp[j] <= 0) { this._fx(x, z, false, PAL.red7Hex); this._remove(j); }
   };
