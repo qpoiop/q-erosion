@@ -228,6 +228,11 @@ export function install(P) {
       ctx.globalAlpha = o === 3 || o === 4 ? .9 : .8;
       ctx.fillRect(x * S, z * S, S, S);
     }
+    for (const f of this.fitems) { // field items blink amber
+      ctx.fillStyle = PAL.amber; ctx.globalAlpha = .5 + Math.sin(this.tm * 6) * .4;
+      const fx = Math.round((f.x + HALF) / TS), fz = Math.round((f.z + HALF) / TS);
+      ctx.fillRect(fx * S - 1, fz * S - 1, S + 2, S + 2);
+    }
     { // active gate(s) blink bright red on the minimap
       ctx.fillStyle = PAL.red; ctx.globalAlpha = .55 + Math.sin(this.tm * 5) * .35;
       for (const gi of this.activeGates || [this.activeGate]) {

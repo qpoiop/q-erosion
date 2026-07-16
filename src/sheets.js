@@ -99,6 +99,7 @@ export function install(P) {
     el.appendChild(note);
   };
   P._buy = function (u) {
+    if (u.max && this._buyCount(u.id) >= u.max) { this._banner('최대 레벨입니다'); return; } // UI disables, but enforce here too
     const cost = this._shopCost(u);
     if (this.scrap < cost) { this._beep(140, .1, 'sawtooth', .05); return; }
     if (this.isHostish()) {

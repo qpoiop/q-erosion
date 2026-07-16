@@ -145,7 +145,7 @@ export function install(P) {
       case 'blt': if (!this.isHost) { if (m.o === 1) { this.scrap = m.sc; this.stat.b++; } this._place(m.i, m.k, true, m.o || 0); this._fx(g2w(m.i % N), g2w((m.i / N) | 0), false, PAL.cyanHex); } break;
       case 'sel': if (this.isHost) { const k = this.occ[m.i]; if (k === 1 || k === 2) { this.allyScrap += Math.round(this._cost(k) * .7); this._remove(m.i); this._send({ t: 'slt', i: m.i, sc: Math.round(this.allyScrap) }); } } break;
       case 'slt': if (!this.isHost) { this.scrap = m.sc; this._remove(m.i); } break;
-      case 'buy': if (this.isHost) { const u = SHOP.find(s => s.id === m.id); if (!u) break; const cost = Math.round(u.cost * Math.pow(1.5, (this._peerBuys = this._peerBuys || {}, this._peerBuys[m.id] || 0)));
+      case 'buy': if (this.isHost) { const u = SHOP.find(s => s.id === m.id); if (!u) break; if (u.max && ((this._peerBuys || {})[m.id] || 0) >= u.max) break; const cost = Math.round(u.cost * Math.pow(1.5, (this._peerBuys = this._peerBuys || {}, this._peerBuys[m.id] || 0)));
         if (this.allyScrap >= cost) { this.allyScrap -= cost; this.allyStat.r++; this._peerBuys[m.id] = (this._peerBuys[m.id] || 0) + 1; if (u.st) { this._applyStructUpg(u, this.ally, 1); this._structUpgFx(u.id); } this._send({ t: 'byk', id: m.id, sc: Math.round(this.allyScrap) }); } } break;
       case 'byk': if (!this.isHost) { const u = SHOP.find(s => s.id === m.id); this.scrap = m.sc; if (u && u.per) { this.stat.r++; this.me.buys[u.id] = this._buyCount(u.id) + 1; u.f(this.me, this); if (u.st) { this._structUpgFx(u.id); this._syncStruct(); } this._beep(760, .1, 'square', .05); if (this.shopEl.style.display === 'flex') this._renderShop(); } } break;
       case 'skl': if (this.isHost) this._shockwave(m.x, m.z, Math.min(m.r || 4, 12), Math.min(m.dmg || 60, 500), false, m.deb && { f: Math.max(.4, m.deb.f || .7), t: Math.min(m.deb.t || 2.5, 5), c: Math.min(m.deb.c || 0, .5), ct: Math.min(m.deb.ct || 1, 2) }); else this._shockFx(m.x, m.z); break;
@@ -156,7 +156,7 @@ export function install(P) {
       case 'use': { if (this.isHost && this.ally.items) { const ix = this.ally.items.indexOf(m.k); if (ix >= 0) this.ally.items.splice(ix, 1); } this._applyItemFx(m.k, m.x, m.z, false); } break;
       case 'dmg': if (!this.isHost) this._hurt(this.me, m.v); break;
       case 'eb': this.ebullets.push({ x: m.x, z: m.z, dx: m.dx, dz: m.dz, life: 3, ghost: !this.isHost }); break;
-      case 'itm': if (!this.isHost) { if (m.who === 1 && this.me.items.length < INV_MAX) { this.me.items.push(m.k); this._banner(`아이템 획득 — ${ITEMS[m.k].n} (${this.me.items.length}/${INV_MAX})`, 2600); } this.fitems = this.fitems.filter(f => f.id !== m.id); this._beep(700, .1); } break;
+      case 'itm': if (!this.isHost) { if (m.who === 1 && this.me.items.length < INV_MAX) { this.me.items.push(m.k); this._banner(`아이템 획득 — ${ITEMS[m.k].n} (${this.me.items.length}/${INV_MAX})`, 2600); } else if (m.who === 0) this._banner(`동료가 ${ITEMS[m.k].n} 획득`, 2200); this.fitems = this.fitems.filter(f => f.id !== m.id); this._beep(700, .1); } break;
       case 'ban': if (!this.isHost) this._banner(m.s); break;
       case 's': if (!this.isHost) this._applyState(m); break;
       case 'end': if (!this.isHost) this._gameOver(m.win, m.why, true); break;
@@ -196,7 +196,11 @@ export function install(P) {
       e.tx = x / 10; e.tz = z / 10; e.hp = hp; if (!e.mhp || hp > e.mhp) e.mhp = hp; });
     for (const [id, e] of this.enemies) if (!seen.has(id)) { this._killFx(e); this.enemies.delete(id); }
     if (m.st) this._structUnpack(m.st);
-    this.fitems = (m.itm || []).map(t => ({ id: t[0], k: t[1], x: t[2] / 10, z: t[3] / 10 }));
+    {
+      const prev = this._fiSeen = this._fiSeen || new Set();
+      this.fitems = (m.itm || []).map(t => ({ id: t[0], k: t[1], x: t[2] / 10, z: t[3] / 10 }));
+      for (const f of this.fitems) if (!prev.has(f.id)) { prev.add(f.id); this._banner(`💠 필드 아이템 출현 — ${ITEMS[f.k].n}`, 2400); }
+    }
   };
   P._netTick = function (dt) {
     this.sendPoseT -= dt;

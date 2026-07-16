@@ -10,7 +10,7 @@ export function install(P) {
     const dirs = this.activeGates.map(i => GATE_DIR[i]).join('·');
     if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus} · 다음 균열: ${dirs}쪽`, 3600); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
     else this._banner(`준비 단계 — ${dirs}쪽 균열을 막아라 (건설 버튼)`, 4200);
-    if (this.fitems.length < 2 && this.wave > 0) { const g = this.gates[Math.floor(Math.random() * 4)]; this.fitems.push({ id: this.eid++, k: ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)], x: rnd(-8, 8), z: rnd(-8, 8) }); }
+    if (this.fitems.length < 2 && this.wave > 0) { const k2 = ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)]; this.fitems.push({ id: this.eid++, k: k2, x: rnd(-8, 8), z: rnd(-8, 8) }); this._banner(`💠 필드 아이템 출현 — ${ITEMS[k2].n} (미니맵 확인)`, 3000); }
   };
   P._startAssault = function () {
     this.wave++; this.phase = 'assault';
@@ -386,7 +386,7 @@ export function install(P) {
         <div style="text-align:center">
           <div style="font:700 11px ${FONT};letter-spacing:.16em;color:${PAL.text};margin-bottom:6px">전투 기록 — ${DN[this.diffKey] || '보통'} · ${mm}:${ss}</div>
           <table style="margin:0 auto;font:700 12px ${FONT};border-collapse:collapse">
-            <tr><td></td><td style="padding:3px 10px;color:${PAL.cyan}">나</td><td style="padding:3px 10px;color:${PAL.amber}">${this.mode === 'solo' ? '유닛-B (봇)' : '동료'}</td></tr>
+            <tr><td></td><td style="padding:3px 10px;color:${PAL.cyan}">나 · ${this.isHostish() ? '유닛-A' : '유닛-B'}</td><td style="padding:3px 10px;color:${PAL.amber}">${this.mode === 'solo' ? '유닛-B (봇)' : '동료 · ' + (this.isHostish() ? '유닛-B' : '유닛-A')}</td></tr>
             ${rows}
           </table>
         </div>
