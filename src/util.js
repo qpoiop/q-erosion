@@ -145,6 +145,7 @@ const SYN = [
 const ITEMS = { bomb: { n: '융단 폭격', i: '💣', d: '전 구역의 적에게 90 피해' }, turret: { n: '즉석 포탑', i: '🗼', d: '현재 위치에 포탑 즉시 건설' }, kit: { n: '응급 키트', i: '➕', d: '내 체력 완전 회복' }, slow: { n: '지연 필드', i: '⏳', d: '5초간 모든 적 감속' } };
 const ITEM_KEYS = Object.keys(ITEMS);
 const INV_MAX = 5; // item inventory slots
+const PV = 2; // net protocol version — bump on breaking message changes; peers warn on mismatch
 const DIFF = { easy: .75, normal: 1, hard: 1.35, nightmare: 1.49 };   // damage: nightmare = hard +10%
 const DIFF_CNT = { easy: .8, normal: 1, hard: 1.25, nightmare: 2.5 }; // wave size: nightmare ≈ 2x hard
 const DIFF_SPT = { easy: 1.15, normal: 1, hard: .88, nightmare: .5 }; // spawn interval (2x mobs need 2x flow)
@@ -172,4 +173,4 @@ const XP_NEED = lv => 45 + lv * 30 + Math.max(0, lv - 5) * 12; // Lv1-5: origina
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
 
-export { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T };
+export { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T };

@@ -1,5 +1,5 @@
 // net.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { PV, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._initNet = function () {
@@ -22,8 +22,8 @@ export function install(P) {
   P._onNetReady = function () { // shared post-connect handshake (relay & mqtt paths)
     if (!this.isHost) {
       clearInterval(this._helloIv);
-      this._helloIv = setInterval(() => { if (this.phase === 'wait') this._send({ t: 'hello' }); else clearInterval(this._helloIv); }, 1500);
-      this._send({ t: 'hello' });
+      this._helloIv = setInterval(() => { if (this.phase === 'wait') this._send({ t: 'hello', v: PV }); else clearInterval(this._helloIv); }, 1500);
+      this._send({ t: 'hello', v: PV });
     }
   };
   P._connectRelay = function () { // dedicated Cloudflare DO relay first; public MQTT as fallback
@@ -85,9 +85,10 @@ export function install(P) {
   P._onMsg = function (m) {
     switch (m.t) {
       case 'hello': if (this.isHost) {
-        if (this.phase === 'wait') { this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {} }); this._startOnline(); }
+        if (m.v !== PV) this._banner('⚠ 상대 클라이언트가 구버전입니다 — 양쪽 모두 새로고침 권장', 5200);
+        if (this.phase === 'wait') { this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV }); this._startOnline(); }
         else if (performance.now() - (this._peerSeenAt || 0) > 3000) { // teammate silent 3s (wall-clock — tm freezes on pause) — allow rejoin mid-game
-          this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {} });
+          this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {}, v: PV });
           this._banner('동료 재접속!', 2600);
         }
         else this._send({ t: 'busy' });
@@ -95,6 +96,7 @@ export function install(P) {
       case 'welcome': if (!this.isHost && this.phase === 'wait') {
         clearInterval(this._helloIv);
         this.diffMul = m.diff; this.maxWave = m.waves; this.buildTime = m.bt; this.scrap = m.sc;
+        if (m.v !== PV) this._banner('⚠ 방장 클라이언트 버전이 다릅니다 — 양쪽 모두 새로고침 권장', 5200);
         if (m.ar) Object.assign(this.me, m.ar); if (m.abuys) this.me.buys = { ...m.abuys }; // rejoin: my research/buy counts live on the host
         this._structUnpack(m.st); this._startOnline();
       } break;
