@@ -106,7 +106,7 @@ export function install(P) {
       this.me.buys[u.id] = this._buyCount(u.id) + 1;
       if (u.st) { this._applyStructUpg(u, this.me, 0); this._structUpgFx(u.id); } else u.f(this.me, this);
       if (this.mode === 'solo' && u.per && Math.random() < .8) { const b = SHOP.find(s => s.id === u.id); this.ally.buys[u.id] = (this.ally.buys[u.id] || 0); } // bot upgrades via wave bonus below
-      this._beep(760, .1, 'square', .05); this._renderShop(); this._refreshShp();
+      this.stat.r++; this._beep(760, .1, 'square', .05); this._renderShop(); this._refreshShp();
     } else { this._send({ t: 'buy', id: u.id }); this._beep(500, .06, 'square', .04); }
   };
   P._buyCount = function (id) { return this.me.buys[id] || 0; }

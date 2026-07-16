@@ -16,6 +16,7 @@ export function install(P) {
     this.coreHp = this.coreMax = 1000;
     this.wave = 0; this.phT = 0; this.spawnQ = []; this.spawnT = 0;
     this.shotQ = []; this.over = null;
+    this.stat = { k: 0, g: 0, b: 0, r: 0 }; this.allyStat = { k: 0, g: 0, b: 0, r: 0 }; // per-player: kills / gold earned / builds / research buys
     this.buildMode = false; this.buildSel = 1; // 1 wall 2 turret 3 sell
     // core 2x2 at center
     this.coreTiles = [];
@@ -84,7 +85,7 @@ export function install(P) {
   P._tryBuild = function (i, k) { // local action (me)
     if (!this._canPlace(i)) return;
     const c = this._cost(k); if (this.scrap < c) { this._banner('자원 부족'); return; }
-    if (this.isHostish()) { this.scrap -= c; this._place(i, k); if (this.mode !== 'solo') this._send({ t: 'blt', i, k, sc: this.scrap }); }
+    if (this.isHostish()) { this.scrap -= c; this.stat.b++; this._place(i, k); if (this.mode !== 'solo') this._send({ t: 'blt', i, k, sc: this.scrap }); }
     else this._send({ t: 'bld', i, k });
   };
   P._trySell = function (i) {
