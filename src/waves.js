@@ -45,7 +45,7 @@ export function install(P) {
     // spawn OUTSIDE the gate, spread across its widened front, walk in
     const nx = g.gx === 0 ? -1 : g.gx === N - 1 ? 1 : 0, nz = g.gz === 0 ? -1 : g.gz === N - 1 ? 1 : 0;
     const off = rnd(1.8, 4), lat = rnd(-4.6, 4.6);
-    const e = { id, ty, x: g.x + nx * off + lat * (nz ? 1 : 0), z: g.z + nz * off + lat * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x + lat * (nz ? 1 : 0), gz: g.z + lat * (nx ? 1 : 0), wsp: 1 + (this.wave - 1) * .035 };
+    const e = { id, ty, x: g.x + nx * off + lat * (nz ? 1 : 0), z: g.z + nz * off + lat * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x + lat * (nz ? 1 : 0), gz: g.z + lat * (nx ? 1 : 0), wsp: Math.min(2, 1 + (this.wave - 1) * .07) }; // wave speed ramp — 2x by wave 15
     if (ETYPES[ty].boss) { // boss tiers: w5 mid, w10 heavy, final wave = colossal structure-wrecker
       e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1;
       if (e.btier === 2) { e.hp *= 4; e.wsp *= 1.15; }
