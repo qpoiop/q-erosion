@@ -70,7 +70,10 @@ export function install(P) {
     if (!silent) this._beep(520, .08, 'square', .05);
   };
   P._remove = function (i) { this.occ[i] = 0; this.own[i] = 0; this.shp[i] = 0; this.bld[i] = 0; this.building.delete(i); this._flow(); this._syncStruct(); }
-  P._cost = function (k, q) { return Math.round((k === 1 ? WALL_COST : TURRET_COST) * ((q || this.me).costMul || 1)); }
+  P._cost = function (k, q) { // build costs inflate with the wave (income does too) — late-game gold shouldn't trivialize walls
+    const waveMul = Math.min(2.5, 1 + Math.max(0, this.wave - 1) * .08);
+    return Math.round((k === 1 ? WALL_COST : TURRET_COST) * ((q || this.me).costMul || 1) * waveMul);
+  }
   P._canPlace = function (i) {
     if (this.occ[i]) return false;
     const gx = i % N, gz = (i / N) | 0, x = g2w(gx), z = g2w(gz);
