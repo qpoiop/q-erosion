@@ -122,7 +122,12 @@ export function install(P) {
     const p = this.me;
     const pool = UPG.map(u => ({ u, tier: p.taken[u.k] || 0 })).filter(c => c.tier < c.u.t.length);
     if (!pool.length) { this.pendUp = 0; return; }
-    const picks = []; while (picks.length < 3 && pool.length) picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    const picks = [];
+    // slot 1 favors build coherence: upgrade an owned line, or a line that completes a synergy with one
+    const owned = k => (p.taken[k] || 0) > 0;
+    const relevant = pool.filter(c => owned(c.u.k) || SYN.some(sy => sy.need.includes(c.u.k) && sy.need.some(k2 => k2 !== c.u.k && owned(k2))));
+    if (relevant.length) { const c = relevant[Math.floor(Math.random() * relevant.length)]; picks.push(c); pool.splice(pool.indexOf(c), 1); }
+    while (picks.length < 3 && pool.length) picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
     this._upBase = 'LV ' + this.lv + ' — 강화 선택' + (this.pendUp > 1 ? ' (+' + (this.pendUp - 1) + ' 대기)' : '');
     this._upDeadline = performance.now() + 30000; // 30s to choose, then the first card auto-picks
     this.upTitle.textContent = this._upBase + ' · 30s';
