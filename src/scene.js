@@ -303,6 +303,19 @@ export function install(P) {
   P._render = function (dt) {
     const T = THREE, now = performance.now() / 1000;
     this._fno = ((this._fno | 0) + 1) & 0xffff;
+    { // perf governor: sustained jank → shed the expensive passes (weak phones died at wave 11+)
+      const ms = Math.min(100, dt * 1000);
+      this._ftAvg = (this._ftAvg || 16) * .92 + ms * .08;
+      if (!this._lowPerf && (this._ftAvg > 34 || new URLSearchParams(location.search).get('perf') === 'low')) {
+        this._lowPerf = true;
+        this.composer = null; // bloom = 5 fullscreen passes
+        this.renderer.shadowMap.autoUpdate = false; // freeze shadows instead of re-rendering the scene for them
+        this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.15));
+        this.renderer.setSize(this.cv.clientWidth, this.cv.clientHeight, false);
+        if (this.dust) this.dust.visible = false;
+        this._banner('⚙ 저사양 모드 — 그래픽 효과를 줄였습니다', 3200);
+      }
+    }
     if (this.dust) this.dust.rotation.y += dt * .01;
     // build-mode overlay: refresh placeable tiles 4x/s
     const bovOn = this.buildMode && this.buildSel !== 3 && !this.over;
