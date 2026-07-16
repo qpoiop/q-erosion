@@ -60,7 +60,11 @@ class ErosionGame extends HTMLElement {
   _exit() { this.dispatchEvent(new CustomEvent('erosion-exit', { bubbles: true, composed: true })); }
   _initAudio() {
     this.mute = false; let ctx = null;
-    this._beep = (f, dur, type, vol) => { if (this.mute) return; try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type || 'square'; o.frequency.value = f; g.gain.setValueAtTime(vol || .05, ctx.currentTime); g.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + dur); o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + dur); } catch (e) {} };
+    this._beep = (f, dur, type, vol) => { if (this.mute) return;
+      const now2 = performance.now(); // budget: max 6 beeps per 180ms — hit storms were spawning oscillators faster than GC could reap
+      if (!this._beepWin || now2 - this._beepWin > 180) { this._beepWin = now2; this._beepN = 0; }
+      if (++this._beepN > 6) return;
+      try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type || 'square'; o.frequency.value = f; g.gain.setValueAtTime(vol || .05, ctx.currentTime); g.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + dur); o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + dur); } catch (e) {} };
   }
   isHostish() { return this.mode === 'solo' || this.isHost; }
   _tick(dt) {

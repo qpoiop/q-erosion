@@ -173,7 +173,7 @@ export function install(P) {
       const g = new T.Group();
       const m = tpl.clone(true);
       if (e.ty === 1) { m.scale.multiplyScalar(1.25); m.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new T.Color(0x3a0d08); } }); } // breaker: bigger, red-tinged
-      else if (e.ty === 2) { m.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new T.Color(0x2e0a06); } }); } // gunners: red tinge — Robo_V2 was reading as the teal player faction
+      else if (e.ty === 2) { m.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new T.Color(0x521208); } }); } // gunners: strong red tinge — Robo_V2 was reading as the teal player faction
       g.add(m); g.isModel = true;
       if (e.ty === 3) {
         const aura = new T.Mesh(new T.RingGeometry(1.5, 1.85, 40), new T.MeshBasicMaterial({ color: PAL.redHex, transparent: true, opacity: .5, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
