@@ -172,6 +172,7 @@ export function install(P) {
     if (tpl) {
       const g = new T.Group();
       const m = tpl.clone(true);
+      if (!ETYPES[e.ty].boss) m.traverse(o => { if (o.isMesh) o.castShadow = false; }); // trash mobs skip the shadow pass (battery)
       if (e.ty === 1) { m.scale.multiplyScalar(1.25); m.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new T.Color(0x3a0d08); } }); } // breaker: bigger, red-tinged
       else if (e.ty === 2) { m.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new T.Color(0x521208); } }); } // gunners: strong red tinge — Robo_V2 was reading as the teal player faction
       g.add(m); g.isModel = true;

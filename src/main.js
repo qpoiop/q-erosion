@@ -117,6 +117,8 @@ class ErosionGame extends HTMLElement {
       p.dashT = Math.max(0, p.dashT - dt); p.dashing = Math.max(0, p.dashing - dt); p.sklT = Math.max(0, p.sklT - dt);
       if (this.mode !== 'solo' && this.allyOn) { const a = this.ally; if (a.tx !== undefined) { a.x += (a.tx - a.x) * Math.min(1, dt * 12); a.z += (a.tz - a.z) * Math.min(1, dt * 12); a.a = a.ta || 0; } }
     }
+    // battery: when the sim is idle (paused, waiting, game over), render at half rate
+    if (!playing && ((this._fskip = ((this._fskip | 0) + 1)) & 1)) return;
     this._render(dt);
   }
 }
