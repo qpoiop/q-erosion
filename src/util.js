@@ -106,6 +106,7 @@ const SHOP = [
   { id: 'gwall', c: '구조물', n: '벽 강화', d: '내가 지은 벽 내구 +40%', cost: 35, per: true, st: true, f: p => { p.wallMul *= 1.4; p.wallLv = (p.wallLv || 0) + 1; } },
   { id: 'gtur', c: '구조물', n: '포탑 화력', d: '내 포탑 공격 +15% · 내구 +15%', cost: 40, per: true, st: true, max: 8, f: p => { p.turMul *= 1.15; p.turHpMul = (p.turHpMul || 1) * 1.15; p.turLv = (p.turLv || 0) + 1; } },
   { id: 'gcost', c: '구조물', n: '건설 자동화', d: '내 건설 비용 −15%', cost: 45, per: true, st: true, max: 3, f: p => p.costMul *= .85 },
+  { id: 'crep', c: '구조물', n: '코어 수리', d: '코어 HP +150 즉시 회복', cost: 50, per: true, f: (p, g) => g && g._coreAug(0, 150) },
 ];
 /* synergies: awaken when both lines are taken, then DEEPEN — f re-applies for every
    tier gained across the two lines (see _checkSyn), so leveling either line keeps paying */

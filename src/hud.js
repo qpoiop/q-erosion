@@ -16,12 +16,12 @@ export function install(P) {
     const tcRow = H('div', 'display:flex;align-items:baseline;gap:7px', tl);
     this.wvEl = H('div', 'font-size:13px;font-weight:700;letter-spacing:.06em', tcRow);
     this.phEl = H('div', 'font-size:10px;font-weight:700;letter-spacing:.06em;color:' + PAL.dim, tcRow);
-    { // difficulty tag — always visible so you know what you signed up for
+    this._mkDiffTag = (parent) => { // difficulty tag — always visible so you know what you signed up for
       const DN = { easy: ['쉬움', PAL.cyan], normal: ['보통', '#e8eaf0'], hard: ['어려움', PAL.red], nightmare: ['☠ 악몽', '#c96bff'] };
       const [dn, dc] = DN[this.diffKey] || DN.normal;
-      const d = H('div', `margin-left:auto;font-size:9px;font-weight:700;letter-spacing:.08em;color:${dc};border:1px solid ${dc}55;padding:1px 5px`, tcRow);
+      const d = H('div', `font:700 10px ${FONT};letter-spacing:.08em;color:${dc};border:1px solid ${dc}66;padding:6px 9px;background:rgba(12,14,20,.6)`, parent);
       d.textContent = dn;
-    }
+    };
     const cbRow = H('div', 'display:flex;align-items:center;gap:6px', tl);
     const cb = H('div', 'flex:1;height:5px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', cbRow);
     this.coreF = H('div', 'height:100%;width:100%;background:linear-gradient(90deg,' + PAL.cyan + ',#7ee8ff);box-shadow:0 0 10px ' + PAL.cyan, cb);
@@ -47,6 +47,7 @@ export function install(P) {
     const tr = H('div', 'position:absolute;top:10px;right:10px;display:flex;flex-direction:column;align-items:flex-end;gap:6px', hud);
     const trb = H('div', 'display:flex;gap:5px', tr);
     const smBtn = txt => { const b = H('button', pe + 'font:700 11px ' + FONT + ';border:1px solid ' + PAL.line + ';background:' + PAL.panel + ';color:' + PAL.text + ';padding:6px 9px;cursor:pointer;letter-spacing:.05em', trb); b.textContent = txt; return b; };
+    this._mkDiffTag(trb);
     this.sndBtn = smBtn('소리 ON');
     this.sndBtn.onclick = () => { this.mute = !this.mute; this.sndBtn.textContent = this.mute ? '소리 OFF' : '소리 ON'; };
     const xb = smBtn('나가기 ✕'); xb.style.borderColor = PAL.red7; xb.onclick = () => this._exitConfirm();
@@ -66,11 +67,12 @@ export function install(P) {
     // first-wave controls hint
     this.hintEl = H('div', 'position:absolute;bottom:88px;left:50%;transform:translateX(-50%);font:400 11px ' + FONT + ';color:' + PAL.dim + ';letter-spacing:.05em;display:none;text-align:center;background:rgba(12,14,20,.45);padding:4px 12px;border:1px solid rgba(58,64,82,.4)', hud);
     this.hintEl.textContent = ('ontouchstart' in window) ? '드래그 이동 · 대시(무적 돌진)/아이템 버튼 · 건설/연구는 좌하단' : '이동 WASD · 대시 Space(무적 돌진) · 아이템 E · 건설/연구는 좌하단';
-    // owned card lines (tier-colored) + awakened synergy badges
-    // one tight column: synergy badges directly above owned chips, capped height + inner scroll
-    const buffCol = H('div', 'position:absolute;bottom:38px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column-reverse;gap:3px;align-items:center;max-width:min(72vw,640px)', hud);
-    this.ownedEl = H('div', 'display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-height:40px;overflow-y:auto;scrollbar-width:none;pointer-events:auto', buffCol);
-    this.synEl = H('div', 'display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-height:24px;overflow-y:auto;scrollbar-width:none;pointer-events:auto', buffCol);
+    // owned augments/synergies live behind ONE summary chip — a full build was overflowing the screen as badges
+    this.buffChip = H('button', pe + 'position:absolute;bottom:40px;left:50%;transform:translateX(-50%);font:700 10.5px ' + FONT + ';border:1px solid ' + PAL.line + ';background:rgba(12,14,20,.7);color:' + PAL.dim + ';padding:4px 12px;cursor:pointer;letter-spacing:.05em;display:none;backdrop-filter:blur(4px)', hud);
+    this.buffChip.onclick = () => this._toggleBuffs();
+    this.buffBg = H('div', 'position:absolute;inset:0;display:none;background:rgba(5,6,10,.45);z-index:24;' + pe, hud);
+    this.buffBg.addEventListener('pointerdown', e => { e.stopPropagation(); this._toggleBuffs(false); });
+    this.buffEl = H('div', 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;flex-direction:column;gap:6px;z-index:25;' + pe + panel + 'padding:16px;min-width:min(88vw,420px);max-height:74vh;overflow:auto', hud);
     // square action buttons — uniform centered label layout
     const sqBtn = (parent, label, accent) => {
       const b = H('button', pe + 'width:68px;height:68px;border:1px solid ' + (accent || PAL.line) + ';background:' + PAL.panel + ';color:' + (accent || PAL.text) + ';font:700 12px ' + FONT + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;gap:2px;text-align:center;backdrop-filter:blur(6px);line-height:1.3', parent);
@@ -125,7 +127,7 @@ export function install(P) {
     [this.wallChip, this.turChip, this.sellChip].forEach((c, i) => { const on = sel === i + 1; c.style.borderColor = on ? PAL.cyan : PAL.line; c.style.color = on ? PAL.cyan : PAL.text; c.style.background = on ? 'rgba(37,216,255,.14)' : PAL.panel; });
   };
   P._obtn = function (primary) { return `font:700 13px ${FONT};border:1px solid ${primary ? PAL.red : PAL.line};background:${primary ? PAL.red : 'transparent'};color:${primary ? '#fff' : PAL.text};padding:10px 16px;cursor:pointer;letter-spacing:.04em`; }
-  P._hudReset = function () { if (this.upEl) { this.upEl.style.display = 'none'; this.shopEl.style.display = 'none'; if (this.shopBg) { this.shopBg.style.display = 'none'; this.shopBtn.textContent = '연구'; this.shopBtn.style.background = PAL.panel; } if (this.invEl) { this.invEl.style.display = 'none'; this.invBg.style.display = 'none'; } this.ov.style.display = 'none'; this.buildMode = false; this._buildBarSync(); } }
+  P._hudReset = function () { if (this.upEl) { this.upEl.style.display = 'none'; this.shopEl.style.display = 'none'; if (this.shopBg) { this.shopBg.style.display = 'none'; this.shopBtn.textContent = '연구'; this.shopBtn.style.background = PAL.panel; } if (this.invEl) { this.invEl.style.display = 'none'; this.invBg.style.display = 'none'; } if (this.buffEl) { this.buffEl.style.display = 'none'; this.buffBg.style.display = 'none'; this.buffChip.style.display = 'none'; this._buffKey = null; } this.ov.style.display = 'none'; this.buildMode = false; this._buildBarSync(); } }
   P._banner = function (t, ms) { this.ban.textContent = t; this.ban.style.display = 'block'; clearTimeout(this._banT); this._banT = setTimeout(() => this.ban.style.display = 'none', ms || 2600); }
   P._exitConfirm = function () { // exit button & browser-back both land here
     if (this.phase === 'over' || this.phase === 'wait') { this._exit(); return; } // no game in progress — leave directly
@@ -170,6 +172,42 @@ export function install(P) {
     note.style.cssText = `font:400 10.5px ${FONT};color:${PAL.dim};letter-spacing:.05em;text-align:center;margin-top:2px`;
     el.appendChild(note);
   };
+  P._toggleBuffs = function (force) {
+    const open = force !== undefined ? force : this.buffEl.style.display !== 'flex';
+    this.buffEl.style.display = open ? 'flex' : 'none';
+    this.buffBg.style.display = open ? 'block' : 'none';
+    if (open) this._renderBuffs();
+  };
+  P._renderBuffs = function () {
+    const el = this.buffEl; el.innerHTML = '';
+    const head = document.createElement('div');
+    head.style.cssText = `display:flex;justify-content:space-between;align-items:center;font:700 13px ${FONT};letter-spacing:.1em`;
+    head.innerHTML = '<span>보유 증강 · 시너지</span>';
+    const close = document.createElement('button');
+    close.textContent = '✕'; close.style.cssText = `background:transparent;border:none;color:${PAL.dim};font:700 14px ${FONT};cursor:pointer;padding:2px 6px`;
+    close.onclick = () => this._toggleBuffs(false); head.appendChild(close);
+    el.appendChild(head);
+    const sec = (title) => { const t = document.createElement('div'); t.textContent = title; t.style.cssText = `font:700 10px ${FONT};letter-spacing:.18em;color:${PAL.dim};margin-top:6px`; el.appendChild(t); };
+    const row = (color, name, tierTxt, desc) => {
+      const r = document.createElement('div');
+      r.style.cssText = `display:flex;gap:8px;align-items:baseline;background:rgba(20,23,32,.7);border-left:3px solid ${color};padding:6px 10px`;
+      r.innerHTML = `<span style="font:700 12px ${FONT};color:${color};white-space:nowrap">${name} ${tierTxt}</span><span style="font:400 10.5px ${FONT};color:${PAL.dim};line-height:1.4">${desc}</span>`;
+      el.appendChild(r);
+    };
+    const taken = UPG.filter(u => this.me.taken[u.k]);
+    if (taken.length) sec('증강 ' + taken.length + '계통');
+    for (const u of taken) {
+      const tier = Math.min(this.me.taken[u.k], u.t.length), r = RAR[tier - 1];
+      row(r.c, u.n, ROMAN[tier - 1], u.t.slice(0, tier).map(t => t.d).join(' · '));
+    }
+    const syns = SYN.filter(s => this.me.syn && this.me.syn[s.id]);
+    if (syns.length) sec('시너지 ' + syns.length + '종');
+    for (const s of syns) {
+      const gr = (this.me.synGrade || {})[s.id] || 1, r = RAR[gr - 1];
+      row(r.c, '✦ ' + s.n, ROMAN[gr - 1] + ' (' + r.n + ')', s.d + ' · 누적 ' + this.me.syn[s.id] + '회');
+    }
+    if (!taken.length && !syns.length) { const e = document.createElement('div'); e.textContent = '아직 획득한 증강이 없습니다'; e.style.cssText = `font:400 11px ${FONT};color:${PAL.dim}`; el.appendChild(e); }
+  };
   P._toggleShop = function () {
     const open = this.shopEl.style.display !== 'flex';
     this.shopEl.style.display = open ? 'flex' : 'none';
@@ -207,7 +245,7 @@ export function install(P) {
     if (this.isHostish()) {
       this.scrap -= cost;
       this.me.buys[u.id] = this._buyCount(u.id) + 1;
-      if (u.st) { this._applyStructUpg(u, this.me, 0); this._structUpgFx(u.id); } else u.f(this.me);
+      if (u.st) { this._applyStructUpg(u, this.me, 0); this._structUpgFx(u.id); } else u.f(this.me, this);
       if (this.mode === 'solo' && u.per && Math.random() < .8) { const b = SHOP.find(s => s.id === u.id); this.ally.buys[u.id] = (this.ally.buys[u.id] || 0); } // bot upgrades via wave bonus below
       this._beep(760, .1, 'square', .05); this._renderShop(); this._refreshShp();
     } else { this._send({ t: 'buy', id: u.id }); this._beep(500, .06, 'square', .04); }
@@ -326,20 +364,15 @@ export function install(P) {
       if (rem <= 0) { const first = this.upRow.querySelector('button'); this._upDeadline = 0; if (first) { this._banner('시간 초과 — 첫 번째 카드 자동 선택', 2200); first.click(); } }
       else this.upTitle.textContent = this._upBase + ' · ' + rem + 's';
     }
-    // owned card lines (tier-colored)
-    const ownKey = JSON.stringify(this.me.taken);
-    if (ownKey !== this._ownKey) {
-      this._ownKey = ownKey;
-      this.ownedEl.innerHTML = UPG.filter(u => this.me.taken[u.k]).map(u => {
-        const tier = Math.min(this.me.taken[u.k], u.t.length) - 1, r = RAR[tier];
-        return `<div style="background:rgba(12,14,20,.6);border:1px solid ${r.c};color:${r.c};font:700 10px ${FONT};padding:2px 7px;letter-spacing:.04em">${u.n.slice(0, 2)} ${ROMAN[tier]}</div>`;
-      }).join('');
-    }
-    const synKey = Object.keys(this.me.syn || {}).join(',');
-    if (synKey !== this._synKey) {
-      this._synKey = synKey;
-      this.synEl.innerHTML = SYN.filter(s => this.me.syn && this.me.syn[s.id])
-        .map(s => { const gr = (this.me.synGrade || {})[s.id] || 1, r = RAR[gr - 1]; return `<div style="background:rgba(12,14,20,.6);border:1px solid ${r.c};color:${r.c};font:700 10px ${FONT};padding:3px 8px;letter-spacing:.05em" title="${s.d}">✦ ${s.n} ${ROMAN[gr - 1]}</div>`; }).join('');
+    // owned-augment summary chip (details open in a sheet — badges used to overflow)
+    const nOwn = UPG.filter(u => this.me.taken[u.k]).length;
+    const nSyn = Object.keys(this.me.syn || {}).length;
+    const buffKey = JSON.stringify([this.me.taken, this.me.syn, this.me.synGrade]);
+    if (buffKey !== this._buffKey) {
+      this._buffKey = buffKey;
+      this.buffChip.style.display = nOwn ? 'block' : 'none';
+      this.buffChip.textContent = `▲ 증강 ${nOwn}` + (nSyn ? ` · ✦ 시너지 ${nSyn}` : '');
+      if (this.buffEl.style.display === 'flex') this._renderBuffs();
     }
     if (this.shopEl.style.display === 'flex') { // live affordability while the sheet is open
       const bal = this.shopEl.querySelector('.shop-bal');
