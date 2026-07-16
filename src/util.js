@@ -13,12 +13,13 @@ const dist2 = (ax, az, bx, bz) => { const dx = ax - bx, dz = az - bz; return dx 
 const PAL = { bg: 0x0b0c10, line: '#3a4052', panel: 'rgba(12,14,20,.82)', text: '#e8eaf0', dim: '#9aa3b5', cyan: '#25d8ff', cyanHex: 0x25d8ff, amber: '#ffb020', amberHex: 0xffb020, red: '#ff3b2a', redHex: 0xff3b2a, red7: '#c22212', red7Hex: 0xc22212 };
 const FONT = "'Chakra Petch','Noto Sans KR',sans-serif";
 /* swarm balance: many weaker mobs rather than few strong ones */
-const ETYPES = [
-  { hp: 30, sp: 3.9, dmg: 6, sdmg: 15, xp: 8, sc: 2, r: .55 },   // tri rusher
-  { hp: 115, sp: 1.9, dmg: 15, sdmg: 40, xp: 20, sc: 6, r: .75 }, // cube breaker
-  { hp: 48, sp: 2.5, dmg: 0, sdmg: 12, xp: 15, sc: 4, r: .6, rng: true }, // hex gunner
-  { hp: 700, sp: 1.5, dmg: 28, sdmg: 95, xp: 80, sc: 30, r: 1.1, boss: true }, // boss
+const ETYPES = [ // sdmg trimmed ~20% when turret retaliation landed — structures were melting
+  { hp: 30, sp: 3.9, dmg: 5, sdmg: 11, xp: 8, sc: 2, r: .55 },   // tri rusher
+  { hp: 115, sp: 1.9, dmg: 13, sdmg: 33, xp: 20, sc: 6, r: .75 }, // cube breaker
+  { hp: 48, sp: 2.5, dmg: 0, sdmg: 9, xp: 15, sc: 4, r: .6, rng: true }, // hex gunner
+  { hp: 700, sp: 1.5, dmg: 25, sdmg: 80, xp: 80, sc: 30, r: 1.1, boss: true }, // boss
 ];
+const DIFF_SCR = { easy: 1, normal: 1, hard: 1.2, nightmare: 1.45 }; // scrap income — harder waves fund a bigger arsenal
 /* card rarity tiers — each line levels 기본→레어→에픽→레전드; a tier only
    appears after the previous tier of the same line was taken */
 const RAR = [
@@ -84,6 +85,11 @@ const UPG = [
     { d: '아이템 드랍 확률 +50%', f: p => p.dropMul = (p.dropMul || 1) * 1.5 },
     { d: '아이템 드랍 확률 +70%', f: p => p.dropMul = (p.dropMul || 1) * 1.7 },
     { d: '아이템 드랍 확률 2배', f: p => p.dropMul = (p.dropMul || 1) * 2 }] },
+  { k: 'skl', n: '충격파 공명', t: [ // multiplies the shockwave skill (see _useSkill)
+    { d: '충격파 피해 +30%', f: p => p.sklDmgMul = (p.sklDmgMul || 1) * 1.3 },
+    { d: '충격파 범위 +25%', f: p => p.sklRMul = (p.sklRMul || 1) * 1.25 },
+    { d: '충격파 쿨다운 −20%', f: p => p.sklCdMul = (p.sklCdMul || 1) * .8 },
+    { d: '피해 +40% · 범위 +20% · 쿨 −15%', f: p => { p.sklDmgMul = (p.sklDmgMul || 1) * 1.4; p.sklRMul = (p.sklRMul || 1) * 1.2; p.sklCdMul = (p.sklCdMul || 1) * .85; } }] },
   { k: 'core', n: '코어 정비', t: [ // second arg = game element (host-authoritative via _coreAug)
     { d: '코어 최대 HP +80 · 즉시 +80', f: (p, g) => g && g._coreAug(80, 80) },
     { d: '코어 최대 HP +100 · 즉시 +100', f: (p, g) => g && g._coreAug(100, 100) },
@@ -96,21 +102,45 @@ const SHOP = [
   { id: 'pdmg', c: '캐릭터', n: '화력 증강', d: '공격력 +12%', cost: 35, per: true, f: p => p.dmg *= 1.12 },
   { id: 'sskl', c: '스킬', n: '충격파 강화', d: '피해·반경 ↑, 쿨다운 ↓', cost: 40, per: true, max: 4, f: p => p.sklLv++ },
   { id: 'sdash', c: '스킬', n: '대시 모듈', d: '대시 쿨다운 −20%', cost: 30, per: true, max: 4, f: p => p.dashCd *= .8 },
-  { id: 'gwall', c: '구조물', n: '벽 강화', d: '벽 내구 +40% (공용)', cost: 35, g: true, f: g => { g.wallMul *= 1.4; g.wallLv = (g.wallLv || 0) + 1; } },
-  { id: 'gtur', c: '구조물', n: '포탑 화력', d: '포탑 공격 +25% · 내구 +15% (공용)', cost: 40, g: true, f: g => { g.turMul *= 1.25; g.turHpMul = (g.turHpMul || 1) * 1.15; g.turLv = (g.turLv || 0) + 1; } },
-  { id: 'gcost', c: '구조물', n: '건설 자동화', d: '건설 비용 −15% (공용)', cost: 45, g: true, max: 3, f: g => g.costMul *= .85 },
+  // structure research is PER-PLAYER: it applies to structures the buyer built (st flag → owner-scoped HP rescale)
+  { id: 'gwall', c: '구조물', n: '벽 강화', d: '내가 지은 벽 내구 +40%', cost: 35, per: true, st: true, f: p => { p.wallMul *= 1.4; p.wallLv = (p.wallLv || 0) + 1; } },
+  { id: 'gtur', c: '구조물', n: '포탑 화력', d: '내 포탑 공격 +15% · 내구 +15%', cost: 40, per: true, st: true, max: 8, f: p => { p.turMul *= 1.15; p.turHpMul = (p.turHpMul || 1) * 1.15; p.turLv = (p.turLv || 0) + 1; } },
+  { id: 'gcost', c: '구조물', n: '건설 자동화', d: '내 건설 비용 −15%', cost: 45, per: true, st: true, max: 3, f: p => p.costMul *= .85 },
+  { id: 'crep', c: '구조물', n: '코어 수리', d: '코어 HP +150 즉시 회복', cost: 50, per: true, f: (p, g) => g && g._coreAug(0, 150) },
 ];
-/* synergies: taking both level-up card lines awakens a one-time evolution bonus */
+/* synergies: awaken when both lines are taken, then DEEPEN — f re-applies for every
+   tier gained across the two lines (see _checkSyn), so leveling either line keeps paying */
 const SYN = [
-  { id: 'storm', need: ['frate', 'shots'], n: '폭풍 사격', d: '연사 +15% 추가', f: p => p.frate *= 1.15 },
-  { id: 'ap', need: ['dmg', 'pierce'], n: '철갑 관통', d: '관통 +1 · 피해 +10%', f: p => { p.pierce++; p.dmg *= 1.1; } },
-  { id: 'rush', need: ['speed', 'regen'], n: '전투 기동', d: '대시 쿨다운 −25%', f: p => p.dashCd *= .75 },
-  { id: 'fort', need: ['maxhp', 'regen'], n: '재생 장갑', d: '자가 수복 ×1.6', f: p => p.regen *= 1.6 },
-  { id: 'greed', need: ['scrap', 'dmg'], n: '약탈 프로토콜', d: '처치 자원 +20% 추가', f: p => p.scrapMul = (p.scrapMul || 1) * 1.2 },
-  { id: 'bulwark', need: ['armor', 'maxhp'], n: '불괴 장갑', d: '받는 피해 −8% 추가', f: p => p.armor = (p.armor || 1) * .92 },
-  { id: 'sanctum', need: ['core', 'regen'], n: '성역 프로토콜', d: '코어 +120 · 완전 수리', f: (p, g) => g && g._coreAug(120, 1e9) },
-  { id: 'hunter', need: ['drop', 'scrap'], n: '전리품 사냥꾼', d: '드랍 +30% · 자원 +15% 추가', f: p => { p.dropMul = (p.dropMul || 1) * 1.3; p.scrapMul = (p.scrapMul || 1) * 1.15; } },
-  { id: 'aegis', need: ['armor', 'core'], n: '수호자 서약', d: '받는 피해 −6% · 코어 +80', f: (p, g) => { p.armor = (p.armor || 1) * .94; if (g) g._coreAug(80, 80); } },
+  /* f: re-applies per combined tier of the two lines (tier-sum, max 8).
+     grade: called once per GRADE level reached (2=레어, 3=에픽, 4=레전드; grade = min of the two line tiers) —
+     modest one-time bumps so grades matter without overshadowing the per-tier growth. */
+  { id: 'storm', need: ['frate', 'shots'], n: '폭풍 사격', d: '티어당 연사 +4% · 등급 보너스', f: p => p.frate *= 1.04,
+    grade: (p, g, gr) => { if (gr >= 2) p.frate *= gr === 4 ? 1.05 : gr === 3 ? 1.04 : 1.03; } },
+  { id: 'ap', need: ['dmg', 'pierce'], n: '철갑 관통', d: '티어당 피해 +3.5% (각성 시 관통 +1) · 등급 보너스', first: p => p.pierce++, f: p => p.dmg *= 1.035,
+    grade: (p, g, gr) => { if (gr >= 2) p.dmg *= gr === 4 ? 1.05 : gr === 3 ? 1.04 : 1.03; if (gr === 4) p.pierce++; } },
+  { id: 'rush', need: ['speed', 'regen'], n: '전투 기동', d: '티어당 대시 쿨다운 −4% · 등급 보너스', f: p => p.dashCd *= .96,
+    grade: (p, g, gr) => { if (gr >= 2) p.dashCd *= gr === 4 ? .95 : gr === 3 ? .96 : .97; } },
+  { id: 'fort', need: ['maxhp', 'regen'], n: '재생 장갑', d: '티어당 초당 수복 +0.35 · 등급 보너스', f: p => p.regen += .35,
+    grade: (p, g, gr) => { if (gr >= 2) p.regen += gr === 4 ? .8 : gr === 3 ? .5 : .3; } },
+  { id: 'greed', need: ['scrap', 'dmg'], n: '약탈 프로토콜', d: '티어당 처치 자원 +4% · 등급 보너스', f: p => p.scrapMul = (p.scrapMul || 1) * 1.04,
+    grade: (p, g, gr) => { if (gr >= 2) p.scrapMul = (p.scrapMul || 1) * (gr === 4 ? 1.06 : gr === 3 ? 1.05 : 1.04); } },
+  { id: 'bulwark', need: ['armor', 'maxhp'], n: '불괴 장갑', d: '티어당 받는 피해 −2% · 등급 보너스', f: p => p.armor = (p.armor || 1) * .98,
+    grade: (p, g, gr) => { if (gr >= 2) p.armor = (p.armor || 1) * (gr === 4 ? .98 : gr === 3 ? .985 : .99); } },
+  { id: 'sanctum', need: ['core', 'regen'], n: '성역 프로토콜', d: '티어당 코어 최대 +25 · 즉시 +25 · 등급 보너스', f: (p, g) => g && g._coreAug(25, 25),
+    grade: (p, g, gr) => { if (gr >= 2 && g) g._coreAug(gr === 4 ? 80 : gr === 3 ? 50 : 30, gr === 4 ? 80 : gr === 3 ? 50 : 30); } },
+  { id: 'hunter', need: ['drop', 'scrap'], n: '전리품 사냥꾼', d: '티어당 드랍 +5% · 자원 +2% · 등급 보너스', f: p => { p.dropMul = (p.dropMul || 1) * 1.05; p.scrapMul = (p.scrapMul || 1) * 1.02; },
+    grade: (p, g, gr) => { if (gr >= 2) p.dropMul = (p.dropMul || 1) * (gr === 4 ? 1.1 : gr === 3 ? 1.07 : 1.05); } },
+  { id: 'aegis', need: ['armor', 'core'], n: '수호자 서약', d: '티어당 받는 피해 −1.5% · 코어 +12 · 등급 보너스', f: (p, g) => { p.armor = (p.armor || 1) * .985; if (g) g._coreAug(12, 12); },
+    grade: (p, g, gr) => { if (gr >= 2) { p.armor = (p.armor || 1) * (gr === 4 ? .985 : .99); if (g) g._coreAug(gr === 4 ? 30 : gr === 3 ? 20 : 15, 15); } } },
+  { id: 'reson', need: ['skl', 'dmg'], n: '공명 폭발', d: '티어당 충격파 피해 +5% · 등급별 둔화/마비 부여', f: p => p.sklDmgMul = (p.sklDmgMul || 1) * 1.05,
+    grade: (p, g, gr) => { // 기본: 30% 둔화 2.5s → 레어 35%/3s → 에픽 +마비 20% → 레전드 50% 둔화 3.5s·마비 35%
+      p.swSlowF = gr >= 4 ? .5 : gr >= 2 ? .65 : .7;
+      p.swSlowT = gr >= 4 ? 3.5 : gr >= 2 ? 3 : 2.5;
+      p.swStunC = gr >= 4 ? .35 : gr >= 3 ? .2 : 0;
+      p.swStunT = gr >= 4 ? 1.2 : 1;
+    } },
+  { id: 'surge', need: ['skl', 'speed'], n: '연쇄 기동', d: '티어당 충격파 쿨 −3% · 범위 +2% · 등급 보너스', f: p => { p.sklCdMul = (p.sklCdMul || 1) * .97; p.sklRMul = (p.sklRMul || 1) * 1.02; },
+    grade: (p, g, gr) => { if (gr >= 2) { p.sklCdMul = (p.sklCdMul || 1) * (gr === 4 ? .95 : gr === 3 ? .97 : .98); p.sklRMul = (p.sklRMul || 1) * (gr === 4 ? 1.03 : 1.02); } } },
 ];
 const ITEMS = { bomb: { n: '융단 폭격', i: '💣', d: '전 구역의 적에게 90 피해' }, turret: { n: '즉석 포탑', i: '🗼', d: '현재 위치에 포탑 즉시 건설' }, kit: { n: '응급 키트', i: '➕', d: '내 체력 완전 회복' }, slow: { n: '지연 필드', i: '⏳', d: '5초간 모든 적 감속' } };
 const ITEM_KEYS = Object.keys(ITEMS);
@@ -128,9 +158,9 @@ const MODELS = {
   melee:  { url: 'assets/enemy_melee.glb',    size: 1.7, yaw: 0, merge: true },
   ranged: { url: 'assets/enemy_ranged_a.glb', size: 1.7, yaw: 0, merge: true },
   ranged2:{ url: 'assets/enemy_ranged_b.glb', size: 1.7, yaw: 0, merge: true },
-  boss1:  { url: 'assets/boss_mid.glb',       size: 4.6, yaw: 0, merge: true },
-  boss2:  { url: 'assets/boss_final.glb',     size: 4.2, yaw: 0, merge: true },
-  boss3:  { url: 'assets/boss_last.glb',      size: 5.8, yaw: 0, merge: true }, // wave-15 final boss
+  boss1:  { url: 'assets/boss_mid.glb',       size: 5.2, yaw: 0, merge: true },
+  boss2:  { url: 'assets/boss_final.glb',     size: 5.0, yaw: 0, merge: true },
+  boss3:  { url: 'assets/boss_last.glb',      size: 6.8, yaw: 0, merge: true }, // wave-15 final boss
   tower0: { url: 'assets/tower_t1.glb',       size: 1.9, yaw: 0, merge: true }, // research band 0-3
   tower1: { url: 'assets/tower_t2.glb',       size: 2.2, yaw: 0, merge: true }, // band 4-9; band 10+ = same model, scaled up
   wall0:  { url: 'assets/wall_t1.glb',        size: 1.84, yaw: 0, merge: true }, // wall research 0-3 (tile is 2 units)
@@ -142,4 +172,4 @@ const XP_NEED = lv => 45 + lv * 30 + Math.max(0, lv - 5) * 12; // Lv1-5: origina
 const WALL_COST = 10, TURRET_COST = 30, WALL_HP = 140, TURRET_HP = 90;
 const BUILD_T = { 1: 1.2, 2: 2.5 }; // construction seconds: wall, turret
 
-export { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T };
+export { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T };

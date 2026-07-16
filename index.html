@@ -99,10 +99,10 @@
         </div>
         <div style="flex:1 1 260px;max-width:330px;background:rgba(13,15,21,.85);border:1px solid #3a4052;border-top:3px solid #ffb020;padding:20px;display:flex;flex-direction:column;gap:10px;backdrop-filter:blur(6px)">
           <div style="font-size:10px;font-weight:700;letter-spacing:.2em;color:#ffb020">SOLO</div>
-          <div style="font-size:19px;font-weight:700;font-family:'Noto Sans KR',sans-serif">혼자 연습</div>
+          <div style="font-size:19px;font-weight:700;font-family:'Noto Sans KR',sans-serif">싱글 플레이</div>
           <div style="font-size:12.5px;line-height:1.65;color:#9aa3b5;font-family:'Noto Sans KR',sans-serif">AI 봇 동료 <b style="color:#ffb020">유닛-B</b>와 함께. 조작과 전략을 익히기 좋습니다.</div>
           <div id="my-stats" style="display:none;font-size:11px;color:#5a6377;font-family:'Noto Sans KR',sans-serif"></div>
-          <button id="btn-solo" style="margin-top:auto;font:700 14px 'Noto Sans KR',sans-serif;background:transparent;color:#ffb020;border:1px solid #ffb020;padding:12px;cursor:pointer;letter-spacing:.06em">연습 개시 →</button>
+          <button id="btn-solo" style="margin-top:auto;font:700 14px 'Noto Sans KR',sans-serif;background:transparent;color:#ffb020;border:1px solid #ffb020;padding:12px;cursor:pointer;letter-spacing:.06em">게임 시작 →</button>
           <button id="btn-resume" style="display:none;font:700 13px 'Noto Sans KR',sans-serif;background:rgba(255,176,32,.12);color:#ffb020;border:1px dashed #ffb020;padding:10px;cursor:pointer;letter-spacing:.04em"></button>
         </div>
       </div>
@@ -169,7 +169,7 @@
 
   const rules = [
     { n: '01', t: '건설로 길을 막아라', d: '준비 단계에 벽·포탑을 배치. 적은 벽을 부수며 최단 경로로 코어를 노립니다.' },
-    { n: '02', t: '자원 = 전략', d: '골드는 각자의 지갑 — 처치한 사람이 자기 회수 배율로 획득, 웨이브 보너스는 각자 지급. 구조물 연구 효과는 팀 전체 적용.' },
+    { n: '02', t: '자원 = 전략', d: '골드는 각자의 지갑 — 처치한 사람이 자기 회수 배율로 획득, 웨이브 보너스는 각자 지급. 연구는 전부 개인 단위: 구조물 연구는 내가 지은 벽·포탑에 적용.' },
     { n: '03', t: '증강 & 시너지', d: '레벨업마다 강화 카드 3택1 — 기본→레전드 4등급 테크. 두 계통 조합 시 시너지 각성, 충격파·대시·아이템까지 빌드의 일부.' },
     { n: '04', t: '코어 사수 + 구조', d: '정화 코어가 부서지면 패배. 쓰러진 동료는 곁에서 2.5초 유지로 부활.' },
   ];

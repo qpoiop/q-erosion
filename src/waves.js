@@ -1,12 +1,12 @@
 // waves.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._startBuild = function () {
     this.phase = 'build'; this.phT = this.wave === 0 ? this.buildTime + 10 : this.buildTime;
     this._pickGates(); // next assault pours through the active gate(s) — nightmare opens several
     if (this.mode === 'solo') this._saveRun();
-    const bonus = 30 + this.wave * 12; this.scrap += bonus; if (this.mode !== 'solo' && this.isHost) this.allyScrap += bonus;
+    const bonus = Math.round((30 + this.wave * 12) * (DIFF_SCR[this.diffKey] || 1)); this.scrap += bonus; if (this.mode !== 'solo' && this.isHost) this.allyScrap += bonus;
     const dirs = this.activeGates.map(i => GATE_DIR[i]).join('·');
     if (this.wave > 0) { this._banner(`WAVE ${this.wave} 방어 성공 — 자원 +${bonus} · 다음 균열: ${dirs}쪽`, 3600); if (this.mode === 'solo' && Math.random() < .7) this._botUpgrade(); }
     else this._banner(`준비 단계 — ${dirs}쪽 균열을 막아라 (건설 버튼)`, 4200);
@@ -77,7 +77,9 @@ export function install(P) {
     }
     for (const e of this.enemies.values()) {
       const et = ETYPES[e.ty];
-      let sp = et.sp * slow * this._dMul() * (e.wsp || 1);
+      if (e.stunT > 0) { e.stunT -= dt; continue; } // paralyzed — no move, no attack
+      if (e.slowT2 > 0) e.slowT2 -= dt;
+      let sp = et.sp * slow * this._dMul() * (e.wsp || 1) * (e.slowT2 > 0 ? (e.slowF || .7) : 1);
       e.cool -= dt;
       // spawned outside: walk in through the gate before anything else
       if (e.entering) {
@@ -98,7 +100,7 @@ export function install(P) {
         continue;
       }
       // melee player if adjacent
-      if (np && npd < 5) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this._dMul() * (this.dmgWaveMul || 1)); } continue; }
+      if (np && npd < (et.boss ? 11 : 5)) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this._dMul() * (this.dmgWaveMul || 1)); } continue; }
       // melee mobs hunt a nearby player; structures in the way get smashed
       if (!et.rng && !et.boss && np && npd < 49) {
         const dx = np.x - e.x, dz = np.z - e.z, d = Math.hypot(dx, dz) || 1;
@@ -113,7 +115,7 @@ export function install(P) {
       // reach scales with body radius — big bosses used to fail the old fixed 1.9u check and ignored structures
       if (e.cool <= 0) {
         const smasher = e.ty === 1 || et.boss;
-        const rr = 1.5 + (et.r || .55) * (e.final ? 1.6 : 1), rr2 = rr * rr;
+        const rr = 1.5 + (et.r || .55) * (et.boss ? (e.final ? 2.4 : 1.9) : 1), rr2 = rr * rr; // bosses swing wide
         let hit = -1;
         for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
           const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
@@ -122,18 +124,30 @@ export function install(P) {
         }
         if (hit >= 0) { this._atkStruct(e, et, hit); continue; }
       }
-      // flow move
+      // flow move — pick among near-best downhill neighbors (per-enemy stable choice) so columns fan out instead of single-filing
       let bi = -1, bd = this.flowD[here];
-      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
-        const j = ti(X, Z); if (this.flowD[j] < bd) { bd = this.flowD[j]; bi = j; }
+      {
+        const cands = [];
+        let best = 1e9;
+        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const X = gx + a, Z = gz + b; if (!inG(X, Z)) continue;
+          const j = ti(X, Z), dj = this.flowD[j];
+          if (dj < bd) { cands.push([j, dj]); if (dj < best) best = dj; }
+        }
+        if (cands.length) {
+          const near = cands.filter(c => c[1] <= best + 2);
+          const pick = near[(e.id + gx * 7 + gz * 13) % near.length];
+          bi = pick[0]; bd = pick[1];
+        }
       }
       if (bi < 0) { // at core
         if (this.occ[here] === 3 || bd <= 1.5) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this._dMul() * (this.dmgWaveMul || 1), e); } }
         continue;
       }
       const o = this.occ[bi];
-      const bx = g2w(bi % N), bz = g2w((bi / N) | 0);
+      // per-enemy lateral bias inside the corridor — breaks the single-file look
+      const lat = ((e.id % 7) - 3) * .3;
+      const bx = g2w(bi % N) + ((bi % N) === gx ? lat : 0), bz = g2w((bi / N) | 0) + ((bi % N) === gx ? 0 : lat);
       if (o === 1 || o === 2) { // blocked: attack structure
         if (e.cool <= 0) this._atkStruct(e, et, bi);
         continue;

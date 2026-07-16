@@ -1,5 +1,5 @@
 // combat.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._spawnBullet = function (x, z, dx, dz, o) {
@@ -27,7 +27,7 @@ export function install(P) {
     if (e.hp <= 0 && !e.deadDone) {
       e.deadDone = true; this.kills++; this._killFx(e); this.enemies.delete(e.id);
       this._grantXp(ETYPES[e.ty].xp);
-      const base = ETYPES[e.ty].sc;
+      const base = ETYPES[e.ty].sc * (DIFF_SCR[this.diffKey] || 1);
       if (this.mode === 'solo') this.scrap += base * (src && src.ally ? (this.ally.scrapMul || 1) : src && src.tur ? 1 : (this.me.scrapMul || 1));
       else if (src && src.tur) { this.scrap += base / 2; this.allyScrap += base / 2; } // turret kills split
       else if (src && src.ally) this.allyScrap += base * (this.ally.scrapMul || 1);
@@ -81,12 +81,23 @@ export function install(P) {
     const u = pool[Math.floor(Math.random() * pool.length)], tier = p.taken[u.k] || 0;
     u.t[tier].f(p, this); p.taken[u.k] = tier + 1; this._checkSyn(p, false);
   };
-  P._checkSyn = function (p, mine) { // combo of taken card lines → one-time evolution bonus
-    p.syn = p.syn || {};
+  P._checkSyn = function (p, mine) { // synergies awaken once, deepen per combined tier, and carry a GRADE = min(two line tiers)
+    p.syn = p.syn || {}; p.synGrade = p.synGrade || {};
     for (const s of SYN) {
-      if (p.syn[s.id] || !s.need.every(k => p.taken[k])) continue;
-      p.syn[s.id] = 1; s.f(p, this);
-      if (mine) { this._banner(`✦ 시너지 각성 — ${s.n}! ${s.d}`, 3800); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
+      if (!s.need.every(k => p.taken[k])) continue;
+      const target = s.need.reduce((t, k) => t + (p.taken[k] || 0), 0);
+      let applied = p.syn[s.id] || 0;
+      const grade = Math.min(...s.need.map(k => p.taken[k] || 0)); // both lines epic → epic synergy
+      const oldGrade = p.synGrade[s.id] || 0;
+      if (applied >= target && grade <= oldGrade) continue;
+      const fresh = !applied;
+      if (fresh && s.first) s.first(p, this);
+      while (applied < target) { s.f(p, this); applied++; }
+      p.syn[s.id] = applied;
+      if (grade > oldGrade) { p.synGrade[s.id] = grade; if (s.grade) for (let lv = oldGrade + 1; lv <= grade; lv++) s.grade(p, this, lv); }
+      if (mine && fresh) { this._banner(`✦ 시너지 각성 — ${s.n}! ${s.d}`, 3800); this._beep(660, .12, 'square', .06); this._beep(990, .16, 'square', .05); }
+      else if (mine && grade > oldGrade && grade >= 2) { this._banner(`✦ 시너지 진화 — ${s.n} [${RAR[grade - 1].n}]`, 3200); this._beep(990, .12, 'square', .05); }
+      else if (mine) this._beep(880, .08, 'square', .04);
     }
   };
   P._dash = function (p) {
@@ -96,18 +107,23 @@ export function install(P) {
   P._useSkill = function () {
     const p = this.me;
     if (p.down || p.sklT > 0 || (this.phase !== 'assault' && this.phase !== 'build')) return;
-    p.sklT = Math.max(6, 14 - p.sklLv);
-    if (this.isHostish()) this._shockwave(p.x, p.z, p.sklLv, true);
-    else { this._shockFx(p.x, p.z, p.sklLv); this._send({ t: 'skl', x: +p.x.toFixed(1), z: +p.z.toFixed(1), lv: p.sklLv }); }
+    p.sklT = Math.max(4, (14 - p.sklLv) * (p.sklCdMul || 1));
+    const r = (3.5 + p.sklLv * .5) * (p.sklRMul || 1), dmg = (40 + p.sklLv * 20) * (p.sklDmgMul || 1);
+    const deb = p.swSlowF ? { f: p.swSlowF, t: p.swSlowT, c: p.swStunC || 0, ct: p.swStunT || 1 } : null; // 공명 폭발 debuffs
+    if (this.isHostish()) this._shockwave(p.x, p.z, r, dmg, true, deb);
+    else { this._shockFx(p.x, p.z); this._send({ t: 'skl', x: +p.x.toFixed(1), z: +p.z.toFixed(1), r: +r.toFixed(1), dmg: Math.round(dmg), deb }); }
   };
   P._shockFx = function (x, z, lv) { this._fx(x, z, true, PAL.cyanHex); this.shake = Math.max(this.shake || 0, .5); this._beep(220, .25, 'sawtooth', .08); }
-  P._shockwave = function (x, z, lv, fx) {
-    if (fx !== false) this._shockFx(x, z, lv);
-    const r = 3.5 + lv * .5, dmg = 40 + lv * 20;
+  P._shockwave = function (x, z, r, dmg, fx, deb) {
+    if (fx !== false) this._shockFx(x, z);
     for (const e of [...this.enemies.values()]) {
       if (dist2(x, z, e.x, e.z) < r * r) {
         const d = Math.sqrt(dist2(x, z, e.x, e.z)) || 1;
         e.x = clamp(e.x + (e.x - x) / d * 2.2, 1 - HALF, HALF - 1); e.z = clamp(e.z + (e.z - z) / d * 2.2, 1 - HALF, HALF - 1);
+        if (deb) { // 공명 폭발: slow, and at epic+ a stun roll (bosses resist stun at half duration)
+          e.slowF = deb.f; e.slowT2 = Math.max(e.slowT2 || 0, deb.t);
+          if (deb.c && Math.random() < deb.c) e.stunT = Math.max(e.stunT || 0, ETYPES[e.ty] && ETYPES[e.ty].boss ? deb.ct * .5 : deb.ct);
+        }
         this._dmgEnemy(e, dmg);
       }
     }
@@ -126,7 +142,7 @@ export function install(P) {
       this._banner('융단 폭격 — 전 구역 타격');
       for (let i = 0; i < 22; i++) setTimeout(() => { if (!this._dead && this.scene) { this._fx(rnd(4 - HALF, HALF - 4), rnd(4 - HALF, HALF - 4), i % 5 === 0, 0xffffff); this.shake = Math.max(this.shake || 0, .3); } }, i * 70);
     }
-    else if (k === 'turret') { if (this.isHostish()) { const i = ti(w2g(x), w2g(z)); const spots = [i, i + 1, i - 1, i + N, i - N].filter(j => j >= 0 && j < N * N && !this.occ[j]); if (spots.length) { this._place(spots[0], 2); this.bld[spots[0]] = .75; this.sendStT = 0; } } }
+    else if (k === 'turret') { if (this.isHostish()) { const i = ti(w2g(x), w2g(z)); const spots = [i, i + 1, i - 1, i + N, i - N].filter(j => j >= 0 && j < N * N && !this.occ[j]); if (spots.length) { this._place(spots[0], 2, false, mine ? 0 : 1); this.bld[spots[0]] = .75; this.sendStT = 0; } } }
     else if (k === 'kit') { if (mine) this.me.hp = this.me.maxhp; }
     else if (k === 'slow') { this.slowT = 5; this._banner('지연 필드 — 적 감속'); }
   };
@@ -149,7 +165,7 @@ export function install(P) {
       if (cd > 0) continue;
       const x = g2w(i % N), z = g2w((i / N) | 0);
       let best = null, bd = 90; for (const e of this.enemies.values()) { const d = dist2(x, z, e.x, e.z); if (d < bd) { bd = d; best = e; } }
-      if (best) { this._turCd[i] = .3; const a = Math.atan2(best.z - z, best.x - x); this._spawnBullet(x, z, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * this.g.turMul, tur: true, band: this._turBand() }); }
+      if (best) { this._turCd[i] = .3; const q = this._ownerOf(i); const a = Math.atan2(best.z - z, best.x - x); this._spawnBullet(x, z, Math.cos(a) * 19, Math.sin(a) * 19, { dmg: 8 * (q.turMul || 1), tur: true, band: this._turBand(q) }); }
     }
   };
   P._pickupSim = function () {

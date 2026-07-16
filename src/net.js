@@ -1,5 +1,5 @@
 // net.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._initNet = function () {
@@ -62,11 +62,12 @@ export function install(P) {
     connect();
   };
   P._send = function (o) { if (this.net && this.net.connected) { this._netUp = true; this.net.publish(this.pubT, JSON.stringify(o)); } }
-  P._structPack = function () { const a = []; for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2 || this.occ[i] === 5) a.push([i, this.occ[i], Math.round(this.shp[i]), +this.bld[i].toFixed(2)]); return a; }
+  P._allyR = function () { const a = this.ally; return { wallMul: a.wallMul, turMul: a.turMul, turHpMul: a.turHpMul, costMul: a.costMul, wallLv: a.wallLv || 0, turLv: a.turLv || 0 }; }
+  P._structPack = function () { const a = []; for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2 || this.occ[i] === 5) a.push([i, this.occ[i], Math.round(this.shp[i]), +this.bld[i].toFixed(2), this.own[i]]); return a; }
   P._structUnpack = function (a) {
     const had = new Set();
-    for (const [i, k, hp, b] of a) {
-      had.add(i); if (this.occ[i] !== k) this.occ[i] = k; this.shp[i] = hp;
+    for (const [i, k, hp, b, ow] of a) {
+      had.add(i); if (this.occ[i] !== k) this.occ[i] = k; this.shp[i] = hp; this.own[i] = ow || 0;
       if (k === 5) { this.bld[i] = 1; continue; }
       const nb = b ?? 1;
       if (nb >= 1) { if (this.bld[i] < 1) { this.bld[i] = 1; this.building.delete(i); } }
@@ -84,9 +85,9 @@ export function install(P) {
   P._onMsg = function (m) {
     switch (m.t) {
       case 'hello': if (this.isHost) {
-        if (this.phase === 'wait') { this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap) }); this._startOnline(); }
-        else if (this.tm - this.ally.lastSeen > 4) { // teammate slot is stale — allow rejoin mid-game
-          this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap) });
+        if (this.phase === 'wait') { this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {} }); this._startOnline(); }
+        else if (performance.now() - (this._peerSeenAt || 0) > 3000) { // teammate silent 3s (wall-clock — tm freezes on pause) — allow rejoin mid-game
+          this._send({ t: 'welcome', diff: this.diffMul, waves: this.maxWave, bt: this.buildTime, st: this._structPack(), sc: Math.round(this.allyScrap), ar: this._allyR(), abuys: this._peerBuys || {} });
           this._banner('동료 재접속!', 2600);
         }
         else this._send({ t: 'busy' });
@@ -94,6 +95,7 @@ export function install(P) {
       case 'welcome': if (!this.isHost && this.phase === 'wait') {
         clearInterval(this._helloIv);
         this.diffMul = m.diff; this.maxWave = m.waves; this.buildTime = m.bt; this.scrap = m.sc;
+        if (m.ar) Object.assign(this.me, m.ar); if (m.abuys) this.me.buys = { ...m.abuys }; // rejoin: my research/buy counts live on the host
         this._structUnpack(m.st); this._startOnline();
       } break;
       case 'busy': if (!this.isHost && this.phase === 'wait') { this._overlay(`<div style="font:700 20px ${FONT}">방이 가득 찼습니다</div><div style="margin-top:14px"><button id="egCancel" style="${this._obtn(false)}">돌아가기</button></div>`); this.ovIn.querySelector('#egCancel').onclick = () => this._exit(); } break;
@@ -101,15 +103,14 @@ export function install(P) {
         (m.sh || []).forEach(s => this._spawnBullet(s[0], s[1], s[2], s[3], { ghost: true, ally: true }));
         break; }
       case 'hit': if (this.isHost) { const e = this.enemies.get(m.id); if (e) this._dmgEnemy(e, m.d, { ally: true }); } break;
-      case 'bld': if (this.isHost) { if (this._canPlace(m.i)) { const c = this._cost(m.k); if (this.allyScrap >= c) { this.allyScrap -= c; this._place(m.i, m.k); this._send({ t: 'blt', i: m.i, k: m.k, sc: Math.round(this.allyScrap) }); } } } break;
-      case 'blt': if (!this.isHost) { this.scrap = m.sc; this._place(m.i, m.k, true); this._fx(g2w(m.i % N), g2w((m.i / N) | 0), false, PAL.cyanHex); } break;
+      case 'bld': if (this.isHost) { if (this._canPlace(m.i)) { const c = this._cost(m.k, this.ally); if (this.allyScrap >= c) { this.allyScrap -= c; this._place(m.i, m.k, false, 1); this._send({ t: 'blt', i: m.i, k: m.k, o: 1, sc: Math.round(this.allyScrap) }); } } } break;
+      case 'blt': if (!this.isHost) { if (m.o === 1) this.scrap = m.sc; this._place(m.i, m.k, true, m.o || 0); this._fx(g2w(m.i % N), g2w((m.i / N) | 0), false, PAL.cyanHex); } break;
       case 'sel': if (this.isHost) { const k = this.occ[m.i]; if (k === 1 || k === 2) { this.allyScrap += Math.round(this._cost(k) * .7); this._remove(m.i); this._send({ t: 'slt', i: m.i, sc: Math.round(this.allyScrap) }); } } break;
       case 'slt': if (!this.isHost) { this.scrap = m.sc; this._remove(m.i); } break;
       case 'buy': if (this.isHost) { const u = SHOP.find(s => s.id === m.id); if (!u) break; const cost = Math.round(u.cost * Math.pow(1.5, (this._peerBuys = this._peerBuys || {}, this._peerBuys[m.id] || 0)));
-        if (this.allyScrap >= cost) { this.allyScrap -= cost; this._peerBuys[m.id] = (this._peerBuys[m.id] || 0) + 1; if (u.g) { this._applyStructUpg(u); this._structUpgFx(m.id); this._send({ t: 'gup', id: m.id, sc: Math.round(this.allyScrap) }); } else this._send({ t: 'byk', id: m.id, sc: Math.round(this.allyScrap) }); } } break;
-      case 'byk': if (!this.isHost) { const u = SHOP.find(s => s.id === m.id); this.scrap = m.sc; if (u && u.per) { this.me.buys[u.id] = this._buyCount(u.id) + 1; u.f(this.me); this._beep(760, .1, 'square', .05); if (this.shopEl.style.display === 'flex') this._renderShop(); } } break;
-      case 'gup': { const u = SHOP.find(s => s.id === m.id); if (this.isHost) break; this.scrap = m.sc; if (u) { u.f(this.g); this._structUpgFx(m.id); this._banner('공용 연구 완료 — ' + u.n); if (this.shopEl.style.display === 'flex') this._renderShop(); } } break;
-      case 'skl': if (this.isHost) this._shockwave(m.x, m.z, m.lv, false); else this._shockFx(m.x, m.z, m.lv); break;
+        if (this.allyScrap >= cost) { this.allyScrap -= cost; this._peerBuys[m.id] = (this._peerBuys[m.id] || 0) + 1; if (u.st) { this._applyStructUpg(u, this.ally, 1); this._structUpgFx(u.id); } this._send({ t: 'byk', id: m.id, sc: Math.round(this.allyScrap) }); } } break;
+      case 'byk': if (!this.isHost) { const u = SHOP.find(s => s.id === m.id); this.scrap = m.sc; if (u && u.per) { this.me.buys[u.id] = this._buyCount(u.id) + 1; u.f(this.me, this); if (u.st) { this._structUpgFx(u.id); this._syncStruct(); } this._beep(760, .1, 'square', .05); if (this.shopEl.style.display === 'flex') this._renderShop(); } } break;
+      case 'skl': if (this.isHost) this._shockwave(m.x, m.z, Math.min(m.r || 4, 12), Math.min(m.dmg || 60, 500), false, m.deb && { f: Math.max(.4, m.deb.f || .7), t: Math.min(m.deb.t || 2.5, 5), c: Math.min(m.deb.c || 0, .5), ct: Math.min(m.deb.ct || 1, 2) }); else this._shockFx(m.x, m.z); break;
       case 'caug': if (this.isHost) this._coreAug(m.a, m.h); break;
       case 'use': { if (this.isHost && this.ally.items) { const ix = this.ally.items.indexOf(m.k); if (ix >= 0) this.ally.items.splice(ix, 1); } this._applyItemFx(m.k, m.x, m.z, false); } break;
       case 'dmg': if (!this.isHost) this._hurt(this.me, m.v); break;
@@ -127,13 +128,14 @@ export function install(P) {
     if (!this.isHost) this._peerPaused = !!m.bg;
     this.scrap = m.asc !== undefined ? m.asc : m.sc;
     this.coreHp = m.core; if (m.cm) this.coreMax = m.cm;
+    if (m.hr) { const a = this.ally; [a.wallMul, a.turMul, a.turHpMul, a.costMul, a.wallLv, a.turLv] = m.hr; } // host's research → my ally view (bands/HP of host-built structures)
     if (this._lastCore !== undefined && m.core < this._lastCore) this._coreHitFx();
     this._lastCore = m.core;
     this.wave = m.wv; this._qn = m.qn || 0;
     const gts = m.gts || (m.gt !== undefined ? [m.gt] : null);
     if (gts && gts.join() !== (this.activeGates || []).join()) { this.activeGates = gts; this.activeGate = gts[0]; if (this.phase === 'build') this._banner(`다음 균열: ${gts.map(i => GATE_DIR[i]).join('·')}쪽`, 2600); }
     const wasPhase = this.phase;
-    if (this.phase !== 'over' && this.phase !== 'count' && m.ph) { if (m.ph !== this.phase) { this.phase = m.ph; if (m.ph === 'assault') this._banner('WAVE ' + this.wave + ' — 습격!'); else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); } } this.phT = m.pt; }
+    if (this.phase !== 'over' && this.phase !== 'count' && this.phase !== 'wait' && m.ph) { if (m.ph !== this.phase) { this.phase = m.ph; if (m.ph === 'assault') this._banner('WAVE ' + this.wave + ' — 습격!'); else if (m.ph === 'build') { this._banner('준비 단계 — 건설·연구'); this._beep(700, .15, 'square', .05); } } this.phT = m.pt; }
     const seen = new Set();
     (m.en || []).forEach(a => { const [id, ty, x, z, hp] = a; seen.add(id); let e = this.enemies.get(id);
       if (!e) { e = { id, ty, x: x / 10, z: z / 10, tx: x / 10, tz: z / 10, hp, ghost: true }; if (ETYPES[ty] && ETYPES[ty].boss) { e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1; if (e.btier === 3) e.final = true; } this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
@@ -155,7 +157,7 @@ export function install(P) {
       this.sendStateT -= dt;
       if (this.sendStateT <= 0) {
         this.sendStateT = .13; this.sendStT -= .13;
-        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, cm: this.coreMax, bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
+        const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, cm: this.coreMax, hr: [this.me.wallMul, this.me.turMul, this.me.turHpMul, this.me.costMul, this.me.wallLv || 0, this.me.turLv || 0], bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
           en: [...this.enemies.values()].map(e => [e.id, e.ty, Math.round(e.x * 10), Math.round(e.z * 10), Math.round(e.hp)]),
           itm: this.fitems.map(f => [f.id, f.k, Math.round(f.x * 10), Math.round(f.z * 10)]) };
         if (this.sendStT <= 0) { this.sendStT = 1.4; o.st = this._structPack(); }

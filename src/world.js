@@ -1,9 +1,9 @@
 // world.js — verbatim methods from game.js (prototype-install)
-import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
+import { N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
 export function install(P) {
   P._reset = function () {
-    const mk = (x, z) => ({ x, z, a: 0, hp: 100, maxhp: 100, speed: 6, dmg: 9, frate: 2.5, shots: 1, pierce: 0, regen: 0, dashCd: 3.5, sklLv: 1, sklT: 0, scrapMul: 1, fireT: 0, dashT: 0, dashing: 0, down: false, downT: 0, revP: 0, items: [], taken: {}, buys: {}, lastSeen: 0 });
+    const mk = (x, z) => ({ x, z, a: 0, hp: 100, maxhp: 100, speed: 6, dmg: 9, frate: 2.5, shots: 1, pierce: 0, regen: 0, dashCd: 3.5, sklLv: 1, sklT: 0, scrapMul: 1, wallMul: 1, turMul: 1, turHpMul: 1, costMul: 1, wallLv: 0, turLv: 0, fireT: 0, dashT: 0, dashing: 0, down: false, downT: 0, revP: 0, items: [], taken: {}, buys: {}, lastSeen: 0 });
     this.me = mk(-2.5, 5); this.ally = mk(2.5, 5);
     this.allyOn = this.mode === 'solo';
     this.occ = new Uint8Array(N * N); this.shp = new Float32Array(N * N);
@@ -11,7 +11,8 @@ export function install(P) {
     this._al50 = this._al25 = false; this._coreHitT = -9; this._lastCore = undefined;
     this.enemies = new Map(); this.eid = 1; this.bullets = []; this.ebullets = []; this.fitems = [];
     this.tm = 0; this.xp = 0; this.lv = 1; this.kills = 0; this.pendUp = 0; this.slowT = 0;
-    this.scrap = 50; this.allyScrap = 50; this.g = { wallMul: 1, turMul: 1, costMul: 1 };
+    this.scrap = 50; this.allyScrap = 50;
+    this.own = new Uint8Array(N * N); // structure builder: 0 = host, 1 = guest (research is per-owner)
     this.coreHp = this.coreMax = 1000;
     this.wave = 0; this.phT = 0; this.spawnQ = []; this.spawnT = 0;
     this.shotQ = []; this.over = null;
@@ -59,16 +60,17 @@ export function install(P) {
       }
     }
   };
-  P._structHp = function (k) { return k === 1 ? WALL_HP * this.g.wallMul : TURRET_HP * (this.g.turHpMul || 1); }
-  P._turBand = function () { const l = this.g.turLv || 0; return l >= 10 ? 2 : l >= 4 ? 1 : 0; }
-  P._place = function (i, k, silent) {
-    this.occ[i] = k; this.shp[i] = this._structHp(k);
+  P._ownerOf = function (i) { const mine = this.isHostish() ? 0 : 1; return this.own[i] === mine ? this.me : this.ally; }
+  P._structHp = function (k, q) { q = q || this.me; return k === 1 ? WALL_HP * (q.wallMul || 1) : TURRET_HP * (q.turHpMul || 1); }
+  P._turBand = function (q) { const l = (q || this.me).turLv || 0; return l >= 8 ? 2 : l >= 4 ? 1 : 0; }
+  P._place = function (i, k, silent, owner) {
+    this.occ[i] = k; this.own[i] = owner || 0; this.shp[i] = this._structHp(k, this._ownerOf(i));
     this.bld[i] = 0; this.building.add(i);
     this._flow(); this._syncStruct();
     if (!silent) this._beep(520, .08, 'square', .05);
   };
-  P._remove = function (i) { this.occ[i] = 0; this.shp[i] = 0; this.bld[i] = 0; this.building.delete(i); this._flow(); this._syncStruct(); }
-  P._cost = function (k) { return Math.round((k === 1 ? WALL_COST : TURRET_COST) * this.g.costMul); }
+  P._remove = function (i) { this.occ[i] = 0; this.own[i] = 0; this.shp[i] = 0; this.bld[i] = 0; this.building.delete(i); this._flow(); this._syncStruct(); }
+  P._cost = function (k, q) { return Math.round((k === 1 ? WALL_COST : TURRET_COST) * ((q || this.me).costMul || 1)); }
   P._canPlace = function (i) {
     if (this.occ[i]) return false;
     const gx = i % N, gz = (i / N) | 0, x = g2w(gx), z = g2w(gz);
@@ -103,13 +105,14 @@ export function install(P) {
       if (this.bld[i] >= 1) { this.bld[i] = 1; this.building.delete(i); this._structDone(i); }
     }
   };
-  P._refreshShp = function () { for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 && this.shp[i] > WALL_HP * this.g.wallMul) this.shp[i] = WALL_HP * this.g.wallMul; }
-  P._applyStructUpg = function (u) { // apply a shared structure research, keeping damaged structures' HP RATIO
-    const ow = this._structHp(1), ot = this._structHp(2);
-    u.f(this.g);
-    const rw = this._structHp(1) / ow, rt = this._structHp(2) / ot;
+  P._refreshShp = function () { for (let i = 0; i < N * N; i++) { const k = this.occ[i]; if (k !== 1 && k !== 2) continue; const mx = this._structHp(k, this._ownerOf(i)); if (this.shp[i] > mx) this.shp[i] = mx; } }
+  P._applyStructUpg = function (u, q, ownVal) { // per-player structure research — rescale ONLY the buyer's structures, keeping HP RATIO
+    q = q || this.me; ownVal = ownVal || 0;
+    const ow = this._structHp(1, q), ot = this._structHp(2, q);
+    u.f(q);
+    const rw = this._structHp(1, q) / ow, rt = this._structHp(2, q) / ot;
     if (rw !== 1 || rt !== 1) {
-      for (let i = 0; i < N * N; i++) { if (this.occ[i] === 1) this.shp[i] *= rw; else if (this.occ[i] === 2) this.shp[i] *= rt; }
+      for (let i = 0; i < N * N; i++) { if (this.own[i] !== ownVal) continue; if (this.occ[i] === 1) this.shp[i] *= rw; else if (this.occ[i] === 2) this.shp[i] *= rt; }
       this._syncStruct();
     }
   };
@@ -125,15 +128,15 @@ export function install(P) {
   P._saveRun = function () {
     try {
       const st = [];
-      for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2) st.push([i, this.occ[i], Math.round(this.shp[i])]);
-      const pick = q => ({ hp: q.hp, maxhp: q.maxhp, speed: q.speed, dmg: q.dmg, frate: q.frate, shots: q.shots, pierce: q.pierce, regen: q.regen, dashCd: q.dashCd, dashDur: q.dashDur, sklLv: q.sklLv, scrapMul: q.scrapMul, armor: q.armor, dropMul: q.dropMul, taken: q.taken, syn: q.syn || {}, buys: q.buys, items: q.items || [] });
-      localStorage.setItem('eg_save', JSON.stringify({ v: 1, wave: this.wave, core: Math.round(this.coreHp), coreMax: Math.round(this.coreMax), scrap: Math.round(this.scrap), lv: this.lv, xp: Math.round(this.xp), kills: this.kills, tm: Math.round(this.tm), g: this.g, st, me: pick(this.me), ally: pick(this.ally), diff: this.diffKey, waves: this.maxWave, bt: this.buildTime }));
+      for (let i = 0; i < N * N; i++) if (this.occ[i] === 1 || this.occ[i] === 2) st.push([i, this.occ[i], Math.round(this.shp[i]), this.own[i]]);
+      const pick = q => ({ hp: q.hp, maxhp: q.maxhp, speed: q.speed, dmg: q.dmg, frate: q.frate, shots: q.shots, pierce: q.pierce, regen: q.regen, dashCd: q.dashCd, dashDur: q.dashDur, sklLv: q.sklLv, scrapMul: q.scrapMul, armor: q.armor, dropMul: q.dropMul, wallMul: q.wallMul, turMul: q.turMul, turHpMul: q.turHpMul, costMul: q.costMul, wallLv: q.wallLv, turLv: q.turLv, taken: q.taken, syn: q.syn || {}, buys: q.buys, items: q.items || [] });
+      localStorage.setItem('eg_save', JSON.stringify({ v: 1, wave: this.wave, core: Math.round(this.coreHp), coreMax: Math.round(this.coreMax), scrap: Math.round(this.scrap), lv: this.lv, xp: Math.round(this.xp), kills: this.kills, tm: Math.round(this.tm), st, me: pick(this.me), ally: pick(this.ally), diff: this.diffKey, waves: this.maxWave, bt: this.buildTime }));
     } catch (e) {}
   };
   P._loadRun = function (s) {
     this.wave = s.wave; this.coreHp = s.core; if (s.coreMax) this.coreMax = s.coreMax; this.scrap = s.scrap; this.lv = s.lv; this.xp = s.xp; this.kills = s.kills; this.tm = s.tm;
-    Object.assign(this.g, s.g);
-    for (const [i, k, hp] of s.st) { this.occ[i] = k; this.shp[i] = hp; this.bld[i] = 1; }
+    if (s.g) Object.assign(this.me, s.g); // legacy shared-research saves fold into my research
+    for (const [i, k, hp, ow] of s.st) { this.occ[i] = k; this.shp[i] = hp; this.bld[i] = 1; this.own[i] = ow || 0; }
     Object.assign(this.me, s.me); Object.assign(this.ally, s.ally);
     // saves from the single-slot era carry `item`; fold it into the inventory
     for (const q of [this.me, this.ally]) if (!Array.isArray(q.items)) q.items = q.item ? [q.item] : [];
