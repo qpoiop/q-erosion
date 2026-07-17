@@ -33,6 +33,10 @@ export function install(P) {
     if (this.coreMesh) { this.coreMesh.position.set(g2w(15) + TS / 2, 0, g2w(15) + TS / 2); this.coreMesh.visible = true; }
     if (this.coreBar) { this.coreBar.position.x = g2w(15) + TS / 2; this.coreBar.position.z = g2w(15) + TS / 2; }
     if (this.mm) this.mm.style.display = '';
+    if (this.fxs) { for (const f of this.fxs) { f.visible = false; this.scene.remove(f); if (this._fxPool && this._fxPool.length < 64) this._fxPool.push(f); } this.fxs.length = 0; }
+    if (this.sparks) { for (const s of this.sparks) { s.visible = false; this.scene.remove(s); if (this._sparkPool && this._sparkPool.length < 160) this._sparkPool.push(s); } this.sparks.length = 0; }
+    if (this.bMeshes) for (const m of this.bMeshes) m.visible = false;
+    this._turFlash = {};
     this._flow(); this._syncStruct();
     this._hudReset();
   };

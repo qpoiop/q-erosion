@@ -162,7 +162,7 @@ export function install(P) {
       case 'ban': if (!this.isHost) this._banner(m.s); break;
       case 's': if (!this.isHost) this._applyState(m); break;
       case 'end': if (!this.isHost) this._gameOver(m.win, m.why, true); break;
-      case 'restart': if (!this.isHost && this.over) { this._reset(); this._startOnline(); } break; // only from the game-over screen
+      case 'restart': if (!this.isHost && m.n && m.n !== this._rsSeen) { this._rsSeen = m.n; this._reset(); this._startOnline(); } break; // nonce: dedups strays/replays, but a joiner that missed 'end' still restarts cleanly
     }
   };
   P._applyState = function (m) {

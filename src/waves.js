@@ -407,7 +407,7 @@ export function install(P) {
     if (re) re.onclick = () => {
       this._reset();
       if (this.mode === 'solo') { this.phase = 'count'; this.countT = 3; }
-      else { this._send({ t: 'restart' }); this._startOnline(); }
+      else { this._send({ t: 'restart', n: (this._rsN = (this._rsN || 0) + 1) }); this._startOnline(); }
     };
   };
 }
