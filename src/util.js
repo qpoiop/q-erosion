@@ -91,11 +91,11 @@ const UPG = [
     { d: '충격파 범위 +25%', f: p => p.sklRMul = (p.sklRMul || 1) + .25 },
     { d: '충격파 쿨다운 −20%', f: p => p.sklCdMul = Math.max(.45, (p.sklCdMul || 1) - .2) },
     { d: '피해 +40% · 범위 +20% · 쿨 −15%', f: p => { p.sklDmgMul = (p.sklDmgMul || 1) + .4; p.sklRMul = (p.sklRMul || 1) + .2; p.sklCdMul = Math.max(.45, (p.sklCdMul || 1) - .15); } }] },
-  { k: 'core', n: '코어 정비', t: [ // second arg = game element (host-authoritative via _coreAug)
-    { d: '코어 최대 HP +80 · 즉시 +80', f: (p, g) => g && g._coreAug(80, 80) },
-    { d: '코어 최대 HP +100 · 즉시 +100', f: (p, g) => g && g._coreAug(100, 100) },
-    { d: '코어 최대 HP +130 · 즉시 +130', f: (p, g) => g && g._coreAug(130, 130) },
-    { d: '코어 최대 HP +160 · 완전 수리', f: (p, g) => g && g._coreAug(160, 1e9) }] },
+  { k: 'core', n: '코어 정비', t: [ // second arg = game element (host-authoritative via _coreAug); values track coreMax 2000
+    { d: '코어 최대 HP +160 · 즉시 +160', f: (p, g) => g && g._coreAug(160, 160) },
+    { d: '코어 최대 HP +200 · 즉시 +200', f: (p, g) => g && g._coreAug(200, 200) },
+    { d: '코어 최대 HP +260 · 즉시 +260', f: (p, g) => g && g._coreAug(260, 260) },
+    { d: '코어 최대 HP +320 · 완전 수리', f: (p, g) => g && g._coreAug(320, 1e9) }] },
 ];
 const SHOP = [
   { id: 'php', c: '캐릭터', n: '장갑 보강', d: '최대 HP +25', cost: 30, per: true, f: p => { p.maxhp += 25; p.hp += 25; } },
@@ -108,7 +108,7 @@ const SHOP = [
   { id: 'gwall', c: '구조물', n: '벽 강화', d: '내가 지은 벽 내구 +40%', cost: 35, per: true, st: true, max: 6, f: p => { p.wallMul = (p.wallMul || 1) + .4; p.wallLv = (p.wallLv || 0) + 1; } },
   { id: 'gtur', c: '구조물', n: '포탑 화력', d: '내 포탑 공격 +15% · 내구 +15%', cost: 40, per: true, st: true, max: 8, f: p => { p.turMul *= 1.15; p.turHpMul = (p.turHpMul || 1) * 1.15; p.turLv = (p.turLv || 0) + 1; } },
   { id: 'gcost', c: '구조물', n: '건설 자동화', d: '내 건설 비용 −15%', cost: 45, per: true, st: true, max: 3, f: p => p.costMul *= .85 },
-  { id: 'crep', c: '구조물', n: '코어 수리', d: '코어 HP +150 즉시 회복', cost: 50, per: true, f: (p, g) => g && g._coreAug(0, 150) },
+  { id: 'crep', c: '구조물', n: '코어 수리', d: '코어 HP +300 즉시 회복', cost: 50, per: true, f: (p, g) => g && g._coreAug(0, 300) },
 ];
 /* synergies: awaken when both lines are taken, then DEEPEN — f re-applies for every
    tier gained across the two lines (see _checkSyn), so leveling either line keeps paying */
@@ -128,12 +128,12 @@ const SYN = [
     grade: (p, g, gr) => p.scrapMul = (p.scrapMul || 1) * (gr === 4 ? 1.15 : gr === 3 ? 1.12 : 1.10) },
   { id: 'bulwark', gd: ['받는 피해 −5%', '받는 피해 −6%', '받는 피해 −8%'], need: ['armor', 'maxhp'], n: '불괴 장갑', d: '받는 피해 −5%/−6%/−8%',
     grade: (p, g, gr) => p.armor = (p.armor || 1) * (gr === 4 ? .92 : gr === 3 ? .94 : .95) },
-  { id: 'sanctum', gd: ['코어 +60', '코어 +90', '코어 +150 · 완전 회복'], need: ['core', 'regen'], n: '성역 프로토콜', d: '코어 최대 +60/+90/+150 · 즉시 회복',
-    grade: (p, g, gr) => g && g._coreAug(gr === 4 ? 150 : gr === 3 ? 90 : 60, gr === 4 ? 1e9 : gr === 3 ? 90 : 60) },
+  { id: 'sanctum', gd: ['코어 +120', '코어 +180', '코어 +300 · 완전 회복'], need: ['core', 'regen'], n: '성역 프로토콜', d: '코어 최대 +120/+180/+300 · 즉시 회복',
+    grade: (p, g, gr) => g && g._coreAug(gr === 4 ? 300 : gr === 3 ? 180 : 120, gr === 4 ? 1e9 : gr === 3 ? 180 : 120) },
   { id: 'hunter', gd: ['드랍 +15% · 자원 +5%', '드랍 +20% · 자원 +5%', '드랍 +30% · 자원 +5%'], need: ['drop', 'scrap'], n: '전리품 사냥꾼', d: '드랍 +15%/+20%/+30% · 자원 +5%씩',
     grade: (p, g, gr) => { p.dropMul = (p.dropMul || 1) * (gr === 4 ? 1.3 : gr === 3 ? 1.2 : 1.15); p.scrapMul = (p.scrapMul || 1) * 1.05; } },
-  { id: 'aegis', gd: ['받는 피해 −3% · 코어 +25', '받는 피해 −4% · 코어 +35', '받는 피해 −5% · 코어 +50'], need: ['armor', 'core'], n: '수호자 서약', d: '받는 피해 −3%/−4%/−5% · 코어 +25/+35/+50',
-    grade: (p, g, gr) => { p.armor = (p.armor || 1) * (gr === 4 ? .95 : gr === 3 ? .96 : .97); if (g) g._coreAug(gr === 4 ? 50 : gr === 3 ? 35 : 25, 25); } },
+  { id: 'aegis', gd: ['받는 피해 −3% · 코어 +50', '받는 피해 −4% · 코어 +70', '받는 피해 −5% · 코어 +100'], need: ['armor', 'core'], n: '수호자 서약', d: '받는 피해 −3%/−4%/−5% · 코어 +50/+70/+100',
+    grade: (p, g, gr) => { p.armor = (p.armor || 1) * (gr === 4 ? .95 : gr === 3 ? .96 : .97); if (g) g._coreAug(gr === 4 ? 100 : gr === 3 ? 70 : 50, 50); } },
   { id: 'reson', gd: ['충격파 +8% · 둔화 30%', '충격파 +8% · 둔화 40%+마비 20%', '충격파 +8% · 둔화 50%+마비 35%'], need: ['skl', 'dmg'], n: '공명 폭발', d: '충격파 피해 +8%씩 · 레어 둔화 30% → 에픽 40%+마비 20% → 레전드 50%+마비 35%',
     grade: (p, g, gr) => {
       p.sklDmgMul = (p.sklDmgMul || 1) * 1.08;

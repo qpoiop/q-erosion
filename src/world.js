@@ -15,7 +15,7 @@ export function install(P) {
     this.tm = 0; this.xp = 0; this.lv = 1; this.kills = 0; this.pendUp = 0; this.slowT = 0;
     this.scrap = 50; this.allyScrap = 50;
     this.own = new Uint8Array(N * N); // structure builder: 0 = host, 1 = guest (research is per-owner)
-    this.coreHp = this.coreMax = 1000;
+    this.coreHp = this.coreMax = 2000; // doubled with the boss-swing pass — repairs/core augs scaled ×2 with it
     this.wave = 0; this.phT = 0; this.spawnQ = []; this.spawnT = 0;
     this.shotQ = []; this.over = null;
     this.stat = { k: 0, g: 0, b: 0, r: 0 }; this.allyStat = { k: 0, g: 0, b: 0, r: 0 }; // per-player: kills / gold earned / builds / research buys
