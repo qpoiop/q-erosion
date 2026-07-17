@@ -167,7 +167,7 @@ export function install(P) {
   };
   P._eMesh = function (e) {
     const T = THREE;
-    const key = e.ty === 3 ? (e.btier === 3 ? (this.mdl && this.mdl.boss3 ? 'boss3' : 'boss2') : e.btier === 2 ? 'boss2' : 'boss1') : e.ty === 2 ? (e.id % 2 ? 'ranged' : (this.mdl && this.mdl.ranged2 ? 'ranged2' : 'ranged')) : 'melee';
+    const key = e.ty === 3 ? (e.btier === 3 ? (this.mdl && this.mdl.boss3 ? 'boss3' : 'boss2') : e.btier === 2 ? 'boss2' : 'boss1') : e.ty === 2 ? 'melee' : (e.id % 2 ? 'ranged' : (this.mdl && this.mdl.ranged2 ? 'ranged2' : 'ranged')); // roles swapped: walkers rush in, the eye-drone snipes
     const tpl = this.mdl && this.mdl[key];
     if (tpl) {
       const g = new T.Group();

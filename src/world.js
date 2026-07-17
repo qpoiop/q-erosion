@@ -1,6 +1,8 @@
 // world.js — verbatim methods from game.js (prototype-install)
 import { PV, CAP_WALL, CAP_TUR, N, TS, HALF, ti, inG, w2g, g2w, rnd, clamp, dist2, PAL, FONT, ETYPES, RAR, ROMAN, UPG, SHOP, SYN, ITEMS, ITEM_KEYS, INV_MAX, DIFF, DIFF_CNT, DIFF_SPT, DIFF_SCR, RELAY, GATE_DIR, MODELS, SHIP_MODEL_YAW, XP_NEED, WALL_COST, TURRET_COST, WALL_HP, TURRET_HP, BUILD_T } from './util.js';
 
+const FDIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
 export function install(P) {
   P._reset = function () {
     const mk = (x, z) => ({ x, z, a: 0, hp: 100, maxhp: 100, speed: 6, dmg: 9, frate: 2.5, shots: 1, pierce: 0, regen: 0, dashCd: 3.5, sklLv: 1, sklT: 0, scrapMul: 1, range: 9, wallMul: 1, turMul: 1, turHpMul: 1, costMul: 1, wallLv: 0, turLv: 0, fireT: 0, dashT: 0, dashing: 0, down: false, downT: 0, revP: 0, items: [], taken: {}, buys: {}, lastSeen: 0 });
@@ -31,6 +33,10 @@ export function install(P) {
     if (this.coreMesh) { this.coreMesh.position.set(g2w(15) + TS / 2, 0, g2w(15) + TS / 2); this.coreMesh.visible = true; }
     if (this.coreBar) { this.coreBar.position.x = g2w(15) + TS / 2; this.coreBar.position.z = g2w(15) + TS / 2; }
     if (this.mm) this.mm.style.display = '';
+    if (this.fxs) { for (const f of this.fxs) { f.visible = false; this.scene.remove(f); if (this._fxPool && this._fxPool.length < 64) this._fxPool.push(f); } this.fxs.length = 0; }
+    if (this.sparks) { for (const s of this.sparks) { s.visible = false; this.scene.remove(s); if (this._sparkPool && this._sparkPool.length < 160) this._sparkPool.push(s); } this.sparks.length = 0; }
+    if (this.bMeshes) for (const m of this.bMeshes) m.visible = false;
+    this._turFlash = {};
     this._flow(); this._syncStruct();
     this._hudReset();
   };
@@ -49,7 +55,7 @@ export function install(P) {
     this.activeGate = this.activeGates[0];
   };
   P._flow = function () {
-    const dist = this.flowD = new Float32Array(N * N).fill(1e9);
+    const dist = this.flowD = (this.flowD && this.flowD.fill(1e9)) || new Float32Array(N * N).fill(1e9);
     const buckets = [[]];
     for (const i of this.coreTiles) { dist[i] = 0; buckets[0].push(i); }
     for (let d = 0; d < buckets.length; d++) {
@@ -58,7 +64,7 @@ export function install(P) {
         const cur = b[n];
         if (dist[cur] !== d) continue; // stale entry — already relaxed cheaper
         const gx = cur % N, gz = (cur / N) | 0;
-        for (const [a, c] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        for (const [a, c] of FDIRS) {
           const X = gx + a, Z = gz + c; if (!inG(X, Z)) continue;
           const j = ti(X, Z), o = this.occ[j];
           if (o === 5) continue; // erosion rock — impassable
