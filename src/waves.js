@@ -104,13 +104,18 @@ export function install(P) {
         if (d > .4) { e.x += dx / d * sp * dt; e.z += dz / d * sp * dt; continue; }
         e.entering = false;
       }
+      // invariant: an enemy that finished entering stays inside the playfield — outside it,
+      // player bullets die at the bounds check and the wave stalls unhittable
+      e.x = clamp(e.x, 1 - HALF, HALF - 1); e.z = clamp(e.z, 1 - HALF, HALF - 1);
       // nearest live player
       let np = null, npd = 1e9; for (const p of players) { if (p.down) continue; const d = dist2(e.x, e.z, p.x, p.z); if (d < npd) { npd = d; np = p; } }
       // ranged behaviour
       if (et.rng && np && npd < 81) {
         const d = Math.sqrt(npd);
-        if (d > 7) { e.x += (np.x - e.x) / d * sp * dt; e.z += (np.z - e.z) / d * sp * dt; }
-        else if (d < 4.5) { e.x -= (np.x - e.x) / d * sp * dt; e.z -= (np.z - e.z) / d * sp * dt; }
+        // clamp like every other branch — backpedal used to push gunners past the map edge,
+        // where player bullets die (combat.js bounds check) and the wave stalled unhittable
+        if (d > 7) { e.x = clamp(e.x + (np.x - e.x) / d * sp * dt, 1 - HALF, HALF - 1); e.z = clamp(e.z + (np.z - e.z) / d * sp * dt, 1 - HALF, HALF - 1); }
+        else if (d < 4.5) { e.x = clamp(e.x - (np.x - e.x) / d * sp * dt, 1 - HALF, HALF - 1); e.z = clamp(e.z - (np.z - e.z) / d * sp * dt, 1 - HALF, HALF - 1); }
         e.shootT -= dt;
         if (e.shootT <= 0) { e.shootT = 2.8; const a = Math.atan2(np.z - e.z, np.x - e.x); const dx = Math.cos(a) * 8.5, dz = Math.sin(a) * 8.5;
           this.ebullets.push({ x: e.x, z: e.z, dx, dz, life: 3 }); if (this.mode !== 'solo') (this._ebQ = this._ebQ || []).push([+e.x.toFixed(1), +e.z.toFixed(1), +dx.toFixed(1), +dz.toFixed(1)]); }
