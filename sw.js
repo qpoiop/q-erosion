@@ -2,7 +2,7 @@
    - app shell (/, index.html, game.js): network-first so deploys reach users immediately; cache fallback for offline
    - CDN assets (unpkg three/mqtt, google fonts): cache-first — URLs are version-pinned, safe to keep forever */
 const BUILD = '__BUILD__'; // stamped by CI per deploy so the browser sees a new SW → update toast
-const CACHE = 'erosion-v1';
+const CACHE = 'erosion-v2'; // v2: purge caches that hold stale same-name assets (char.glb was replaced in place once)
 const APP_SHELL = ['/', '/index.html', '/src/main.js', '/src/util.js', '/src/scene.js', '/src/models.js', '/src/hud.js', '/src/sheets.js', '/src/input.js', '/src/net.js', '/src/world.js', '/src/combat.js', '/src/waves.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-512-maskable.png'];
 const CDN = [
   'https://unpkg.com/three@0.147.0/build/three.min.js',
@@ -42,13 +42,13 @@ self.addEventListener('fetch', e => {
   const sameOrigin = url.origin === self.location.origin;
 
   if (sameOrigin && url.pathname.startsWith('/assets/')) {
-    // large binary assets (3D models): cache-first, version by filename
+    // stale-while-revalidate: serve the cache instantly, refresh it in the background —
+    // an asset replaced under the same filename self-heals on the next load
     e.respondWith((async () => {
       const hit = await caches.match(req);
-      if (hit) return hit;
-      const res = await fetch(req);
-      if (res.ok) (await caches.open(CACHE)).put(req, res.clone());
-      return res;
+      const refresh = fetch(req).then(async res => { if (res.ok) (await caches.open(CACHE)).put(req, res.clone()); return res; }).catch(() => null);
+      if (hit) { e.waitUntil(refresh); return hit; }
+      return (await refresh) || new Response('', { status: 504 });
     })());
     return;
   }
