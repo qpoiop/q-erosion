@@ -51,7 +51,8 @@ export function install(P) {
       if (ETYPES[ty].boss) {
         this.infBossN = (this.infBossN || 0) + 1; // 5 mid bosses, then 5 heavy
         e.btier = this.infBossN <= 5 ? 1 : 2;
-        if (e.btier === 2) { e.hp *= 4; e.wsp *= 1.15; }
+        if (e.btier === 2) { e.hp *= 3; e.wsp *= 1.15; }
+        if (this.mode !== 'solo' && this.allyOn) e.hp *= 1.5; // two guns on it — solo stays the balance baseline
         this._banner(e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); this.shake = Math.max(this.shake || 0, .5);
       }
       e.mhp = e.hp; this.enemies.set(id, e);
@@ -64,8 +65,9 @@ export function install(P) {
     const e = { id, ty, x: g.x + nx * off + lat * (nz ? 1 : 0), z: g.z + nz * off + lat * (nx ? 1 : 0), hp: ETYPES[ty].hp * hpMul, cool: 0, shootT: rnd(0, 2), entering: true, gx: g.x + lat * (nz ? 1 : 0), gz: g.z + lat * (nx ? 1 : 0), wsp: Math.min(2, 1 + (this.wave - 1) * .04 + Math.max(0, this.wave - 8) * .09) }; // late-loaded speed ramp: w5 1.16 / w10 1.54 / w15 ≈2
     if (ETYPES[ty].boss) { // boss tiers: w5 mid, w10 heavy, final wave = colossal structure-wrecker
       e.btier = this.wave >= this.maxWave ? 3 : this.wave >= 10 ? 2 : 1;
-      if (e.btier === 2) { e.hp *= 4; e.wsp *= 1.15; }
-      else if (e.btier === 3) { e.final = true; e.hp *= 14; e.smash = 2; e.wsp *= 1.4; } // colossal but NOT slow
+      if (e.btier === 2) { e.hp *= 3; e.wsp *= 1.15; }
+      else if (e.btier === 3) { e.final = true; e.hp *= 11; e.smash = 2; e.wsp *= 1.4; } // colossal but NOT slow
+      if (this.mode !== 'solo' && this.allyOn) e.hp *= 1.5; // two guns on it — solo stays the balance baseline
     }
     e.mhp = e.hp;
     this.enemies.set(id, e);
@@ -115,7 +117,7 @@ export function install(P) {
         continue;
       }
       // melee player if adjacent
-      if (np && npd < (et.boss ? 11 : 5)) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this._dMul() * (this.dmgWaveMul || 1)); } continue; }
+      if (np && npd < (et.boss ? 11 : 5)) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this._dMul() * (this.dmgWaveMul || 1) * (e.btier >= 2 ? .85 : 1)); } continue; } // big-boss swings tempered — a w10+ hit was near a two-shot
       // melee mobs hunt a nearby player; structures in the way get smashed
       if (!et.rng && !et.boss && np && npd < 49) {
         const dx = np.x - e.x, dz = np.z - e.z, d = Math.hypot(dx, dz) || 1;
@@ -139,6 +141,26 @@ export function install(P) {
         }
         if (hit >= 0) { this._atkStruct(e, et, hit); continue; }
       }
+      // bosses carve through the defense: seek the nearest structure within a few tiles instead of
+      // slipping single-file down the open lane (throttled scan, cached target)
+      if (et.boss) {
+        if ((e.stT = (e.stT || 0) - dt) <= 0) {
+          e.stT = .5; e.stTile = -1;
+          let bestD = 78; // ~8.8u — wide enough to notice defenses a few tiles off the lane
+          for (let dz2 = -4; dz2 <= 4; dz2++) for (let dx2 = -4; dx2 <= 4; dx2++) {
+            const X = gx + dx2, Z = gz + dz2; if (!inG(X, Z)) continue;
+            const j = ti(X, Z), o2 = this.occ[j];
+            if (o2 === 1 || o2 === 2) { const d2 = dist2(e.x, e.z, g2w(X), g2w(Z)); if (d2 < bestD) { bestD = d2; e.stTile = j; } }
+          }
+        }
+        if (e.stTile >= 0 && (this.occ[e.stTile] === 1 || this.occ[e.stTile] === 2)) {
+          const tx = g2w(e.stTile % N), tz = g2w((e.stTile / N) | 0);
+          const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz) || 1;
+          // stop short of the tile — the DIRS8 swing scan never checks the tile the boss stands ON
+          if (d > 1.7) { e.x = clamp(e.x + dx / d * sp * dt, 1 - HALF, HALF - 1); e.z = clamp(e.z + dz / d * sp * dt, 1 - HALF, HALF - 1); }
+          continue; // the adjacency check above lands the hit once in reach
+        }
+      }
       // flow move — pick among near-best downhill neighbors (per-enemy stable choice) so columns fan out instead of single-filing
       let bi = -1, bd = this.flowD[here];
       {
@@ -156,7 +178,7 @@ export function install(P) {
         }
       }
       if (bi < 0) { // at core
-        if (this.occ[here] === 3 || bd <= 1.5) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this._dMul() * (this.dmgWaveMul || 1), e); } }
+        if (this.occ[here] === 3 || bd <= 1.5) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this._dMul() * (this.dmgWaveMul || 1) * (e.btier >= 2 ? .85 : 1), e); } }
         continue;
       }
       const o = this.occ[bi];
@@ -167,7 +189,7 @@ export function install(P) {
         if (e.cool <= 0) this._atkStruct(e, et, bi);
         continue;
       }
-      if (o === 3) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this._dMul() * 2 * (this.dmgWaveMul || 1), e); } continue; }
+      if (o === 3) { if (e.cool <= 0) { e.cool = 1; this._dmgCoreBy(et.dmg * this._dMul() * 2 * (this.dmgWaveMul || 1) * (e.btier >= 2 ? .85 : 1), e); } continue; }
       const dx = bx - e.x, dz = bz - e.z, d = Math.hypot(dx, dz) || 1;
       e.x += dx / d * sp * dt; e.z += dz / d * sp * dt;
       e.x = clamp(e.x, 1 - HALF, HALF - 1); e.z = clamp(e.z, 1 - HALF, HALF - 1);
@@ -326,7 +348,7 @@ export function install(P) {
   P._spawnSource = function () {
     const hpMul = (1 + (this.maxWave - 1) * .18) * this._dMul();
     const id = this.eid++;
-    const e = { id, ty: 3, x: g2w(15) + 1, z: g2w(4), hp: ETYPES[3].hp * hpMul * 14 * 5, cool: 0, shootT: 1, wsp: 1.6, btier: 3, final: true, smash: 2, giant: true }; // 5x the wave-15 final boss, twice the size
+    const e = { id, ty: 3, x: g2w(15) + 1, z: g2w(4), hp: ETYPES[3].hp * hpMul * 11 * 5 * (this.mode !== 'solo' && this.allyOn ? 1.5 : 1), cool: 0, shootT: 1, wsp: 1.6, btier: 3, final: true, smash: 2, giant: true }; // 5x the wave-15 final boss, twice the size
     e.mhp = e.hp; this.enemies.set(id, e);
     this._banner('⚠⚠ 침식의 근원 — 모든 것의 시작이 모습을 드러냈다', 5200);
     this._beep(50, .8, 'sawtooth', .12); this._beep(70, 1, 'sawtooth', .1); this.shake = 1.2;
