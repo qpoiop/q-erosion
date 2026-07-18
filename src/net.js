@@ -158,6 +158,7 @@ export function install(P) {
       case 'use': { if (this.isHost && this.ally.items) { const ix = this.ally.items.indexOf(m.k); if (ix >= 0) this.ally.items.splice(ix, 1); } this._applyItemFx(m.k, m.x, m.z, false); } break;
       case 'dmg': if (!this.isHost) this._hurt(this.me, m.v); break;
       case 'eb': this.ebullets.push({ x: m.x, z: m.z, dx: m.dx, dz: m.dz, life: 3, ghost: !this.isHost }); break;
+      case 'bsk': if (!this.isHost) this._teleAdd(m); break; // boss skill telegraph — visual only, damage stays host-side
       case 'itm': if (!this.isHost) { if (m.who === 1 && this.me.items.length < INV_MAX) { this.me.items.push(m.k); this._banner(`아이템 획득 — ${ITEMS[m.k].n} (${this.me.items.length}/${INV_MAX})`, 2600); } else if (m.who === 0) this._banner(`동료가 ${ITEMS[m.k].n} 획득`, 2200); this.fitems = this.fitems.filter(f => f.id !== m.id); this._beep(700, .1); } break;
       case 'ban': if (!this.isHost) this._banner(m.s); break;
       case 's': if (!this.isHost) this._applyState(m); break;
@@ -200,6 +201,7 @@ export function install(P) {
           else { e.btier = this.wave >= this.maxWave ? 3 : (fl & 1) || this.wave >= 10 ? 2 : 1; if (e.btier === 3) e.final = true; }
         } this.enemies.set(id, e); if (ETYPES[ty] && ETYPES[ty].boss) { this._banner(e.btier === 3 ? '⚠ 최종 보스 출현!' : e.btier === 2 ? '⚠ 대형 보스 출현!' : '⚠ 중간 보스 출현!', 3200); this._beep(70, .5, 'sawtooth', .09); } }
       e.tx = x / 10; e.tz = z / 10; e.hp = hp; if (!e.mhp || hp > e.mhp) e.mhp = hp;
+      const aOn = !!(fl & 4); if (aOn && !e._aOn) e.atkT = this.tm; e._aOn = aOn; // edge-trigger the swing anim
     }
     for (const [id, e] of this.enemies) if (!seen.has(id)) { this._killFx(e); this.enemies.delete(id); }
     if (m.st) this._structUnpack(m.st);
@@ -225,7 +227,7 @@ export function install(P) {
         this.sendStateT = this._stIv || .13; this.sendStT -= this._stIv || .13;
         this._stIv = this.enemies.size > 120 ? .26 : this.enemies.size > 60 ? .2 : .13; // adaptive: hordes don't need 7.7Hz
       const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, eg: this.escGate, cm: this.coreMax, ss: [this.stat.k, Math.round(this.stat.g), this.stat.b, this.stat.r], as: [this.allyStat.k, Math.round(this.allyStat.g)], hr: [this.me.wallMul, this.me.turMul, this.me.turHpMul, this.me.costMul, this.me.wallLv || 0, this.me.turLv || 0], bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
-          en: (() => { const a = new Array(this.enemies.size * 6); let i2 = 0; for (const e of this.enemies.values()) { a[i2++] = e.id; a[i2++] = e.ty; a[i2++] = Math.round(e.x * 10); a[i2++] = Math.round(e.z * 10); a[i2++] = Math.round(e.hp); a[i2++] = (e.giant ? 2 : 0) | (e.btier === 2 ? 1 : 0); } return a; })(), // flat stride-6 — one array, cheap parse
+          en: (() => { const a = new Array(this.enemies.size * 6); let i2 = 0; for (const e of this.enemies.values()) { a[i2++] = e.id; a[i2++] = e.ty; a[i2++] = Math.round(e.x * 10); a[i2++] = Math.round(e.z * 10); a[i2++] = Math.round(e.hp); a[i2++] = (e.giant ? 2 : 0) | (e.btier === 2 ? 1 : 0) | (this.tm - (e.atkT ?? -9) < .35 ? 4 : 0); } return a; })(), // flat stride-6 — one array, cheap parse; bit2 = boss mid-swing
           ebq: this._ebQ && this._ebQ.length ? (() => { const q = this._ebQ; this._ebQ = []; return q; })() : undefined,
           itm: this.fitems.map(f => [f.id, f.k, Math.round(f.x * 10), Math.round(f.z * 10)]) };
         if (this.sendStT <= 0) { this.sendStT = 1.4; o.st = this._structPack(); }

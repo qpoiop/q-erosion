@@ -109,6 +109,12 @@ export function install(P) {
       e.x = clamp(e.x, 1 - HALF, HALF - 1); e.z = clamp(e.z, 1 - HALF, HALF - 1);
       // nearest live player
       let np = null, npd = 1e9; for (const p of players) { if (p.down) continue; const d = dist2(e.x, e.z, p.x, p.z); if (d < npd) { npd = d; np = p; } }
+      // boss skill machine: tier-2+ telegraph a ground AoE and hold still while it charges;
+      // the SOURCE cycles charge / expanding rings / AoE. Damage = its (tempered) melee swing.
+      if (et.boss && (e.btier >= 2 || e.giant)) {
+        if (e.cast) { if (this._castTick(e, et, dt, players)) continue; }
+        else if ((e.skCd = (e.skCd === undefined ? 4 + Math.random() * 3 : e.skCd - dt)) <= 0) { this._castStart(e, np); continue; }
+      }
       // ranged behaviour
       if (et.rng && np && npd < 81) {
         const d = Math.sqrt(npd);
@@ -122,7 +128,7 @@ export function install(P) {
         continue;
       }
       // melee player if adjacent
-      if (np && npd < (et.boss ? 11 : 5)) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this._dMul() * (this.dmgWaveMul || 1) * (e.btier >= 2 ? .85 : 1)); } continue; } // big-boss swings tempered — a w10+ hit was near a two-shot
+      if (np && npd < (et.boss ? 11 : 5)) { if (e.cool <= 0) { e.cool = .9; this._dealToPlayer(np, et.dmg * this._dMul() * (this.dmgWaveMul || 1) * (e.btier >= 2 ? .85 : 1)); if (et.boss) { e.atkT = this.tm; this._burst(np.x, np.z, 0xff5136, 11, 7); } } continue; } // big-boss swings tempered — a w10+ hit was near a two-shot
       // melee mobs hunt a nearby player; structures in the way get smashed
       if (!et.rng && !et.boss && np && npd < 49) {
         const dx = np.x - e.x, dz = np.z - e.z, d = Math.hypot(dx, dz) || 1;
@@ -202,12 +208,56 @@ export function install(P) {
   };
   P._atkStruct = function (e, et, j) {
     e.cool = .8;
+    if (et.boss) e.atkT = this.tm;
     const x = g2w(j % N), z = g2w((j / N) | 0);
     this.shp[j] -= et.sdmg * this._dMul() * (this.dmgWaveMul || 1) * (e.smash || 1); // final boss wrecks structures at 2x
     this._burst(x, z, PAL.redHex, 4, 4); this._beep(190, .05, 'square', .02);
     if (this.shp[j] <= 0) { this._fx(x, z, false, PAL.red7Hex); this._remove(j); }
   };
+  P._castStart = function (e, np) { // host only — joiners get the telegraph via 'bsk'
+    const kind = e.giant ? ['chg', 'ring', 'aoe'][(e.skN = ((e.skN ?? -1) + 1) % 3)] : 'aoe';
+    const c = { k: kind, t: 0, x: e.x, z: e.z, r: e.btier === 3 ? 6 : 4, dur: 1.4 };
+    if (kind === 'chg') { const d = np ? Math.hypot(np.x - e.x, np.z - e.z) || 1 : 1; c.dx = np ? (np.x - e.x) / d : 0; c.dz = np ? (np.z - e.z) / d : 1; c.dur = 1; c.len = 6; c.trav = 0; }
+    else if (kind === 'ring') { c.dur = .55; c.band = 0; c.bands = 4; }
+    e.cast = c;
+    this._teleAdd({ k: kind, x: c.x, z: c.z, r: c.r, d: c.dur, dx: c.dx, dz: c.dz, len: c.len, bands: c.bands, id: e.id });
+    if (this.mode !== 'solo') this._send({ t: 'bsk', k: kind, x: +c.x.toFixed(1), z: +c.z.toFixed(1), r: c.r, d: c.dur, dx: c.dx, dz: c.dz, len: c.len, bands: c.bands, id: e.id });
+    this._beep(96, .25, 'sawtooth', .05);
+  };
+  P._castTick = function (e, et, dt, players) { // true = boss is busy casting, skip normal AI
+    const c = e.cast, dmg = et.dmg * this._dMul() * (this.dmgWaveMul || 1) * (e.btier >= 2 ? .85 : 1);
+    c.t += dt;
+    if (c.k === 'aoe') { // hold still while the gauge fills, then slam the circle
+      if (c.t >= c.dur) {
+        for (const p of players) if (!p.down && dist2(p.x, p.z, c.x, c.z) < c.r * c.r) this._dealToPlayer(p, dmg);
+        this._fx(c.x, c.z, true, 0xff4a2e); this.shake = Math.max(this.shake || 0, .5);
+        e.atkT = this.tm; e.cast = null; e.skCd = (e.btier === 3 ? 8 : 9) + Math.random() * 2;
+      }
+      return true;
+    }
+    if (c.k === 'ring') { // bands detonate outward one tile at a time
+      const bi = Math.min(c.bands, Math.floor(c.t / c.dur));
+      while (c.band < bi) {
+        c.band++; const ri = c.band * 2, ro = ri + 2;
+        for (const p of players) { const d2 = dist2(p.x, p.z, c.x, c.z); if (!p.down && d2 >= ri * ri && d2 < ro * ro) this._dealToPlayer(p, dmg); }
+        this.shake = Math.max(this.shake || 0, .35);
+      }
+      if (c.band >= c.bands) { e.cast = null; e.skCd = 6.5 + Math.random() * 1.5; e.atkT = this.tm; }
+      return true;
+    }
+    // chg: telegraph, then a dash that walls (and the map edge) stop
+    if (c.t < c.dur) return true;
+    const step = 16 * dt, nx2 = e.x + c.dx * step, nz2 = e.z + c.dz * step;
+    const o = this.occ[ti(w2g(nx2 + c.dx * .9), w2g(nz2 + c.dz * .9))];
+    if (o === 1 || o === 2 || o === 5 || Math.abs(nx2) > HALF - 1.2 || Math.abs(nz2) > HALF - 1.2) { e.cast = null; e.skCd = 6.5 + Math.random() * 1.5; this._fx(e.x, e.z, false, 0xff4a2e); return true; }
+    e.x = nx2; e.z = nz2; c.trav += step;
+    for (const p of players) { const bit = p === this.me ? 1 : 2; if (!p.down && !(c.hit & bit) && dist2(p.x, p.z, e.x, e.z) < 2.6) { c.hit = (c.hit | 0) | bit; this._dealToPlayer(p, dmg); this._burst(p.x, p.z, 0xff5136, 12, 7); } }
+    this.shake = Math.max(this.shake || 0, .2);
+    if (c.trav >= c.len) { e.cast = null; e.skCd = 6.5 + Math.random() * 1.5; }
+    return true;
+  };
   P._dmgCoreBy = function (v, e) {
+    if (e && ETYPES[e.ty] && ETYPES[e.ty].boss) e.atkT = this.tm;
     this.coreHp -= v; this.shake = Math.max(this.shake || 0, .3);
     this._burst(this.coreMesh.position.x + rnd(-1, 1), this.coreMesh.position.z + rnd(-1, 1), PAL.cyanHex, 5, 4);
     this._coreHitFx();
