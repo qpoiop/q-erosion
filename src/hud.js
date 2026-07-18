@@ -37,11 +37,19 @@ export function install(P) {
     this.pbar = {}; ['me', 'ally'].forEach(k => {
       const row = H('div', 'display:flex;flex-direction:column;gap:3px', tl);
       const lab = H('div', 'font-size:10px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;color:' + PAL.dim, row);
-      const bo = H('div', 'height:8px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', row);
+      const brow = H('div', 'display:flex;gap:6px;align-items:center', row);
+      const bo = H('div', 'height:8px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5);flex:1', brow);
       const f = H('div', 'height:100%;width:100%;transition:width .15s', bo);
+      if (k === 'me') { // my bar yields ~30% to a stat-sheet button on its right
+        const sb = H('button', pe + 'font:700 10px ' + FONT + ';border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.4);color:' + PAL.dim + ';padding:2px 8px;cursor:pointer;letter-spacing:.06em;flex:0 0 auto', brow);
+        sb.textContent = '스탯'; sb.onclick = () => this._toggleStats();
+      }
       this.pbar[k] = { lab, f, row };
     });
     this.pbar.me.lab.textContent = '나 · 유닛-A';
+    this.statBg = H('div', 'position:absolute;inset:0;display:none;background:rgba(5,6,10,.45);z-index:24;' + pe, hud);
+    this.statBg.addEventListener('pointerdown', e => { e.stopPropagation(); this._toggleStats(false); });
+    this.statEl = H('div', 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;flex-direction:column;gap:6px;z-index:25;' + pe + panel + 'padding:16px;min-width:min(88vw,380px);max-height:74vh;overflow:auto', hud);
     // scrap
     const sc = H('div', 'display:flex;align-items:center;gap:7px;border-top:1px solid ' + PAL.line + ';padding-top:7px;margin-top:2px', tl);
     H('div', 'width:10px;height:10px;background:' + PAL.amber + ';box-shadow:0 0 10px ' + PAL.amber, sc);
@@ -131,7 +139,7 @@ export function install(P) {
     [this.wallChip, this.turChip, this.sellChip].forEach((c, i) => { const on = sel === i + 1; c.style.borderColor = on ? PAL.cyan : PAL.line; c.style.color = on ? PAL.cyan : PAL.text; c.style.background = on ? 'rgba(37,216,255,.14)' : PAL.panel; });
   };
   P._obtn = function (primary) { return `font:700 13px ${FONT};border:1px solid ${primary ? PAL.red : PAL.line};background:${primary ? PAL.red : 'transparent'};color:${primary ? '#fff' : PAL.text};padding:10px 16px;cursor:pointer;letter-spacing:.04em`; }
-  P._hudReset = function () { if (this.upEl) { this.upEl.style.display = 'none'; this.shopEl.style.display = 'none'; if (this.shopBg) { this.shopBg.style.display = 'none'; this.shopBtn.textContent = '연구'; this.shopBtn.style.background = PAL.panel; } if (this.invEl) { this.invEl.style.display = 'none'; this.invBg.style.display = 'none'; } if (this.buffEl) { this.buffEl.style.display = 'none'; this.buffBg.style.display = 'none'; this.buffChip.style.display = 'none'; this._buffKey = null; } this.ov.style.display = 'none'; this.buildMode = false; this._buildBarSync(); } }
+  P._hudReset = function () { if (this.upEl) { this.upEl.style.display = 'none'; this.shopEl.style.display = 'none'; if (this.shopBg) { this.shopBg.style.display = 'none'; this.shopBtn.textContent = '연구'; this.shopBtn.style.background = PAL.panel; } if (this.invEl) { this.invEl.style.display = 'none'; this.invBg.style.display = 'none'; } if (this.buffEl) { this.buffEl.style.display = 'none'; this.buffBg.style.display = 'none'; this.buffChip.style.display = 'none'; this._buffKey = null; } if (this.statEl) { this.statEl.style.display = 'none'; this.statBg.style.display = 'none'; } this.ov.style.display = 'none'; this.buildMode = false; this._buildBarSync(); } }
   P._banner = function (t, ms) { this.ban.textContent = t; this.ban.style.display = 'block'; clearTimeout(this._banT); this._banT = setTimeout(() => this.ban.style.display = 'none', ms || 2600); }
   P._exitConfirm = function () { // exit button & browser-back both land here
     if (this.phase === 'over' || this.phase === 'wait') { this._exit(); return; } // no game in progress — leave directly

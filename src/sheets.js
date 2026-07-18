@@ -31,6 +31,35 @@ export function install(P) {
     note.style.cssText = `font:400 10.5px ${FONT};color:${PAL.dim};letter-spacing:.05em;text-align:center;margin-top:2px`;
     el.appendChild(note);
   };
+  P._toggleStats = function (force) {
+    const open = force !== undefined ? force : this.statEl.style.display !== 'flex';
+    this.statEl.style.display = open ? 'flex' : 'none';
+    this.statBg.style.display = open ? 'block' : 'none';
+    if (open) this._renderStats();
+  };
+  P._renderStats = function () { // computed FINAL values, with the delta vs the class base alongside
+    const p = this.me, el = this.statEl; el.innerHTML = '';
+    this.H('div', 'font:700 13px ' + FONT + ';letter-spacing:.1em;color:#e8eaf0;margin-bottom:4px', el).textContent = '유닛 스탯 — 나';
+    const grid = this.H('div', 'display:grid;grid-template-columns:auto 1fr;gap:5px 16px;font:500 12px ' + FONT, el);
+    const pct = (v, b) => { const d = Math.round((v / b - 1) * 100); return d ? ` (${d > 0 ? '+' : ''}${d}%)` : ''; };
+    const row = (n, v, hi) => { this.H('div', 'color:' + PAL.dim, grid).textContent = n; const c = this.H('div', 'color:' + (hi || '#e8eaf0') + ';text-align:right;font-weight:700', grid); c.textContent = v; };
+    row('체력', `${Math.ceil(p.hp)} / ${p.maxhp}`);
+    row('공격력', `${+p.dmg.toFixed(1)}${pct(p.dmg, 9)}`);
+    row('연사', `${+Math.min(7.5, p.frate).toFixed(2)}/s${Math.min(7.5, p.frate) >= 7.5 ? ' (상한)' : pct(p.frate, 2.5)}`);
+    row('산탄', `${p.shots}발`); row('관통', `${p.pierce}회`);
+    row('사거리', `${+p.range.toFixed(1)}${pct(p.range, 9)}`);
+    row('이동 속도', `${+p.speed.toFixed(1)}${pct(p.speed, 6)}`);
+    row('자가 수복', `${+(p.regen || 0).toFixed(1)}/s`);
+    row('받는 피해', `${Math.round(((p.armor || 1) - 1) * 100)}%`, (p.armor || 1) < 1 ? PAL.cyan : undefined);
+    row('대시 쿨다운', `${+p.dashCd.toFixed(2)}s${p.dashCd <= 1.2 ? ' (하한)' : ''}`);
+    row('충격파', `Lv${p.sklLv} · 피해 ${Math.round((40 + p.sklLv * 20) * (p.sklDmgMul || 1))} · 반경 ${+((3.5 + p.sklLv * .5) * (p.sklRMul || 1)).toFixed(1)} · 쿨 ${+Math.max(4, (14 - p.sklLv) * (p.sklCdMul || 1)).toFixed(1)}s`);
+    row('처치 자원', `×${+(p.scrapMul || 1).toFixed(2)}`);
+    row('아이템 드랍', `×${+(p.dropMul || 1).toFixed(2)}`);
+    const nAug = Object.values(p.taken || {}).reduce((a, b) => a + b, 0), nSyn = Object.keys(p.syn || {}).length;
+    row('획득 증강', `${nAug}개${nSyn ? ` · 시너지 ${nSyn}` : ''}`);
+    const cl = this.H('button', 'margin-top:10px;font:700 11px ' + FONT + ';border:1px solid ' + PAL.line + ';background:transparent;color:' + PAL.dim + ';padding:7px;cursor:pointer;letter-spacing:.08em;pointer-events:auto', el);
+    cl.textContent = '닫기'; cl.onclick = () => this._toggleStats(false);
+  };
   P._toggleBuffs = function (force) {
     const open = force !== undefined ? force : this.buffEl.style.display !== 'flex';
     this.buffEl.style.display = open ? 'flex' : 'none';
