@@ -433,6 +433,7 @@ export function install(P) {
     this._overlay(`
       <div style="font:700 11px ${FONT};letter-spacing:.18em;color:${win ? PAL.cyan : PAL.red}">${win ? 'PROTOCOL COMPLETE' : 'PROTOCOL FAILED'}</div>
       <div style="font:700 34px ${FONT};margin:4px 0 10px;text-shadow:0 0 20px ${win ? 'rgba(37,216,255,.4)' : 'rgba(255,59,42,.4)'}">${win ? (this.inf ? '최종 클리어 — 침식 정화' : '방어 성공') : '방어선 붕괴'}</div>
+      ${(() => { const D = { easy: ['쉬움', PAL.cyan], normal: ['보통', '#e8eaf0'], hard: ['어려움', PAL.red], nightmare: ['☠ 악몽', '#c96bff'] }[this.diffKey] || ['보통', '#e8eaf0']; return `<div style="margin:-2px 0 10px"><span style="font:700 10.5px ${FONT};letter-spacing:.12em;color:${D[1]};border:1px solid ${D[1]};padding:3px 12px">난이도 · ${D[0]}</span></div>`; })()}
       <div style="font:400 13px ${FONT};line-height:1.7;border-top:1px solid ${PAL.line};padding-top:10px;color:${PAL.dim}">
         사유 — ${why}<br>웨이브 ${this.wave}/${this.maxWave} · 경과 ${mm}:${ss} · 처치 ${this.kills} · 레벨 ${this.lv}
       </div>
@@ -453,6 +454,7 @@ export function install(P) {
           <div style="font:700 10px ${FONT};letter-spacing:.3em;color:${PAL.cyan}">CO-OP TACTICAL SURVIVAL</div>
           <div style="font:900 40px 'Noto Sans KR',sans-serif;color:${PAL.red};text-shadow:0 0 24px rgba(255,59,42,.6);margin:6px 0 2px">침식 프로토콜</div>
           <div style="font:600 11px ${FONT};letter-spacing:.4em;color:${PAL.text}">E R O S I O N</div>
+          <div style="margin-top:8px"><span style="font:700 10.5px ${FONT};letter-spacing:.12em;color:#c96bff;border:1px solid #c96bff;padding:3px 12px">난이도 · ${DN[this.diffKey] || this.diffKey}</span></div>
         </div>
         <div style="font:400 12.5px 'Noto Sans KR',sans-serif;line-height:2;color:${PAL.dim};text-align:center;margin:18px 0;border-top:1px solid ${PAL.line};border-bottom:1px solid ${PAL.line};padding:14px 4px">
           균열 너머는 우리가 알던 세계가 아니었다.<br>
