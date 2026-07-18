@@ -367,8 +367,11 @@ export function install(P) {
     }
     if (this._fpsEl && (this._fno & 15) === 0) this._fpsEl.textContent = `${(1000 / Math.max(1, this._ftAvg || 16)).toFixed(0)}fps · ${(this._ftAvg || 16).toFixed(0)}ms${this._lowPerf ? ' · LOW' : ''}`;
     { // perf governor: sustained jank → shed the expensive passes (weak phones died at wave 11+)
+      // hidden-tab watchdog frames are not render cost — feeding them latched low-perf mode
+      // in the background and left the frozen shadow map showing stale silhouettes on return
       const ms = Math.min(100, dt * 1000);
-      this._ftAvg = (this._ftAvg || 16) * .92 + ms * .08;
+      if (!document.hidden) this._ftAvg = (this._ftAvg || 16) * .92 + ms * .08;
+      if (this._lowPerf && !this.renderer.shadowMap.autoUpdate && ((this._sfT = (this._sfT || 0) + dt) > .5)) { this._sfT = 0; this.renderer.shadowMap.needsUpdate = true; } // frozen shadows still refresh 2x/s — never minutes stale
       if (!this._lowPerf && (this._ftAvg > 34 || new URLSearchParams(location.search).get('perf') === 'low')) {
         this._lowPerf = true;
         this.composer = null; // bloom = 5 fullscreen passes

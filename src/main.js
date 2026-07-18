@@ -45,7 +45,7 @@ class ErosionGame extends HTMLElement {
     }
     this._bindInput();
     this._warmFx(); // pre-compile particle materials while the intro overlay covers the screen
-    this._onVis = () => { this._bgPaused = document.hidden; };
+    this._onVis = () => { this._bgPaused = document.hidden; if (!document.hidden) { this._ftAvg = 16; if (this.renderer) this.renderer.shadowMap.needsUpdate = true; } }; // wake-up spikes shouldn't judge the device; refresh any frozen shadows immediately
     document.addEventListener('visibilitychange', this._onVis);
     if (this.mode === 'solo') {
       let resumed = false;
