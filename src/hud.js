@@ -37,13 +37,8 @@ export function install(P) {
     this.pbar = {}; ['me', 'ally'].forEach(k => {
       const row = H('div', 'display:flex;flex-direction:column;gap:3px', tl);
       const lab = H('div', 'font-size:10px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;color:' + PAL.dim, row);
-      const brow = H('div', 'display:flex;gap:6px;align-items:center', row);
-      const bo = H('div', 'height:8px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5);flex:1', brow);
+      const bo = H('div', 'height:8px;border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.5)', row);
       const f = H('div', 'height:100%;width:100%;transition:width .15s', bo);
-      if (k === 'me') { // my bar yields ~30% to a stat-sheet button on its right
-        const sb = H('button', pe + 'font:700 10px ' + FONT + ';border:1px solid ' + PAL.line + ';background:rgba(0,0,0,.4);color:' + PAL.dim + ';padding:2px 8px;cursor:pointer;letter-spacing:.06em;flex:0 0 auto', brow);
-        sb.textContent = '스탯'; sb.onclick = () => this._toggleStats();
-      }
       this.pbar[k] = { lab, f, row };
     });
     this.pbar.me.lab.textContent = '나 · 유닛-A';
@@ -60,7 +55,8 @@ export function install(P) {
     const trb = H('div', 'display:flex;gap:5px', tr);
     const smBtn = txt => { const b = H('button', pe + 'font:700 11px ' + FONT + ';border:1px solid ' + PAL.line + ';background:' + PAL.panel + ';color:' + PAL.text + ';padding:6px 9px;cursor:pointer;letter-spacing:.05em', trb); b.textContent = txt; return b; };
     this._mkDiffTag(trb);
-    this.sndBtn = smBtn('소리 ON');
+    this.mute = true; // opt-in audio
+    this.sndBtn = smBtn('소리 OFF');
     this.sndBtn.onclick = () => { this.mute = !this.mute; this.sndBtn.textContent = this.mute ? '소리 OFF' : '소리 ON'; };
     const xb = smBtn('나가기 ✕'); xb.style.borderColor = PAL.red7; xb.onclick = () => this._exitConfirm();
     this.mm = H('canvas', 'position:absolute;right:10px;top:48px;width:104px;height:104px;border:1px solid rgba(58,64,82,.7);border-radius:50%;background:transparent', hud);
@@ -80,7 +76,12 @@ export function install(P) {
     this.hintEl = H('div', 'position:absolute;bottom:88px;left:50%;transform:translateX(-50%);font:400 11px ' + FONT + ';color:' + PAL.dim + ';letter-spacing:.05em;display:none;text-align:center;background:rgba(12,14,20,.45);padding:4px 12px;border:1px solid rgba(58,64,82,.4)', hud);
     this.hintEl.textContent = ('ontouchstart' in window) ? '드래그 이동 · 대시(무적 돌진)/아이템 버튼 · 건설/연구는 좌하단' : '이동 WASD · 대시 Space(무적 돌진) · 아이템 E · 건설/연구는 좌하단';
     // owned augments/synergies live behind ONE summary chip — a full build was overflowing the screen as badges
-    this.buffChip = H('button', pe + 'position:absolute;bottom:40px;left:50%;transform:translateX(-50%);font:700 10.5px ' + FONT + ';border:1px solid ' + PAL.line + ';background:rgba(12,14,20,.7);color:' + PAL.dim + ';padding:4px 12px;cursor:pointer;letter-spacing:.05em;display:none;backdrop-filter:blur(4px)', hud);
+    const chipRow = H('div', 'position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:6px', hud);
+    const chipCss = 'font:700 10.5px ' + FONT + ';border:1px solid ' + PAL.line + ';background:rgba(12,14,20,.7);color:' + PAL.dim + ';padding:4px 12px;cursor:pointer;letter-spacing:.05em;backdrop-filter:blur(4px)';
+    this.statChip = H('button', pe + chipCss, chipRow);
+    this.statChip.textContent = '📊 스탯';
+    this.statChip.onclick = () => this._toggleStats();
+    this.buffChip = H('button', pe + chipCss + ';display:none', chipRow);
     this.buffChip.onclick = () => this._toggleBuffs();
     this.buffBg = H('div', 'position:absolute;inset:0;display:none;background:rgba(5,6,10,.45);z-index:24;' + pe, hud);
     this.buffBg.addEventListener('pointerdown', e => { e.stopPropagation(); this._toggleBuffs(false); });

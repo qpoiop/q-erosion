@@ -416,7 +416,7 @@ export function install(P) {
           if (!g.bar) g.bar = this._mkBar(g.position.x, g.position.z);
           this._setBar(g.bar, b, PAL.cyanHex);
         } else {
-          const hpP = clamp(this.shp[i] / this._structHp(g.kind), 0, 1);
+          const hpP = clamp(this.shp[i] / this._structHp(g.kind, this._ownerOf(i)), 0, 1); // owner's research decides the max — my gwall was skewing the PEER's wall bar
           if (hpP < .999) { // damaged: same slot becomes an HP gauge
             if (!g.bar) g.bar = this._mkBar(g.position.x, g.position.z);
             this._setBar(g.bar, hpP, this._hpColor(hpP));

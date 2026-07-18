@@ -60,7 +60,7 @@ class ErosionGame extends HTMLElement {
   }
   _exit() { this.dispatchEvent(new CustomEvent('erosion-exit', { bubbles: true, composed: true })); }
   _initAudio() {
-    this.mute = false; let ctx = null;
+    this.mute = true; let ctx = null; // opt-in audio — the HUD button starts at 소리 OFF to match
     this._beep = (f, dur, type, vol) => { if (this.mute) return;
       const now2 = performance.now(); // budget: max 6 beeps per 180ms — hit storms were spawning oscillators faster than GC could reap
       if (!this._beepWin || now2 - this._beepWin > 180) { this._beepWin = now2; this._beepN = 0; }
