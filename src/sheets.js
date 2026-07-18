@@ -49,7 +49,7 @@ export function install(P) {
     const sec = (t) => { const d = this.H('div', `grid-column:1/-1;margin-top:7px;padding-bottom:3px;border-bottom:1px solid ${PAL.line};font:700 9.5px ${FONT};letter-spacing:.16em;color:${PAL.dim}`, grid); d.textContent = t; };
     const row = (name, f) => {
       this.H('div', 'color:' + PAL.dim, grid).textContent = name;
-      this.H('div', 'text-align:right;font-weight:700;color:#e8eaf0', grid).textContent = f(this.me);
+      this.H('div', 'text-align:right;font-weight:700;color:' + PAL.cyan, grid).textContent = f(this.me); // my column matches the 나 header — plain white read weaker than the partner's amber
       if (two) this.H('div', 'text-align:right;font-weight:700;color:' + PAL.amber, grid).textContent = allyReady ? f(this.ally) : '—';
     };
     const pct = (v, b) => { const d = Math.round((v / b - 1) * 100); return d ? ` (${d > 0 ? '+' : ''}${d}%)` : ''; };

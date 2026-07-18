@@ -373,7 +373,8 @@ export function install(P) {
       if (!document.hidden) this._ftAvg = (this._ftAvg || 16) * .92 + ms * .08;
       if (this._lowPerf && !this.renderer.shadowMap.autoUpdate && ((this._sfT = (this._sfT || 0) + dt) > .5)) { this._sfT = 0; this.renderer.shadowMap.needsUpdate = true; } // frozen shadows still refresh 2x/s — never minutes stale
       if (!this._lowPerf && (this._ftAvg > 34 || new URLSearchParams(location.search).get('perf') === 'low')) {
-        this._lowPerf = true;
+        this._lowPerf = true; this._lowForced = new URLSearchParams(location.search).get('perf') === 'low';
+        this._pr0 = this.renderer.getPixelRatio();
         this.composer = null; // bloom = 5 fullscreen passes
         this.renderer.shadowMap.autoUpdate = false; // freeze shadows instead of re-rendering the scene for them
         this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.15));
@@ -381,6 +382,20 @@ export function install(P) {
         if (this.dust) this.dust.visible = false;
         this._banner('⚙ 저사양 모드 — 그래픽 효과를 줄였습니다', 3200);
       }
+      // low-perf is no longer a one-way latch: 10s of healthy frames restores full quality
+      // (a transient spike — or a pre-fix background latch — used to leave the game blurry forever)
+      if (this._lowPerf && !this._lowForced && this._ftAvg < 20) {
+        if ((this._recT = (this._recT || 0) + dt) > 10) {
+          this._lowPerf = false; this._recT = 0; this._ftAvg = 16;
+          this.renderer.shadowMap.autoUpdate = true; this.renderer.shadowMap.needsUpdate = true;
+          if (this._pr0) this.renderer.setPixelRatio(this._pr0);
+          this.renderer.setSize(this.cv.clientWidth, this.cv.clientHeight, false);
+          if (this.dust) this.dust.visible = true;
+          const T2 = THREE;
+          if (T2.EffectComposer && T2.UnrealBloomPass) { this.composer = new T2.EffectComposer(this.renderer); this.composer.addPass(new T2.RenderPass(this.scene, this.cam)); this.bloom = new T2.UnrealBloomPass(new T2.Vector2(innerWidth, innerHeight), .45, .5, .85); this.composer.addPass(this.bloom); this.composer.setSize(this.cv.clientWidth, this.cv.clientHeight); }
+          this._banner('⚙ 그래픽 품질 복원', 2400);
+        }
+      } else this._recT = 0;
     }
     if (this.dust) this.dust.rotation.y += dt * .01;
     // build-mode overlay: refresh placeable tiles 4x/s
