@@ -13,11 +13,11 @@ const dist2 = (ax, az, bx, bz) => { const dx = ax - bx, dz = az - bz; return dx 
 const PAL = { bg: 0x0b0c10, line: '#3a4052', panel: 'rgba(12,14,20,.82)', text: '#e8eaf0', dim: '#9aa3b5', cyan: '#25d8ff', cyanHex: 0x25d8ff, amber: '#ffb020', amberHex: 0xffb020, red: '#ff3b2a', redHex: 0xff3b2a, red7: '#c22212', red7Hex: 0xc22212 };
 const FONT = "'Chakra Petch','Noto Sans KR',sans-serif";
 /* swarm balance: many weaker mobs rather than few strong ones */
-const ETYPES = [ // sdmg trimmed ~20% when turret retaliation landed — structures were melting
-  { hp: 30, sp: 3.9, dmg: 5, sdmg: 11, xp: 8, sc: 2, r: .55 },   // tri rusher
-  { hp: 115, sp: 1.9, dmg: 13, sdmg: 33, xp: 20, sc: 6, r: .75 }, // cube breaker
+const ETYPES = [ // sdmg trimmed ~20% when turret retaliation landed — structures were melting. dmg (vs players/core) trimmed 20% across the board 2026-07-18
+  { hp: 30, sp: 3.9, dmg: 4, sdmg: 11, xp: 8, sc: 2, r: .55 },   // tri rusher
+  { hp: 115, sp: 1.9, dmg: 10.4, sdmg: 33, xp: 20, sc: 6, r: .75 }, // cube breaker
   { hp: 48, sp: 2.5, dmg: 0, sdmg: 9, xp: 15, sc: 4, r: .6, rng: true }, // hex gunner
-  { hp: 700, sp: 1.5, dmg: 25, sdmg: 80, xp: 80, sc: 30, r: 1.1, boss: true }, // boss
+  { hp: 700, sp: 1.5, dmg: 20, sdmg: 80, xp: 80, sc: 30, r: 1.1, boss: true }, // boss
 ];
 const DIFF_SCR = { easy: 1, normal: 1, hard: 1.2, nightmare: 1.45 }; // scrap income — harder waves fund a bigger arsenal
 /* card rarity tiers — each line levels 기본→레어→에픽→레전드; a tier only
