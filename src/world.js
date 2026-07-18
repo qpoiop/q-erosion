@@ -36,6 +36,7 @@ export function install(P) {
     if (this.fxs) { for (const f of this.fxs) { f.visible = false; this.scene.remove(f); if (this._fxPool && this._fxPool.length < 64) this._fxPool.push(f); } this.fxs.length = 0; }
     if (this.sparks) { for (const s of this.sparks) { s.visible = false; this.scene.remove(s); if (this._sparkPool && this._sparkPool.length < 160) this._sparkPool.push(s); } this.sparks.length = 0; }
     if (this.bMeshes) for (const m of this.bMeshes) m.visible = false;
+    if (this.teles) this.teles.length = 0; if (this._teleP) for (const m of this._teleAllMeshes()) m.visible = false; // boss telegraphs don't survive a restart
     this._turFlash = {};
     this._flow(); this._syncStruct();
     this._hudReset();

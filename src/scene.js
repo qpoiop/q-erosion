@@ -259,6 +259,62 @@ export function install(P) {
     for (let i = 0; i < 24; i++) this._fx(cx, cz, false, 0xffffff);
     for (const s of this.sparks) { s.userData.life = .1; s.material.opacity = .02; }
     for (const f of this.fxs) { f.userData.t = .8; f.material.opacity = .02; }
+    // telegraph pool too — same rule, compile the shaders behind the overlay, not on the first boss cast
+    this._telePoolInit();
+    for (const m of this._teleAllMeshes()) { m.visible = true; m.material.opacity = .01; }
+  };
+  P._teleAdd = function (o) { (this.teles = this.teles || []).push(Object.assign({ t: 0 }, o)); };
+  P._telePoolInit = function () { // pooled, MeshBasicMaterial only: no lights touched, no recompile after warm-up
+    if (this._teleP) return;
+    const T = THREE;
+    const mk = (geo, op) => { const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color: 0xff3524, transparent: true, opacity: op, depthWrite: false, side: T.DoubleSide })); m.rotation.x = -Math.PI / 2; m.position.y = .07; m.visible = false; m.renderOrder = 2; this.scene.add(m); return m; };
+    const circG = new T.CircleGeometry(1, 30), rimG = new T.RingGeometry(.93, 1, 30);
+    const discs = []; for (let i = 0; i < 5; i++) discs.push({ base: mk(circG, .13), fill: mk(circG, .3), rim: mk(rimG, .5) });
+    const rectG = new T.PlaneGeometry(1, 1).translate(0, .5, 0); // scale.y extends forward from the caster
+    const rects = [{ base: mk(rectG, .13), fill: mk(rectG, .3) }];
+    const bands = [new T.RingGeometry(2, 4, 36), new T.RingGeometry(4, 6, 42), new T.RingGeometry(6, 8, 48), new T.RingGeometry(8, 10, 54)].map(g => mk(g, .3));
+    this._teleP = { discs, rects, bands };
+  };
+  P._teleAllMeshes = function () { const p = this._teleP, a = []; for (const d of p.discs) a.push(d.base, d.fill, d.rim); for (const r of p.rects) a.push(r.base, r.fill); a.push(...p.bands); return a; };
+  P._teleRender = function (dt) {
+    const L = this.teles;
+    if (!this._teleP) { if (!L || !L.length) return; this._telePoolInit(); }
+    for (const m of this._teleAllMeshes()) m.visible = false;
+    if (!L || !L.length) return;
+    let di = 0, ri = 0;
+    for (let i = L.length - 1; i >= 0; i--) {
+      const o = L[i]; o.t += dt;
+      const total = o.k === 'ring' ? o.d * (o.bands || 4) + .05 : o.k === 'chg' ? o.d + .5 : o.d + .03;
+      const alive = o.id === undefined || this.enemies.has(o.id);
+      if (o.t >= total || !alive) {
+        if (o.t >= total && alive && !this.isHostish()) { // host already blasted in the sim
+          if (o.k === 'aoe') { this._fx(o.x, o.z, true, 0xff4a2e); this.shake = Math.max(this.shake || 0, .4); }
+          else if (o.k === 'ring') { for (let a = 0; a < 6; a++) this._burst(o.x + Math.cos(a * 1.047) * 9, o.z + Math.sin(a * 1.047) * 9, 0xff4a2e, 3, 4); this.shake = Math.max(this.shake || 0, .3); }
+        }
+        L[i] = L[L.length - 1]; L.pop(); continue;
+      }
+      if (o.k === 'aoe' && di < this._teleP.discs.length) {
+        const d = this._teleP.discs[di++], pr = Math.min(1, o.t / o.d);
+        d.base.visible = d.fill.visible = d.rim.visible = true;
+        d.base.position.x = d.fill.position.x = d.rim.position.x = o.x; d.base.position.z = d.fill.position.z = d.rim.position.z = o.z;
+        d.base.scale.setScalar(o.r); d.rim.scale.setScalar(o.r); d.fill.scale.setScalar(Math.max(.01, o.r * pr));
+        d.base.material.opacity = .13; d.fill.material.opacity = .3; d.rim.material.opacity = .4 + pr * .3;
+      } else if (o.k === 'chg' && ri < this._teleP.rects.length) {
+        const r = this._teleP.rects[ri++], pr = Math.min(1, o.t / o.d), yaw = Math.atan2(-(o.dx || 0), -(o.dz || 1));
+        r.base.visible = r.fill.visible = true;
+        r.base.position.x = r.fill.position.x = o.x; r.base.position.z = r.fill.position.z = o.z;
+        r.base.rotation.z = r.fill.rotation.z = yaw;
+        r.base.scale.set(2.6, o.len || 6, 1); r.fill.scale.set(2.6, Math.max(.01, (o.len || 6) * pr), 1);
+        r.base.material.opacity = .13; r.fill.material.opacity = o.t > o.d ? .45 : .3; // brighter once the dash fires
+      } else if (o.k === 'ring') {
+        const bi = Math.min((o.bands || 4) - 1, Math.floor(o.t / o.d));
+        o.bandFx = o.bandFx ?? 0;
+        while (o.bandFx < bi) { o.bandFx++; if (!this.isHostish()) { const rr = o.bandFx * 2 + 1; for (let a = 0; a < 6; a++) this._burst(o.x + Math.cos(a * 1.047) * rr, o.z + Math.sin(a * 1.047) * rr, 0xff4a2e, 3, 4); this.shake = Math.max(this.shake || 0, .3); } }
+        const m = this._teleP.bands[bi]; m.visible = true;
+        m.position.x = o.x; m.position.z = o.z;
+        m.material.opacity = .1 + ((o.t - bi * o.d) / o.d) * .35;
+      }
+    }
   };
   P._mkBar = function (x, z, w) { // progress/HP gauge above a structure
     const T = THREE, gr = new T.Group(); w = w || 1.5;
@@ -467,6 +523,11 @@ export function install(P) {
       if (e.ty === 0) m.position.y = Math.abs(Math.sin(now * 6 + id)) * .12;
       if (m.body) { if (e.flash > 0) { e.flash -= dt; m.body.material = this.mFlash; } else m.body.material = this.mEnemy; }
       else if (m.isModel && e.flash > 0) { e.flash -= dt; m.children[0].scale.setScalar(m.children[0].userData.s0 || (m.children[0].userData.s0 = m.children[0].scale.x)); m.children[0].scale.multiplyScalar(1.06); }
+      if (e.atkT !== undefined && ETYPES[e.ty] && ETYPES[e.ty].boss) { // swing: quick direction-free squash-and-stretch (group scale, so it stacks with the flash anim on the child)
+        const ap = this.tm - e.atkT;
+        if (ap >= 0 && ap < .3) { const k = Math.sin(ap / .3 * Math.PI), s0 = m.userData.as0 ?? (m.userData.as0 = m.scale.x); m.scale.set(s0 * (1 + .16 * k), s0 * (1 - .22 * k), s0 * (1 + .16 * k)); }
+        else if (m.userData.as0 !== undefined) m.scale.setScalar(m.userData.as0);
+      }
     }
     for (const [id, m] of this.eMeshes) if (!this.enemies.has(id)) { if (m.bossBar) this.scene.remove(m.bossBar); this.scene.remove(m); this.eMeshes.delete(id); }
     // bullets
@@ -479,6 +540,8 @@ export function install(P) {
     // no PointLight here: adding/removing lights changes the light count and forces a full-scene shader recompile (one-frame stall)
     while (this.itemMs.length < this.fitems.length) { const g = new T.Group(); const b = new T.Mesh(new T.BoxGeometry(.55, .55, .55), this.mGlowAmber); b.position.y = .5; g.add(b); const halo = new T.Mesh(new T.CircleGeometry(.7, 20), new T.MeshBasicMaterial({ color: PAL.amberHex, transparent: true, opacity: .22, blending: T.AdditiveBlending, depthWrite: false })); halo.rotation.x = -Math.PI / 2; halo.position.y = .06; g.add(halo); this.scene.add(g); this.itemMs.push(g); }
     this.itemMs.forEach((g, i) => { const f = this.fitems[i]; if (f) { g.visible = true; g.position.set(f.x, Math.sin(now * 2.2) * .15 + .1, f.z); g.children[0].rotation.y += dt * 2; } else g.visible = false; });
+    // boss skill telegraphs (pooled ground markers)
+    this._teleRender(dt);
     // fx
     for (let i = this.fxs.length - 1; i >= 0; i--) {
       const f = this.fxs[i]; f.userData.t += dt * 3;
