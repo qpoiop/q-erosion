@@ -42,6 +42,9 @@ export function install(P) {
       this.pbar[k] = { lab, f, row };
     });
     this.pbar.me.lab.textContent = '나 · 유닛-A';
+    this.statBg = H('div', 'position:absolute;inset:0;display:none;background:rgba(5,6,10,.45);z-index:24;' + pe, hud);
+    this.statBg.addEventListener('pointerdown', e => { e.stopPropagation(); this._toggleStats(false); });
+    this.statEl = H('div', 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;flex-direction:column;gap:6px;z-index:25;' + pe + panel + 'padding:16px;min-width:min(88vw,380px);max-height:74vh;overflow:auto', hud);
     // scrap
     const sc = H('div', 'display:flex;align-items:center;gap:7px;border-top:1px solid ' + PAL.line + ';padding-top:7px;margin-top:2px', tl);
     H('div', 'width:10px;height:10px;background:' + PAL.amber + ';box-shadow:0 0 10px ' + PAL.amber, sc);
@@ -52,7 +55,8 @@ export function install(P) {
     const trb = H('div', 'display:flex;gap:5px', tr);
     const smBtn = txt => { const b = H('button', pe + 'font:700 11px ' + FONT + ';border:1px solid ' + PAL.line + ';background:' + PAL.panel + ';color:' + PAL.text + ';padding:6px 9px;cursor:pointer;letter-spacing:.05em', trb); b.textContent = txt; return b; };
     this._mkDiffTag(trb);
-    this.sndBtn = smBtn('소리 ON');
+    this.mute = true; // opt-in audio
+    this.sndBtn = smBtn('소리 OFF');
     this.sndBtn.onclick = () => { this.mute = !this.mute; this.sndBtn.textContent = this.mute ? '소리 OFF' : '소리 ON'; };
     const xb = smBtn('나가기 ✕'); xb.style.borderColor = PAL.red7; xb.onclick = () => this._exitConfirm();
     this.mm = H('canvas', 'position:absolute;right:10px;top:48px;width:104px;height:104px;border:1px solid rgba(58,64,82,.7);border-radius:50%;background:transparent', hud);
@@ -72,7 +76,12 @@ export function install(P) {
     this.hintEl = H('div', 'position:absolute;bottom:88px;left:50%;transform:translateX(-50%);font:400 11px ' + FONT + ';color:' + PAL.dim + ';letter-spacing:.05em;display:none;text-align:center;background:rgba(12,14,20,.45);padding:4px 12px;border:1px solid rgba(58,64,82,.4)', hud);
     this.hintEl.textContent = ('ontouchstart' in window) ? '드래그 이동 · 대시(무적 돌진)/아이템 버튼 · 건설/연구는 좌하단' : '이동 WASD · 대시 Space(무적 돌진) · 아이템 E · 건설/연구는 좌하단';
     // owned augments/synergies live behind ONE summary chip — a full build was overflowing the screen as badges
-    this.buffChip = H('button', pe + 'position:absolute;bottom:40px;left:50%;transform:translateX(-50%);font:700 10.5px ' + FONT + ';border:1px solid ' + PAL.line + ';background:rgba(12,14,20,.7);color:' + PAL.dim + ';padding:4px 12px;cursor:pointer;letter-spacing:.05em;display:none;backdrop-filter:blur(4px)', hud);
+    const chipRow = H('div', 'position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;gap:6px', hud);
+    const chipCss = 'font:700 10.5px ' + FONT + ';border:1px solid ' + PAL.line + ';background:rgba(12,14,20,.7);color:' + PAL.dim + ';padding:4px 12px;cursor:pointer;letter-spacing:.05em;backdrop-filter:blur(4px)';
+    this.statChip = H('button', pe + chipCss, chipRow);
+    this.statChip.textContent = '📊 스탯';
+    this.statChip.onclick = () => this._toggleStats();
+    this.buffChip = H('button', pe + chipCss + ';display:none', chipRow);
     this.buffChip.onclick = () => this._toggleBuffs();
     this.buffBg = H('div', 'position:absolute;inset:0;display:none;background:rgba(5,6,10,.45);z-index:24;' + pe, hud);
     this.buffBg.addEventListener('pointerdown', e => { e.stopPropagation(); this._toggleBuffs(false); });
@@ -131,7 +140,7 @@ export function install(P) {
     [this.wallChip, this.turChip, this.sellChip].forEach((c, i) => { const on = sel === i + 1; c.style.borderColor = on ? PAL.cyan : PAL.line; c.style.color = on ? PAL.cyan : PAL.text; c.style.background = on ? 'rgba(37,216,255,.14)' : PAL.panel; });
   };
   P._obtn = function (primary) { return `font:700 13px ${FONT};border:1px solid ${primary ? PAL.red : PAL.line};background:${primary ? PAL.red : 'transparent'};color:${primary ? '#fff' : PAL.text};padding:10px 16px;cursor:pointer;letter-spacing:.04em`; }
-  P._hudReset = function () { if (this.upEl) { this.upEl.style.display = 'none'; this.shopEl.style.display = 'none'; if (this.shopBg) { this.shopBg.style.display = 'none'; this.shopBtn.textContent = '연구'; this.shopBtn.style.background = PAL.panel; } if (this.invEl) { this.invEl.style.display = 'none'; this.invBg.style.display = 'none'; } if (this.buffEl) { this.buffEl.style.display = 'none'; this.buffBg.style.display = 'none'; this.buffChip.style.display = 'none'; this._buffKey = null; } this.ov.style.display = 'none'; this.buildMode = false; this._buildBarSync(); } }
+  P._hudReset = function () { if (this.upEl) { this.upEl.style.display = 'none'; this.shopEl.style.display = 'none'; if (this.shopBg) { this.shopBg.style.display = 'none'; this.shopBtn.textContent = '연구'; this.shopBtn.style.background = PAL.panel; } if (this.invEl) { this.invEl.style.display = 'none'; this.invBg.style.display = 'none'; } if (this.buffEl) { this.buffEl.style.display = 'none'; this.buffBg.style.display = 'none'; this.buffChip.style.display = 'none'; this._buffKey = null; } if (this.statEl) { this.statEl.style.display = 'none'; this.statBg.style.display = 'none'; } this.ov.style.display = 'none'; this.buildMode = false; this._buildBarSync(); } }
   P._banner = function (t, ms) { this.ban.textContent = t; this.ban.style.display = 'block'; clearTimeout(this._banT); this._banT = setTimeout(() => this.ban.style.display = 'none', ms || 2600); }
   P._exitConfirm = function () { // exit button & browser-back both land here
     if (this.phase === 'over' || this.phase === 'wait') { this._exit(); return; } // no game in progress — leave directly

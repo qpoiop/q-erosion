@@ -114,7 +114,7 @@
         <button class="diff-btn" data-diff="nightmare" style="font:700 12px 'Noto Sans KR',sans-serif;background:transparent;color:#c96bff;border:1px solid #5a3a72;padding:7px 16px;cursor:pointer;letter-spacing:.04em">☠ 악몽</button>
       </div>
       <div id="nm-warn" style="display:none;margin-top:10px;text-align:center;font:700 11.5px 'Noto Sans KR',sans-serif;color:#ff5e6b;letter-spacing:.06em;line-height:1.7;animation:nmWarn 1.2s ease-in-out infinite">
-        ⚠ 균열이 동시에 여러 개 열립니다 — 불가능에 가까운 난이도.<br><span style="color:#c96bff">멀티 협동 플레이를 권장합니다.</span>
+        ⚠ 멀티 협동 플레이를 권장합니다.<br><span style="color:#c96bff">15웨이브 너머, 침식의 근원을 파괴하면 진엔딩을 볼 수 있습니다.</span>
       </div>
       <style>
         @keyframes nmWarn{0%,100%{opacity:1}50%{opacity:.55}}
@@ -122,11 +122,10 @@
       </style>
       <div id="rules" style="display:flex;flex-wrap:wrap;gap:1px;background:#3a4052;border:1px solid #3a4052;margin:26px 0 0"></div>
       <div style="padding:16px 0 34px;font-size:11px;line-height:1.7;color:#5a6377;font-family:'Noto Sans KR',sans-serif;text-align:center">
-        온라인 협동은 무료 공개 WebSocket 릴레이로 연결됩니다 — 서버 설치·비용 없음.<br>
-        3D 모델(sketchfab.com): 캐릭터 "Toy Robot" by rkmorello · 근접 "drone robot" by noortjeschuur · 원거리 "Robo_V2" by _SeF_, "Robot_04" by taktelon<br>
-        보스 "Robot" by l0wpoly, "Utility Robot" by nickheitzman, "Futuristic army robot" by iasarmientoj · 타워 "Combat Turret" by SnoyCat, "Scy-fi turret" by kudinadarya<br>
-        코어 "Crystal" by rudolfs · 벽 "Cube Metalic" by _sqtime_, "Yellow Metal Cube" by JakobHenerey20231 (전부 CC-BY, 캐릭터/l0wpoly 제외 명시)<br>
-        모바일: 화면 드래그 이동(가상 스틱) · 자동 조준 · 대시/아이템 버튼 — <span style="color:#9aa3b5;font-weight:700">가로 모드 플레이 권장</span> &nbsp;|&nbsp; PC: WASD 이동 · Space 대시 · E 아이템<br>빌드 <span id="bver">__BUILD__</span>
+        모바일: 드래그 이동 · 자동 조준 — <span style="color:#9aa3b5;font-weight:700">가로 모드 권장</span> &nbsp;|&nbsp; PC: WASD 이동 · Space 대시 · E 아이템<br>
+        3D 모델 출처(Sketchfab, CC BY 4.0 — "Toy Robot"·"Robot"은 원 게시 라이선스 표기를 따름): "Toy Robot" rkmorello · "drone robot" noortjeschuur · "Robo_V2" _SeF_ · "Robot_04" taktelon ·<br>
+        "Robot" l0wpoly · "Utility Robot" nickheitzman · "Futuristic army robot" iasarmientoj · "Combat Turret" SnoyCat · "Scy-fi turret" kudinadarya · "Crystal" rudolfs · "Cube Metalic" _sqtime_ · "Yellow Metal Cube" JakobHenerey20231<br>
+        © 2026 란도 — 침식 프로토콜 · 빌드 <span id="bver">__BUILD__</span>
       </div>
     </div>
   </div>
@@ -168,10 +167,10 @@
   syncDiff();
 
   const rules = [
-    { n: '01', t: '건설로 길을 막아라', d: '준비 단계에 벽·포탑을 배치. 적은 벽을 부수며 최단 경로로 코어를 노립니다.' },
-    { n: '02', t: '자원 = 전략', d: '처치 골드는 두 유닛 모두에게 — 각자 자기 회수 배율로 획득, 웨이브 보너스도 각자 지급. 연구는 전부 개인 단위: 구조물 연구는 내가 지은 벽·포탑에 적용.' },
-    { n: '03', t: '증강 & 시너지', d: '레벨업마다 강화 카드 3택1 — 기본→레전드 4등급 테크. 두 계통 조합 시 시너지 각성, 충격파·대시·아이템까지 빌드의 일부.' },
-    { n: '04', t: '코어 사수 + 구조', d: '정화 코어가 부서지면 패배. 쓰러진 동료는 곁에서 2.5초 유지로 부활.' },
+    { n: '01', t: '길을 막아라', d: '준비 단계에 벽과 포탑을 배치하세요. 적은 방어선을 부수며 최단 경로로 코어를 노립니다.' },
+    { n: '02', t: '자원을 굴려라', d: '처치 골드는 두 유닛 모두에게 지급됩니다. 연구는 전부 개인 단위 — 구조물 연구는 내가 지은 벽과 포탑에만 적용됩니다.' },
+    { n: '03', t: '빌드를 완성하라', d: '레벨업마다 강화 카드 3택1, 기본부터 레전드까지 4등급. 두 계통을 조합하면 시너지가 각성합니다.' },
+    { n: '04', t: '코어를 사수하라', d: '정화 코어가 파괴되면 패배합니다. 쓰러진 동료는 곁에 2.5초 머물면 부활시킬 수 있습니다.' },
   ];
   const rulesEl = document.getElementById('rules');
   rulesEl.innerHTML = rules.map(r => `

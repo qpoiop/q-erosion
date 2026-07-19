@@ -45,7 +45,7 @@ class ErosionGame extends HTMLElement {
     }
     this._bindInput();
     this._warmFx(); // pre-compile particle materials while the intro overlay covers the screen
-    this._onVis = () => { this._bgPaused = document.hidden; };
+    this._onVis = () => { this._bgPaused = document.hidden; if (!document.hidden) { this._ftAvg = 16; if (this.renderer) this.renderer.shadowMap.needsUpdate = true; } }; // wake-up spikes shouldn't judge the device; refresh any frozen shadows immediately
     document.addEventListener('visibilitychange', this._onVis);
     if (this.mode === 'solo') {
       let resumed = false;
@@ -60,7 +60,7 @@ class ErosionGame extends HTMLElement {
   }
   _exit() { this.dispatchEvent(new CustomEvent('erosion-exit', { bubbles: true, composed: true })); }
   _initAudio() {
-    this.mute = false; let ctx = null;
+    this.mute = true; let ctx = null; // opt-in audio — the HUD button starts at 소리 OFF to match
     this._beep = (f, dur, type, vol) => { if (this.mute) return;
       const now2 = performance.now(); // budget: max 6 beeps per 180ms — hit storms were spawning oscillators faster than GC could reap
       if (!this._beepWin || now2 - this._beepWin > 180) { this._beepWin = now2; this._beepN = 0; }

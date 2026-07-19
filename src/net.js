@@ -139,6 +139,7 @@ export function install(P) {
       } break;
       case 'busy': if (!this.isHost && this.phase === 'wait') { this._overlay(`<div style="font:700 20px ${FONT}">방이 가득 찼습니다</div><div style="margin-top:14px"><button id="egCancel" style="${this._obtn(false)}">돌아가기</button></div>`); this.ovIn.querySelector('#egCancel').onclick = () => this._exit(); } break;
       case 'p': { this._peerSeenAt = performance.now(); const a = this.ally; a.lastSeen = this.tm; a.tx = m.x; a.tz = m.z; a.ta = m.a; a.hp = m.hp; a.maxhp = m.mh; a.down = m.dn; a.lv = m.lv; this._peerPaused = !!m.bg; if (m.sm) a.scrapMul = m.sm; if (m.au !== undefined) a.au = m.au;
+        if (m.st2) { const s = m.st2; a.dmg = s[0]; a.frate = s[1]; a.shots = s[2]; a.pierce = s[3]; a.range = s[4]; a.speed = s[5]; a.regen = s[6]; a.armor = s[7]; a.dashCd = s[8]; a.sklLv = s[9]; a.sklDmgMul = s[10]; a.sklRMul = s[11]; a.sklCdMul = s[12]; a.dropMul = s[13]; a.synN = s[14]; a.sttOk = 1; }
         (m.sh || []).forEach(s => this._spawnBullet(s[0], s[1], s[2], s[3], { ghost: true, ally: true, life: s[4] || .55 }));
         if (this.isHost && m.hq) for (const [hid, hd] of m.hq) { const he = this.enemies.get(hid); if (he) this._dmgEnemy(he, Math.min(hd, 500), { ally: true }); }
         break; }
@@ -217,6 +218,7 @@ export function install(P) {
       this.sendPoseT = .09;
       const p = this.me;
       const o = { t: 'p', x: +p.x.toFixed(2), z: +p.z.toFixed(2), a: +p.a.toFixed(2), hp: Math.round(p.hp), mh: p.maxhp, dn: p.down, lv: this.lv, bg: this._bgPaused ? 1 : 0, sm: +(p.scrapMul || 1).toFixed(2), au: Object.values(p.taken || {}).reduce((a, b) => a + b, 0) };
+      if ((this._pn = ((this._pn || 0) + 1)) % 22 === 0) o.st2 = [p.dmg, p.frate, p.shots, p.pierce, p.range, p.speed, p.regen, p.armor || 1, p.dashCd, p.sklLv, p.sklDmgMul || 1, p.sklRMul || 1, p.sklCdMul || 1, p.dropMul || 1, Object.keys(p.syn || {}).length].map(v => +(+v).toFixed(2)); // ~2s stat snapshot for the partner's stat sheet
       if (this.shotQ.length) { o.sh = this.shotQ; this.shotQ = []; }
       if (this._hitQ && this._hitQ.length) { o.hq = this._hitQ; this._hitQ = []; }
       this._send(o);
