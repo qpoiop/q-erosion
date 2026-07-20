@@ -31,7 +31,9 @@ const RAR = [
 const ROMAN = ['I', 'II', 'III', 'IV'];
 const UPG = [
   // 연사/위력 are ADDITIVE on the base stat (base 2.5 / 9) — multiplicative stacking turned bullets into a laser
-  { k: 'frate', n: '연사 계통', t: [
+  /* bound(p, tier): the stat already sits at its hard cap/floor and the NEXT tier would add nothing —
+     the card pool and the research shop both consult it, so capped lines stop being offered/sellable */
+  { k: 'frate', n: '연사 계통', bound: p => p.frate >= 7.5, t: [
     { d: '발사 속도 +20%', f: p => p.frate += 2.5 * .2 },
     { d: '발사 속도 +25%', f: p => p.frate += 2.5 * .25 },
     { d: '발사 속도 +32%', f: p => p.frate += 2.5 * .32 },
@@ -66,7 +68,7 @@ const UPG = [
     { d: '최대 HP +40, 즉시 회복', f: p => { p.maxhp += 40; p.hp = Math.min(p.maxhp, p.hp + 40); } },
     { d: '최대 HP +55, 즉시 회복', f: p => { p.maxhp += 55; p.hp = Math.min(p.maxhp, p.hp + 55); } },
     { d: '최대 HP +80, 완전 회복', f: p => { p.maxhp += 80; p.hp = p.maxhp; } }] },
-  { k: 'dash', n: '대시 강화', t: [ // additive on the 3.5s base, floored at 1.2s
+  { k: 'dash', n: '대시 강화', bound: (p, tier) => tier < 3 && p.dashCd <= 1.2, t: [ // additive on the 3.5s base, floored at 1.2s; tier 4 still grants i-frames, so only 1-3 dead-end at the floor
     { d: '대시 쿨다운 −15%', f: p => p.dashCd = Math.max(1.2, p.dashCd - 3.5 * .15) },
     { d: '대시 쿨다운 −18%', f: p => p.dashCd = Math.max(1.2, p.dashCd - 3.5 * .18) },
     { d: '대시 쿨다운 −22%', f: p => p.dashCd = Math.max(1.2, p.dashCd - 3.5 * .22) },
@@ -76,7 +78,7 @@ const UPG = [
     { d: '처치 자원 +35%', f: p => p.scrapMul = (p.scrapMul || 1) + .35 },
     { d: '처치 자원 +45%', f: p => p.scrapMul = (p.scrapMul || 1) + .45 },
     { d: '처치 자원 +60%', f: p => p.scrapMul = (p.scrapMul || 1) + .6 }] },
-  { k: 'armor', n: '피해 감쇠', t: [ // additive reduction, floored at 35% taken
+  { k: 'armor', n: '피해 감쇠', bound: p => (p.armor || 1) <= .35, t: [ // additive reduction, floored at 35% taken
     { d: '받는 피해 −10%', f: p => p.armor = Math.max(.35, (p.armor || 1) - .10) },
     { d: '받는 피해 −12%', f: p => p.armor = Math.max(.35, (p.armor || 1) - .12) },
     { d: '받는 피해 −15%', f: p => p.armor = Math.max(.35, (p.armor || 1) - .15) },
@@ -103,7 +105,7 @@ const SHOP = [
   { id: 'pdmg', c: '캐릭터', n: '화력 증강', d: '공격력 +12%', cost: 35, per: true, f: p => p.dmg += 9 * .12 },
   { id: 'prng', c: '캐릭터', n: '조준 광학', d: '사거리 +12%', cost: 35, per: true, max: 5, f: p => p.range = (p.range || 9) + 9 * .12 },
   { id: 'sskl', c: '스킬', n: '충격파 강화', d: '피해·반경 ↑, 쿨다운 ↓', cost: 40, per: true, max: 4, f: p => p.sklLv++ },
-  { id: 'sdash', c: '스킬', n: '대시 모듈', d: '대시 쿨다운 −20%', cost: 30, per: true, max: 4, f: p => p.dashCd = Math.max(1.2, p.dashCd - 3.5 * .2) },
+  { id: 'sdash', c: '스킬', n: '대시 모듈', d: '대시 쿨다운 −20%', cost: 30, per: true, max: 4, bound: p => p.dashCd <= 1.2, dv: p => ` · 현재 ${(+p.dashCd).toFixed(2)}s`, f: p => p.dashCd = Math.max(1.2, p.dashCd - 3.5 * .2) },
   // structure research is PER-PLAYER: it applies to structures the buyer built (st flag → owner-scoped HP rescale)
   { id: 'gwall', c: '구조물', n: '벽 강화', d: '내가 지은 벽 내구 +40%', cost: 35, per: true, st: true, max: 6, f: p => { p.wallMul = (p.wallMul || 1) + .4; p.wallLv = (p.wallLv || 0) + 1; } },
   { id: 'gtur', c: '구조물', n: '포탑 화력', d: '내 포탑 공격 +15% · 내구 +15%', cost: 40, per: true, st: true, max: 8, f: p => { p.turMul *= 1.15; p.turHpMul = (p.turHpMul || 1) * 1.15; p.turLv = (p.turLv || 0) + 1; } },

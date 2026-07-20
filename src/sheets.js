@@ -129,10 +129,10 @@ export function install(P) {
     let cat = '';
     for (const u of SHOP) {
       if (u.c !== cat) { cat = u.c; const h = document.createElement('div'); h.textContent = cat; h.style.cssText = `font:700 10px ${FONT};letter-spacing:.2em;color:${PAL.dim};margin-top:6px`; el.appendChild(h); }
-      const cnt = this._buyCount(u.id), maxed = u.max && cnt >= u.max, cost = this._shopCost(u);
+      const cnt = this._buyCount(u.id), bounded = u.bound && u.bound(this.me), maxed = (u.max && cnt >= u.max) || bounded, cost = this._shopCost(u);
       const row = document.createElement('button');
       row.style.cssText = `display:flex;align-items:center;gap:10px;border:1px solid ${PAL.line};background:rgba(0,0,0,.3);color:${PAL.text};padding:9px 12px;cursor:${maxed ? 'default' : 'pointer'};text-align:left;font-family:${FONT};opacity:${maxed ? .45 : 1}`;
-      row.innerHTML = `<span style="min-width:86px;font:700 13px ${FONT}">${u.n}${cnt ? ` <span style=\"color:${PAL.cyan};font-size:10px\">Lv${cnt + (u.id === 'sskl' ? 1 : 0)}</span>` : ''}</span><span style="flex:1;font-size:11px;color:${PAL.dim}">${u.d}</span><span class="shop-cost" data-cost="${maxed ? -1 : cost}" style="font:700 13px ${FONT};color:${this.scrap >= cost ? PAL.amber : PAL.red}">${maxed ? 'MAX' : '◈ ' + cost}</span>`;
+      row.innerHTML = `<span style="min-width:86px;font:700 13px ${FONT}">${u.n}${cnt ? ` <span style=\"color:${PAL.cyan};font-size:10px\">Lv${cnt + (u.id === 'sskl' ? 1 : 0)}</span>` : ''}</span><span style="flex:1;font-size:11px;color:${PAL.dim}">${u.d}${u.dv ? u.dv(this.me) : ''}</span><span class="shop-cost" data-cost="${maxed ? -1 : cost}" style="font:700 13px ${FONT};color:${this.scrap >= cost ? PAL.amber : PAL.red}">${bounded && !(u.max && cnt >= u.max) ? '하한 도달' : maxed ? 'MAX' : '◈ ' + cost}</span>`;
       if (!maxed) row.onclick = () => this._buy(u);
       el.appendChild(row);
     }
@@ -143,6 +143,7 @@ export function install(P) {
   };
   P._buy = function (u) {
     if (u.max && this._buyCount(u.id) >= u.max) { this._banner('최대 레벨입니다'); return; } // UI disables, but enforce here too
+    if (u.bound && u.bound(this.me)) { this._banner('이미 한계치입니다 — 효과 없음'); return; }
     const cost = this._shopCost(u);
     if (this.scrap < cost) { this._beep(140, .1, 'sawtooth', .05); return; }
     if (this.isHostish()) {
@@ -164,7 +165,7 @@ export function install(P) {
   };
   P._showUpgrades = function () {
     const p = this.me;
-    const pool = UPG.map(u => ({ u, tier: p.taken[u.k] || 0 })).filter(c => c.tier < c.u.t.length);
+    const pool = UPG.map(u => ({ u, tier: p.taken[u.k] || 0 })).filter(c => c.tier < c.u.t.length && !(c.u.bound && c.u.bound(p, c.tier))); // capped/floored lines leave the pool — a card that changes nothing is a dead pick
     if (!pool.length) { this.pendUp = 0; return; }
     const picks = [];
     // slot 1 favors build coherence: upgrade an owned line, or a line that completes a synergy with one
