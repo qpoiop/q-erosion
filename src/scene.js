@@ -24,10 +24,10 @@ export function install(P) {
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = T.PCFSoftShadowMap;
     this.renderer.toneMapping = T.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.25;
     const mobile = Math.min(innerWidth, innerHeight) < 700;
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.6 : 2));
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.4 : 1.7)); // capped below native hi-dpi — render is draw-call bound, the extra pixels buy little but cost fill
     const hemi = new T.HemisphereLight(0x93a5cc, 0x07070c, .7); this.scene.add(hemi);
     const dir = new T.DirectionalLight(0xdfe8ff, 1.15); dir.position.set(22, 34, 12); dir.castShadow = true;
-    dir.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048);
+    dir.shadow.mapSize.set(mobile ? 768 : 1536, mobile ? 768 : 1536); // full scene re-renders into this each frame — a smaller map cuts a real geometry pass, near-invisible with static casters
     dir.shadow.camera.left = -42; dir.shadow.camera.right = 42; dir.shadow.camera.top = 42; dir.shadow.camera.bottom = -42; dir.shadow.camera.far = 90; dir.shadow.bias = -.0006;
     this.scene.add(dir);
     const rim = new T.DirectionalLight(0x2a3552, .5); rim.position.set(-18, 12, -20); this.scene.add(rim);
@@ -126,12 +126,12 @@ export function install(P) {
       const asp = w / h, vh = Math.max(26, 26 / asp);
       this.cam.left = -vh * asp / 2; this.cam.right = vh * asp / 2; this.cam.top = vh / 2; this.cam.bottom = -vh / 2;
       this.cam.updateProjectionMatrix();
-      if (this.composer) this.composer.setSize(w, h);
+      if (this.composer) { this.composer.setSize(w, h); if (this.bloom) this.bloom.setSize(w >> 1, h >> 1); } // half-res bloom — a blur doesn't need full res, and it's ~40% of the render budget
     };
     if (T.EffectComposer && T.UnrealBloomPass) {
       this.composer = new T.EffectComposer(this.renderer);
       this.composer.addPass(new T.RenderPass(this.scene, this.cam));
-      this.bloom = new T.UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .45, .5, .85);
+      this.bloom = new T.UnrealBloomPass(new T.Vector2(innerWidth >> 1, innerHeight >> 1), .45, .5, .85);
       this.composer.addPass(this.bloom);
     }
     // iOS fires resize/orientationchange before layout settles — re-run sizing a few times
@@ -372,7 +372,7 @@ export function install(P) {
       const ms = Math.min(100, dt * 1000);
       if (!document.hidden) this._ftAvg = (this._ftAvg || 16) * .92 + ms * .08;
       if (this._lowPerf && !this.renderer.shadowMap.autoUpdate && ((this._sfT = (this._sfT || 0) + dt) > .5)) { this._sfT = 0; this.renderer.shadowMap.needsUpdate = true; } // frozen shadows still refresh 2x/s — never minutes stale
-      if (!this._lowPerf && (this._ftAvg > 34 || new URLSearchParams(location.search).get('perf') === 'low')) {
+      if (!this._lowPerf && (this._ftAvg > 28 || new URLSearchParams(location.search).get('perf') === 'low')) { // shed effects at ~35fps, not 29 — mid devices that hover-and-stutter never hit the old bar
         this._lowPerf = true; this._lowForced = new URLSearchParams(location.search).get('perf') === 'low';
         this._pr0 = this.renderer.getPixelRatio();
         this.composer = null; // bloom = 5 fullscreen passes
@@ -392,7 +392,7 @@ export function install(P) {
           this.renderer.setSize(this.cv.clientWidth, this.cv.clientHeight, false);
           if (this.dust) this.dust.visible = true;
           const T2 = THREE;
-          if (T2.EffectComposer && T2.UnrealBloomPass) { this.composer = new T2.EffectComposer(this.renderer); this.composer.addPass(new T2.RenderPass(this.scene, this.cam)); this.bloom = new T2.UnrealBloomPass(new T2.Vector2(innerWidth, innerHeight), .45, .5, .85); this.composer.addPass(this.bloom); this.composer.setSize(this.cv.clientWidth, this.cv.clientHeight); }
+          if (T2.EffectComposer && T2.UnrealBloomPass) { this.composer = new T2.EffectComposer(this.renderer); this.composer.addPass(new T2.RenderPass(this.scene, this.cam)); this.bloom = new T2.UnrealBloomPass(new T2.Vector2(innerWidth >> 1, innerHeight >> 1), .45, .5, .85); this.composer.addPass(this.bloom); this.composer.setSize(this.cv.clientWidth, this.cv.clientHeight); this.bloom.setSize(this.cv.clientWidth >> 1, this.cv.clientHeight >> 1); }
           this._banner('⚙ 그래픽 품질 복원', 2400);
         }
       } else this._recT = 0;
