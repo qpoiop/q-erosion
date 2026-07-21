@@ -18,10 +18,14 @@ export class Room {
     const role = new URL(req.url).searchParams.get('role') === 'h' ? 'h' : 'g';
     // reconnect takeover: a new socket for a role evicts the stale one
     for (const old of this.state.getWebSockets(role)) { try { old.close(4000, 'replaced by reconnect'); } catch {} }
-    if (this.state.getWebSockets().length >= 2) return new Response('room full', { status: 409 });
+    // cap on the OPPOSITE role only — our own stale same-role socket may still be counted (close() is async),
+    // and counting it 409'd legit reconnects into the MQTT fallback → relay/MQTT split-brain, no re-link.
+    if (this.state.getWebSockets(role === 'h' ? 'g' : 'h').length >= 2) return new Response('room full', { status: 409 });
     const pair = new WebSocketPair();
     const client = pair[0], server = pair[1];
     this.state.acceptWebSocket(server, [role]); // hibernation API
+    // heartbeat: auto-reply 'pi'→'po' without waking the DO (no duration billing, no rate cost). lets clients detect a dead link fast.
+    try { this.state.setWebSocketAutoResponse(new WebSocketRequestResponsePair('pi', 'po')); } catch (e) {}
     server.serializeAttachment({ role, n: 0, t: Date.now() });
     if (!(await this.state.storage.getAlarm())) await this.state.storage.setAlarm(Date.now() + ROOM_TTL_MS);
     return new Response(null, { status: 101, webSocket: client });
@@ -29,6 +33,7 @@ export class Room {
 
   webSocketMessage(ws, msg) {
     try {
+      if (msg === 'pi') { try { ws.send('po'); } catch (e) {} return; } // fallback pong if auto-response is unavailable — never forwarded, never rate-counted
       this._lastMsg = String(msg).slice(0, 40);
       if (typeof msg !== 'string' || msg.length > MAX_MSG_BYTES) { ws.close(1009, 'message too large'); return; }
       const a = ws.deserializeAttachment();

@@ -16,7 +16,7 @@ class ErosionGame extends HTMLElement {
   _destroy() {
     this._dead = true;
     cancelAnimationFrame(this._raf);
-    clearInterval(this._helloIv); clearTimeout(this._banT); clearInterval(this._wdIv); clearTimeout(this._waitHintT); clearInterval(this._relayRetryIv);
+    clearInterval(this._helloIv); clearTimeout(this._banT); clearInterval(this._wdIv); clearTimeout(this._waitHintT); clearInterval(this._relayRetryIv); clearInterval(this._pingIv);
     if (this.net) { try { this.net.end(true); } catch (e) {} this.net = null; }
     if (this.net2) { try { this.net2.end(true); } catch (e) {} this.net2 = null; }
     window.removeEventListener('resize', this._onRzBurst);
@@ -45,7 +45,7 @@ class ErosionGame extends HTMLElement {
     }
     this._bindInput();
     this._warmFx(); // pre-compile particle materials while the intro overlay covers the screen
-    this._onVis = () => { this._bgPaused = document.hidden; if (!document.hidden) { this._ftAvg = 16; if (this.renderer) this.renderer.shadowMap.needsUpdate = true; } }; // wake-up spikes shouldn't judge the device; refresh any frozen shadows immediately
+    this._onVis = () => { this._bgPaused = document.hidden; if (!document.hidden) { this._ftAvg = 16; this._pongAt = performance.now(); if (this.renderer) this.renderer.shadowMap.needsUpdate = true; } }; // resume: give the socket one ping-cycle of grace before the watchdog judges it // wake-up spikes shouldn't judge the device; refresh any frozen shadows immediately
     document.addEventListener('visibilitychange', this._onVis);
     if (this.mode === 'solo') {
       let resumed = false;
