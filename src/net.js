@@ -51,11 +51,20 @@ export function install(P) {
         if (prev && !prev.isRelay) { try { prev.end(true); } catch (e) {} } // was on the MQTT fallback — relay recovered, drop it
         clearInterval(this._relayRetryIv); this._relayRetryIv = null;
         this._netUp = true;
-        ws.onmessage = ev => { try { this._onMsg(JSON.parse(ev.data)); } catch (e) {} };
+        ws.onmessage = ev => { const d = ev.data; if (d === 'po') { this._pongAt = performance.now(); this._pongSeen = true; return; } try { this._onMsg(JSON.parse(d)); } catch (e) {} };
         ws.onclose = () => {
+          clearInterval(this._pingIv); this._pingIv = null;
           if (this.net && this.net.ws === ws) this.net.connected = false;
           if (!this._dead && this.phase !== 'over') setTimeout(() => { if (!this._dead && this.net && !this.net.connected) this._connectRelay(); }, 1500);
         };
+        // heartbeat: a half-dead socket won't fire onclose for minutes (TCP retransmit). ping keeps NAT warm AND detects the corpse in ~6s → force reconnect
+        this._pongAt = performance.now(); this._pongSeen = false; // arm the corpse-detector only after a real pong — never churn against a relay that doesn't answer (old deploy)
+        clearInterval(this._pingIv);
+        this._pingIv = setInterval(() => {
+          if (this._dead || !this.net || this.net.ws !== ws || !this.net.connected) { clearInterval(this._pingIv); this._pingIv = null; return; }
+          if (this._pongSeen && performance.now() - this._pongAt > 6000) { try { ws.close(); } catch (e) {} return; } // was ponging, now silent → link is a corpse; close triggers the reconnect path
+          try { ws.send('pi'); } catch (e) {}
+        }, 2000);
         this._onNetReady();
       };
       ws.onerror = () => { if (!settled) { settled = true; this._relayTrying = false; clearTimeout(to); this._connectMqtt(); } };
@@ -73,7 +82,7 @@ export function install(P) {
     let ui = 0;
     const connect = () => {
       if (this._dead) return;
-      const c = mqtt.connect(urls[ui], { clientId: 'eg_' + Math.random().toString(16).slice(2, 10), clean: true, connectTimeout: 8000, reconnectPeriod: 3000 });
+      const c = mqtt.connect(urls[ui], { clientId: 'eg_' + Math.random().toString(16).slice(2, 10), clean: true, connectTimeout: 8000, reconnectPeriod: 3000, keepalive: 20 });
       this.net = c;
       c.on('connect', () => { c.subscribe(this.subT); this._onNetReady(); });
       c.on('message', (t, m) => { try { this._onMsg(JSON.parse(m.toString())); } catch (e) {} });
@@ -168,6 +177,10 @@ export function install(P) {
     }
   };
   P._applyState = function (m) {
+    if (m.rs !== undefined) { // restart rides the reliable state stream — the one-shot 'restart' packet strands a joiner that misses it
+      if (this._rsSeen === undefined && this.phase !== 'over') this._rsSeen = m.rs; // fresh joiner: adopt baseline, don't reset
+      else if (m.rs !== this._rsSeen) { this._rsSeen = m.rs; this._reset(); this._startOnline(); return; } // host restarted, I missed it (or I'm stuck on game-over) — catch up
+    }
     this.tm = m.tm; if (m.xp !== undefined) this._setXpTotal(m.xp);
     this._lastStateAt = performance.now(); this._peerSeenAt = performance.now(); this._hostLost = false;
     if (!this.isHost) this._peerPaused = !!m.bg;
@@ -228,7 +241,7 @@ export function install(P) {
       if (this.sendStateT <= 0) {
         this.sendStateT = this._stIv || .13; this.sendStT -= this._stIv || .13;
         this._stIv = this.enemies.size > 120 ? .26 : this.enemies.size > 60 ? .2 : .13; // adaptive: hordes don't need 7.7Hz
-      const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, eg: this.escGate, cm: this.coreMax, ss: [this.stat.k, Math.round(this.stat.g), this.stat.b, this.stat.r], as: [this.allyStat.k, Math.round(this.allyStat.g)], hr: [this.me.wallMul, this.me.turMul, this.me.turHpMul, this.me.costMul, this.me.wallLv || 0, this.me.turLv || 0], bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap),
+      const o = { t: 's', tm: +this.tm.toFixed(1), xp: this.xpTotal(), sc: Math.round(this.scrap), core: Math.round(this.coreHp), wv: this.wave, ph: this.phase, pt: +this.phT.toFixed(1), qn: this.spawnQ.length, gt: this.activeGate, gts: this.activeGates, eg: this.escGate, cm: this.coreMax, ss: [this.stat.k, Math.round(this.stat.g), this.stat.b, this.stat.r], as: [this.allyStat.k, Math.round(this.allyStat.g)], hr: [this.me.wallMul, this.me.turMul, this.me.turHpMul, this.me.costMul, this.me.wallLv || 0, this.me.turLv || 0], bg: this._bgPaused ? 1 : 0, asc: Math.round(this.allyScrap), rs: this._rsN || 0,
           en: (() => { const a = new Array(this.enemies.size * 6); let i2 = 0; for (const e of this.enemies.values()) { a[i2++] = e.id; a[i2++] = e.ty; a[i2++] = Math.round(e.x * 10); a[i2++] = Math.round(e.z * 10); a[i2++] = Math.round(e.hp); a[i2++] = (e.giant ? 2 : 0) | (e.btier === 2 ? 1 : 0) | (this.tm - (e.atkT ?? -9) < .35 ? 4 : 0); } return a; })(), // flat stride-6 — one array, cheap parse; bit2 = boss mid-swing
           ebq: this._ebQ && this._ebQ.length ? (() => { const q = this._ebQ; this._ebQ = []; return q; })() : undefined,
           itm: this.fitems.map(f => [f.id, f.k, Math.round(f.x * 10), Math.round(f.z * 10)]) };
@@ -238,6 +251,10 @@ export function install(P) {
     }
     if (this.allyOn && this.tm - this.ally.lastSeen > 6 && this.tm > 8) {
       if (!this._lostBan || this.tm - this._lostBan > 6) { this._lostBan = this.tm; this._banner('동료 연결 대기 중…', 3000); }
+    }
+    if (!this.isHost && this._hostLost) { // host silent mid-game — poke it to re-welcome once the transport recovers (hello only auto-fires during 'wait')
+      this._reHelloT = (this._reHelloT || 0) - dt;
+      if (this._reHelloT <= 0) { this._reHelloT = 2; this._send({ t: 'hello', v: PV }); }
     }
   };
 }
