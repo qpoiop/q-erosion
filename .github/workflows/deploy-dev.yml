@@ -21,6 +21,7 @@ jobs:
           cp -r icons dist/icons
           mkdir -p dist/assets
           cp assets/*.glb assets/*.png dist/assets/
+          cp -r assets/screens dist/assets/screens
 
       - name: Deploy to Cloudflare Pages (dev)
         uses: cloudflare/wrangler-action@v3
